@@ -16,12 +16,15 @@ export default auth((request) => {
     return NextResponse.json({ error: "authentication required" }, { status: 401 });
   }
 
-  const signInUrl = new URL("/signin", request.nextUrl.origin);
-  signInUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
-  return NextResponse.redirect(signInUrl);
+  const callback = encodeURIComponent(`${pathname}${search}`);
+  return new NextResponse(null, {
+    status: 307,
+    headers: {
+      Location: `/signin?callbackUrl=${callback}`,
+    },
+  });
 });
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
-
