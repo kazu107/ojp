@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import { ProblemEditorForm } from "@/components/problem-editor-form";
 import { getCurrentUser, getProblemForViewer } from "@/lib/store";
 
@@ -10,7 +10,7 @@ interface EditProblemPageProps {
 
 export default async function EditProblemPage({ params }: EditProblemPageProps) {
   const { problemId } = await params;
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   const problem = getProblemForViewer(problemId, me.id);
   if (!problem) {
     notFound();

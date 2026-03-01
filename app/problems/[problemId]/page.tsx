@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkdownBlock } from "@/components/markdown-block";
 import { StatusBadge } from "@/components/status-badge";
@@ -17,7 +17,7 @@ interface ProblemDetailPageProps {
 
 export default async function ProblemDetailPage({ params }: ProblemDetailPageProps) {
   const { problemId } = await params;
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   const problem = getProblemForViewer(problemId, me.id);
   if (!problem) {
     notFound();

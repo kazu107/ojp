@@ -11,8 +11,8 @@ import { getContestStatus, getCurrentUser, listContestsForListView } from "@/lib
 
 export const dynamic = "force-dynamic";
 
-export default function ContestsPage() {
-  const me = getCurrentUser();
+export default async function ContestsPage() {
+  const me = await getCurrentUser();
   const contests = listContestsForListView(me.id);
 
   return (

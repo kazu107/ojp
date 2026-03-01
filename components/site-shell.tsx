@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthControls } from "@/components/auth-controls";
 
 const links = [
   { href: "/", label: "Dashboard" },
@@ -9,7 +10,7 @@ const links = [
   { href: "/admin", label: "Admin" },
 ];
 
-export function SiteShell({ children }: { children: React.ReactNode }) {
+export async function SiteShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="site-root">
       <header className="site-header">
@@ -27,6 +28,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <Link href="/problems/new" className="site-nav-cta">
               New Problem
             </Link>
+            <AuthControls />
           </nav>
         </div>
       </header>

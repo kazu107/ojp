@@ -10,8 +10,8 @@ import { findUser, getCurrentUser, listProblemsForListView } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export default function ProblemsPage() {
-  const me = getCurrentUser();
+export default async function ProblemsPage() {
+  const me = await getCurrentUser();
   const problems = listProblemsForListView(me.id);
 
   return (

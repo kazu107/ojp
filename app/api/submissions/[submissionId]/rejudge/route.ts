@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: RejudgeRouteContext) {
   try {
     const { submissionId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
-    const result = requestRejudge({
+    const result = await requestRejudge({
       submissionId,
       reason: parseString(body.reason),
       detail: parseString(body.detail),

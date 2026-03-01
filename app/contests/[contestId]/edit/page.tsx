@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import { ContestEditorForm } from "@/components/contest-editor-form";
 import { getContestForViewer, getCurrentUser, listProblemsForListView } from "@/lib/store";
 
@@ -10,7 +10,7 @@ interface EditContestPageProps {
 
 export default async function EditContestPage({ params }: EditContestPageProps) {
   const { contestId } = await params;
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   const contest = getContestForViewer(contestId, me.id);
   if (!contest) {
     notFound();

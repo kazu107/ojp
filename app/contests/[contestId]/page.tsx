@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContestJoinButton } from "@/components/contest-join-button";
 import { MarkdownBlock } from "@/components/markdown-block";
@@ -26,7 +26,7 @@ interface ContestDetailPageProps {
 
 export default async function ContestDetailPage({ params }: ContestDetailPageProps) {
   const { contestId } = await params;
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   const contest = getContestForViewer(contestId, me.id);
   if (!contest) {
     notFound();

@@ -1,8 +1,8 @@
 import { ContestEditorForm } from "@/components/contest-editor-form";
 import { getCurrentUser, listProblemsForListView } from "@/lib/store";
 
-export default function NewContestPage() {
-  const me = getCurrentUser();
+export default async function NewContestPage() {
+  const me = await getCurrentUser();
   const availableProblems = listProblemsForListView(me.id);
 
   return (

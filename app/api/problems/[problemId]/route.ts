@@ -15,20 +15,24 @@ interface ProblemRouteContext {
 }
 
 export async function GET(_request: Request, { params }: ProblemRouteContext) {
-  const { problemId } = await params;
-  const user = getCurrentUser();
-  const problem = getProblemForViewer(problemId, user.id);
-  if (!problem) {
-    return NextResponse.json({ error: "problem not found" }, { status: 404 });
+  try {
+    const { problemId } = await params;
+    const user = await getCurrentUser();
+    const problem = getProblemForViewer(problemId, user.id);
+    if (!problem) {
+      return NextResponse.json({ error: "problem not found" }, { status: 404 });
+    }
+    return NextResponse.json({ problem });
+  } catch (error) {
+    return errorResponse(error, "failed to fetch problem");
   }
-  return NextResponse.json({ problem });
 }
 
 export async function PATCH(request: Request, { params }: ProblemRouteContext) {
   try {
     const { problemId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
-    const problem = updateProblem(problemId, {
+    const problem = await updateProblem(problemId, {
       title: parseOptionalString(body.title),
       slug: parseOptionalString(body.slug),
       statementMarkdown: parseOptionalString(body.statementMarkdown),

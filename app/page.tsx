@@ -17,8 +17,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  const me = getCurrentUser();
+export default async function HomePage() {
+  const me = await getCurrentUser();
   const problems = listPublicProblems();
   const contests = listContestsForListView(me.id);
   const submissions = listRecentSubmissions(8);

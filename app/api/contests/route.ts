@@ -44,9 +44,13 @@ function parseContestProblems(raw: unknown): ContestProblem[] {
 }
 
 export async function GET() {
-  const user = getCurrentUser();
-  const contests = listContestsForListView(user.id);
-  return NextResponse.json({ contests });
+  try {
+    const user = await getCurrentUser();
+    const contests = listContestsForListView(user.id);
+    return NextResponse.json({ contests });
+  } catch (error) {
+    return errorResponse(error, "failed to fetch contests");
+  }
 }
 
 export async function POST(request: Request) {
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
 
     const parsedProblems = parseContestProblems(body.problems);
 
-    const contest = createContest({
+    const contest = await createContest({
       title: parseString(body.title),
       slug: parseString(body.slug),
       descriptionMarkdown: parseString(body.descriptionMarkdown),

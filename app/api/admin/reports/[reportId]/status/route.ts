@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: UpdateReportStatusRoute
   try {
     const { reportId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
-    const report = updateReportStatusByAdmin(
+    const report = await updateReportStatusByAdmin(
       reportId,
       parseReportStatus(body.status),
       parseString(body.reason),

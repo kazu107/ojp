@@ -9,15 +9,19 @@ import { createProblem, getCurrentUser, listProblemsForListView } from "@/lib/st
 import { errorResponse } from "@/lib/api-response";
 
 export async function GET() {
-  const user = getCurrentUser();
-  const problems = listProblemsForListView(user.id);
-  return NextResponse.json({ problems });
+  try {
+    const user = await getCurrentUser();
+    const problems = listProblemsForListView(user.id);
+    return NextResponse.json({ problems });
+  } catch (error) {
+    return errorResponse(error, "failed to fetch problems");
+  }
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const problem = createProblem({
+    const problem = await createProblem({
       title: parseString(body.title).trim(),
       slug: parseString(body.slug).trim(),
       statementMarkdown: parseString(body.statementMarkdown),

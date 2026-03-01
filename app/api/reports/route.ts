@@ -14,7 +14,7 @@ function parseTargetType(raw: unknown): ReportTargetType {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const report = createReport({
+    const report = await createReport({
       targetType: parseTargetType(body.targetType),
       targetId: parseString(body.targetId),
       reason: parseString(body.reason),

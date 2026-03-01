@@ -6,7 +6,7 @@ import { errorResponse } from "@/lib/api-response";
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const submission = createSubmission({
+    const submission = await createSubmission({
       problemId: parseString(body.problemId),
       contestId: parseOptionalString(body.contestId) ?? null,
       language: parseLanguage(body.language),

@@ -12,14 +12,14 @@ import { formatDate } from "@/lib/presentation";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminPage() {
-  const me = getCurrentUser();
-  const reports = listReportsForAdmin();
+export default async function AdminPage() {
+  const me = await getCurrentUser();
+  const reports = await listReportsForAdmin();
   const users = listUsers();
   const problems = listProblemsForListView(me.id);
   const contests = listContestsForListView(me.id);
-  const audits = listAuditLogsForAdmin(15);
-  const rejudgeRequests = listRejudgeRequestsForAdmin(20);
+  const audits = await listAuditLogsForAdmin(15);
+  const rejudgeRequests = await listRejudgeRequestsForAdmin(20);
 
   return (
     <div className="page">

@@ -40,7 +40,8 @@ AtCoder風プラットフォームのMVPプロトタイプです。
 ## 実装上の制約
 
 - 永続化は未実装で、基本はインメモリストアです。
-- 認証は GitHub OAuth の代わりに固定の現在ユーザーを使用しています。
+- 認証は GitHub OAuth ログインです（`next-auth`）。
+- 初回ログイン時は、GitHubアカウント情報からアプリ内ユーザーを自動作成します。
 - ジャッジは疑似判定です。
 - Prisma / PostgreSQL を用意して、スナップショットの seed で初期データ投入できます。
 
@@ -61,6 +62,23 @@ npm run dev
 ```
 
 ブラウザで `http://localhost:3000` を開いてください。
+
+## GitHub OAuth 設定
+
+`.env.local` に以下を設定してください。
+
+```bash
+AUTH_SECRET="replace-with-long-random-string"
+AUTH_GITHUB_ID="github-oauth-client-id"
+AUTH_GITHUB_SECRET="github-oauth-client-secret"
+```
+
+GitHub OAuth App 側には、利用環境に合わせて Callback URL を設定してください。
+
+- ローカル開発: `http://localhost:3000/api/auth/callback/github`
+- Heroku例: `https://<your-app-name>.herokuapp.com/api/auth/callback/github`
+
+`AUTH_SECRET` は `openssl rand -base64 32` などで生成した十分に長いランダム文字列を推奨します。
 
 ## DB セットアップ（Prisma / PostgreSQL）
 
@@ -133,6 +151,7 @@ npm run build
 
 ## API エンドポイント
 
+- `GET/POST /api/auth/*` (next-auth)
 - `GET /api/me`
 - `PATCH /api/me/profile`
 - `GET /api/problems`

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SubmissionForm } from "@/components/submission-form";
 import {
@@ -19,7 +19,7 @@ interface SubmitPageProps {
 export default async function SubmitPage({ params, searchParams }: SubmitPageProps) {
   const { problemId } = await params;
   const { contestId } = await searchParams;
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   const problem = getProblemForViewer(problemId, me.id);
 
   if (!problem) {

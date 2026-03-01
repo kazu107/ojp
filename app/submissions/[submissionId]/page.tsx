@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RejudgeRequestForm } from "@/components/rejudge-request-form";
 import { StatusBadge } from "@/components/status-badge";
@@ -22,7 +22,7 @@ interface SubmissionDetailPageProps {
 
 export default async function SubmissionDetailPage({ params }: SubmissionDetailPageProps) {
   const { submissionId } = await params;
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   const result = getSubmissionWithAccess(submissionId, me.id);
 
   if (!result) {

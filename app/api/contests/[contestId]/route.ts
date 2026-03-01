@@ -52,20 +52,24 @@ function parseContestProblems(raw: unknown): ContestProblem[] | undefined {
 }
 
 export async function GET(_request: Request, { params }: ContestRouteContext) {
-  const { contestId } = await params;
-  const user = getCurrentUser();
-  const contest = getContestForViewer(contestId, user.id);
-  if (!contest) {
-    return NextResponse.json({ error: "contest not found" }, { status: 404 });
+  try {
+    const { contestId } = await params;
+    const user = await getCurrentUser();
+    const contest = getContestForViewer(contestId, user.id);
+    if (!contest) {
+      return NextResponse.json({ error: "contest not found" }, { status: 404 });
+    }
+    return NextResponse.json({ contest });
+  } catch (error) {
+    return errorResponse(error, "failed to fetch contest");
   }
-  return NextResponse.json({ contest });
 }
 
 export async function PATCH(request: Request, { params }: ContestRouteContext) {
   try {
     const { contestId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
-    const contest = updateContest(contestId, {
+    const contest = await updateContest(contestId, {
       title: parseOptionalString(body.title),
       slug: parseOptionalString(body.slug),
       descriptionMarkdown: parseOptionalString(body.descriptionMarkdown),

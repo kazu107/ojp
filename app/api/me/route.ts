@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/store";
+import { errorResponse } from "@/lib/api-response";
 
 export async function GET() {
-  const user = getCurrentUser();
-  return NextResponse.json({ user });
+  try {
+    const user = await getCurrentUser();
+    return NextResponse.json({ user });
+  } catch (error) {
+    return errorResponse(error, "failed to fetch current user");
+  }
 }

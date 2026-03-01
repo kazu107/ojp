@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export default function MePage() {
-  const user = getCurrentUser();
+export default async function MePage() {
+  const user = await getCurrentUser();
 
   return (
     <div className="page">

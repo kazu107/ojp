@@ -4,7 +4,7 @@ import { listReportsForAdmin } from "@/lib/store";
 
 export async function GET() {
   try {
-    const reports = listReportsForAdmin();
+    const reports = await listReportsForAdmin();
     return NextResponse.json({ reports });
   } catch (error) {
     return errorResponse(error, "failed to fetch reports");

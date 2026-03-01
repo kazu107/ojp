@@ -22,8 +22,7 @@
   User,
   Visibility,
 } from "@/lib/types";
-
-const CURRENT_USER_ID = "u1";
+import { auth } from "@/auth";
 const BASE_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
 
 const SUBMISSION_COOLDOWN_MS = 10_000;
@@ -51,7 +50,9 @@ interface Store {
   reports: Report[];
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
+  githubIndex: Record<string, string>;
   counters: {
+    user: number;
     problem: number;
     contest: number;
     submission: number;
@@ -302,7 +303,9 @@ function createInitialStore(): Store {
     reports,
     auditLogs,
     rejudgeRequests: [],
+    githubIndex: {},
     counters: {
+      user: 4,
       problem: 1002,
       contest: 1001,
       submission: 1002,
@@ -324,6 +327,12 @@ const store = globalStore.__ojpStore ?? createInitialStore();
 
 if (!globalStore.__ojpStore) {
   globalStore.__ojpStore = store;
+}
+
+function nextUserId(): string {
+  const id = `u${store.counters.user}`;
+  store.counters.user += 1;
+  return id;
 }
 
 function nextProblemId(): string {
@@ -642,23 +651,165 @@ function findUserOrThrow(userId: string): User {
   return user;
 }
 
-export function getCurrentUser(): User {
-  const user = store.users.find((item) => item.id === CURRENT_USER_ID);
+interface SessionUserLike {
+  githubId?: string;
+  githubLogin?: string;
+  githubBio?: string | null;
+  name?: string | null;
+}
+
+function normalizeUsername(raw: string): string {
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || "user";
+}
+
+function uniqueUsername(base: string, currentId?: string): string {
+  let index = 1;
+  let candidate = base;
+  while (
+    store.users.some(
+      (entry) =>
+        entry.id !== currentId &&
+        entry.username.toLowerCase() === candidate.toLowerCase() &&
+        entry.status !== "deleted",
+    )
+  ) {
+    index += 1;
+    candidate = `${base}${index}`;
+  }
+  return candidate;
+}
+
+function uniqueDisplayName(base: string, currentId?: string): string {
+  let index = 1;
+  let candidate = base || "user";
+  while (
+    store.users.some(
+      (entry) =>
+        entry.id !== currentId &&
+        entry.displayName.toLowerCase() === candidate.toLowerCase() &&
+        entry.status !== "deleted",
+    )
+  ) {
+    index += 1;
+    candidate = `${base}${index}`;
+  }
+  return candidate;
+}
+
+function findActiveUserByUsername(username: string): User | undefined {
+  return store.users.find(
+    (entry) =>
+      entry.username.toLowerCase() === username.toLowerCase() && entry.status !== "deleted",
+  );
+}
+
+function upsertUserFromGitHubSession(params: {
+  githubId?: string;
+  githubLogin: string;
+  name?: string | null;
+  bio?: string | null;
+}): User {
+  const normalizedLogin = normalizeUsername(params.githubLogin);
+  const accountId = params.githubId?.trim() ?? "";
+  const timestamp = nowIso();
+
+  let user: User | undefined;
+  if (accountId) {
+    const indexedUserId = store.githubIndex[accountId];
+    if (indexedUserId) {
+      user = findUser(indexedUserId);
+      if (!user) {
+        delete store.githubIndex[accountId];
+      }
+    }
+  }
+
   if (!user) {
-    throw new HttpError("current user not found", 500);
+    user = findActiveUserByUsername(normalizedLogin);
+  }
+
+  if (!user) {
+    const displayNameBase = params.name?.trim() || normalizedLogin;
+    user = {
+      id: nextUserId(),
+      username: uniqueUsername(normalizedLogin),
+      displayName: uniqueDisplayName(displayNameBase),
+      bio: params.bio?.trim() ?? "",
+      role: "user",
+      status: "active",
+      displayNameChangedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    store.users.push(user);
+  }
+
+  if (user.status === "deleted") {
+    throw new HttpError("user account is deleted", 403);
+  }
+
+  const nextUsername = uniqueUsername(normalizedLogin, user.id);
+  if (nextUsername !== user.username) {
+    user.username = nextUsername;
+  }
+
+  if ((!user.bio || !user.bio.trim()) && params.bio && params.bio.trim()) {
+    user.bio = params.bio.trim();
+  }
+
+  user.updatedAt = timestamp;
+  if (accountId) {
+    store.githubIndex[accountId] = user.id;
   }
   return user;
+}
+
+function getSessionUserLike(session: unknown): SessionUserLike | null {
+  if (!session || typeof session !== "object") {
+    return null;
+  }
+
+  const maybeUser = (session as { user?: unknown }).user;
+  if (!maybeUser || typeof maybeUser !== "object") {
+    return null;
+  }
+
+  return maybeUser as SessionUserLike;
+}
+
+export async function getCurrentUser(): Promise<User> {
+  const session = await auth();
+  const sessionUser = getSessionUserLike(session);
+  if (!sessionUser) {
+    throw new HttpError("authentication required", 401);
+  }
+
+  if (!sessionUser.githubLogin) {
+    throw new HttpError("github login is missing from session", 401);
+  }
+
+  return upsertUserFromGitHubSession({
+    githubId: sessionUser.githubId,
+    githubLogin: sessionUser.githubLogin,
+    name: sessionUser.name,
+    bio: sessionUser.githubBio,
+  });
 }
 
 export function listUsers(): User[] {
   return [...store.users];
 }
 
-export function updateCurrentUserProfile(payload: {
+export async function updateCurrentUserProfile(payload: {
   displayName?: string;
   bio?: string;
-}): User {
-  const user = getCurrentUser();
+}): Promise<User> {
+  const user = await getCurrentUser();
   assertActiveUser(user);
   const timestamp = nowIso();
 
@@ -754,9 +905,9 @@ export function getProblemForViewer(problemId: string, viewerId: string): Proble
   return allowed ? problem : undefined;
 }
 
-export function createProblem(input: CreateProblemInput): Problem {
+export async function createProblem(input: CreateProblemInput): Promise<Problem> {
   uniqueSlugOrThrow("problem", input.slug);
-  const user = getCurrentUser();
+  const user = await getCurrentUser();
   assertActiveUser(user);
 
   const timestamp = nowIso();
@@ -783,8 +934,11 @@ export function createProblem(input: CreateProblemInput): Problem {
   return problem;
 }
 
-export function updateProblem(problemId: string, input: UpdateProblemInput): Problem {
-  const user = getCurrentUser();
+export async function updateProblem(
+  problemId: string,
+  input: UpdateProblemInput,
+): Promise<Problem> {
+  const user = await getCurrentUser();
   const problem = resolveProblemIfExists(problemId);
   if (user.role !== "admin" && problem.authorId !== user.id) {
     throw new HttpError("you cannot edit this problem", 403);
@@ -874,9 +1028,9 @@ export function getContestStatus(contest: Contest): ContestStatus {
   return "ended";
 }
 
-export function createContest(input: CreateContestInput): Contest {
+export async function createContest(input: CreateContestInput): Promise<Contest> {
   uniqueSlugOrThrow("contest", input.slug);
-  const user = getCurrentUser();
+  const user = await getCurrentUser();
   assertActiveUser(user);
 
   const timestamp = nowIso();
@@ -901,8 +1055,11 @@ export function createContest(input: CreateContestInput): Contest {
   return contest;
 }
 
-export function updateContest(contestId: string, input: UpdateContestInput): Contest {
-  const user = getCurrentUser();
+export async function updateContest(
+  contestId: string,
+  input: UpdateContestInput,
+): Promise<Contest> {
+  const user = await getCurrentUser();
   const contest = resolveContestIfExists(contestId);
   if (user.role !== "admin" && contest.organizerId !== user.id) {
     throw new HttpError("you cannot edit this contest", 403);
@@ -941,8 +1098,8 @@ export function updateContest(contestId: string, input: UpdateContestInput): Con
   return contest;
 }
 
-export function joinContest(contestId: string): Contest {
-  const user = getCurrentUser();
+export async function joinContest(contestId: string): Promise<Contest> {
+  const user = await getCurrentUser();
   assertActiveUser(user);
   const contest = resolveContestIfExists(contestId);
   if (getContestStatus(contest) === "ended") {
@@ -977,8 +1134,8 @@ export function getSubmissionById(submissionId: string): Submission | undefined 
   return store.submissions.find((submission) => submission.id === submissionId);
 }
 
-export function createSubmission(input: CreateSubmissionInput): Submission {
-  const currentUser = getCurrentUser();
+export async function createSubmission(input: CreateSubmissionInput): Promise<Submission> {
+  const currentUser = await getCurrentUser();
   assertActiveUser(currentUser);
 
   const problem = resolveProblemIfExists(input.problemId);
@@ -1265,8 +1422,8 @@ export function getSubmissionWithAccess(
   };
 }
 
-export function createReport(input: CreateReportInput): Report {
-  const reporter = getCurrentUser();
+export async function createReport(input: CreateReportInput): Promise<Report> {
+  const reporter = await getCurrentUser();
   assertActiveUser(reporter);
 
   if (!input.reason.trim()) {
@@ -1307,8 +1464,8 @@ export function createReport(input: CreateReportInput): Report {
   return report;
 }
 
-export function listReportsForAdmin(): Report[] {
-  const user = getCurrentUser();
+export async function listReportsForAdmin(): Promise<Report[]> {
+  const user = await getCurrentUser();
   assertAdmin(user);
   return [...store.reports].sort(
     (left, right) =>
@@ -1316,12 +1473,12 @@ export function listReportsForAdmin(): Report[] {
   );
 }
 
-export function updateReportStatusByAdmin(
+export async function updateReportStatusByAdmin(
   reportId: string,
   status: ReportStatus,
   reason: string,
-): Report {
-  const user = getCurrentUser();
+): Promise<Report> {
+  const user = await getCurrentUser();
   assertAdmin(user);
   const report = store.reports.find((item) => item.id === reportId);
   if (!report) {
@@ -1343,8 +1500,8 @@ export function updateReportStatusByAdmin(
   return report;
 }
 
-export function freezeUserByAdmin(userId: string, reason: string): User {
-  const admin = getCurrentUser();
+export async function freezeUserByAdmin(userId: string, reason: string): Promise<User> {
+  const admin = await getCurrentUser();
   assertAdmin(admin);
   const target = findUserOrThrow(userId);
   if (target.role === "admin") {
@@ -1364,8 +1521,11 @@ export function freezeUserByAdmin(userId: string, reason: string): User {
   return target;
 }
 
-export function hideProblemByAdmin(problemId: string, reason: string): Problem {
-  const admin = getCurrentUser();
+export async function hideProblemByAdmin(
+  problemId: string,
+  reason: string,
+): Promise<Problem> {
+  const admin = await getCurrentUser();
   assertAdmin(admin);
   const problem = resolveProblemIfExists(problemId);
   problem.visibility = "private";
@@ -1382,8 +1542,11 @@ export function hideProblemByAdmin(problemId: string, reason: string): Problem {
   return problem;
 }
 
-export function hideContestByAdmin(contestId: string, reason: string): Contest {
-  const admin = getCurrentUser();
+export async function hideContestByAdmin(
+  contestId: string,
+  reason: string,
+): Promise<Contest> {
+  const admin = await getCurrentUser();
   assertAdmin(admin);
   const contest = resolveContestIfExists(contestId);
   contest.visibility = "private";
@@ -1400,27 +1563,27 @@ export function hideContestByAdmin(contestId: string, reason: string): Contest {
   return contest;
 }
 
-export function listAuditLogsForAdmin(limit = 100): AuditLog[] {
-  const user = getCurrentUser();
+export async function listAuditLogsForAdmin(limit = 100): Promise<AuditLog[]> {
+  const user = await getCurrentUser();
   assertAdmin(user);
   return [...store.auditLogs]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, limit);
 }
 
-export function listRejudgeRequestsForAdmin(limit = 50): RejudgeRequest[] {
-  const user = getCurrentUser();
+export async function listRejudgeRequestsForAdmin(limit = 50): Promise<RejudgeRequest[]> {
+  const user = await getCurrentUser();
   assertAdmin(user);
   return [...store.rejudgeRequests]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, limit);
 }
 
-export function requestRejudge(input: RequestRejudgeInput): {
+export async function requestRejudge(input: RequestRejudgeInput): Promise<{
   request: RejudgeRequest;
   submission: Submission;
-} {
-  const actor = getCurrentUser();
+}> {
+  const actor = await getCurrentUser();
   assertActiveUser(actor);
   if (!input.reason.trim()) {
     throw new HttpError("rejudge reason is required", 400);

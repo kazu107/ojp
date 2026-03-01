@@ -9,7 +9,7 @@ export async function PATCH(request: Request) {
       displayName?: unknown;
       bio?: unknown;
     };
-    const user = updateCurrentUserProfile({
+    const user = await updateCurrentUserProfile({
       displayName: parseOptionalString(body.displayName),
       bio: parseOptionalString(body.bio),
     });

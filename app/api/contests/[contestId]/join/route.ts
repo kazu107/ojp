@@ -11,7 +11,7 @@ interface JoinContestRouteContext {
 export async function POST(_request: Request, { params }: JoinContestRouteContext) {
   try {
     const { contestId } = await params;
-    const contest = joinContest(contestId);
+    const contest = await joinContest(contestId);
     return NextResponse.json({ contest });
   } catch (error) {
     return errorResponse(error, "contest join failed");
