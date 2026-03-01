@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import {
+  parseExplanationVisibility,
   parseLanguages,
   parseOptionalString,
   parsePositiveNumber,
+  parseTestCaseVisibility,
   parseVisibility,
 } from "@/lib/api-helpers";
-import { getCurrentUser, getProblemForViewer, updateProblem } from "@/lib/store";
+import {
+  getOptionalCurrentUser,
+  getProblemForViewer,
+  updateProblem,
+} from "@/lib/store";
 import { errorResponse } from "@/lib/api-response";
 
 interface ProblemRouteContext {
@@ -17,8 +23,8 @@ interface ProblemRouteContext {
 export async function GET(_request: Request, { params }: ProblemRouteContext) {
   try {
     const { problemId } = await params;
-    const user = await getCurrentUser();
-    const problem = getProblemForViewer(problemId, user.id);
+    const user = await getOptionalCurrentUser();
+    const problem = getProblemForViewer(problemId, user?.id ?? "guest");
     if (!problem) {
       return NextResponse.json({ error: "problem not found" }, { status: 404 });
     }
@@ -40,6 +46,10 @@ export async function PATCH(request: Request, { params }: ProblemRouteContext) {
       outputDescription: parseOptionalString(body.outputDescription),
       constraintsMarkdown: parseOptionalString(body.constraintsMarkdown),
       explanationMarkdown: parseOptionalString(body.explanationMarkdown),
+      explanationVisibility:
+        typeof body.explanationVisibility === "string"
+          ? parseExplanationVisibility(body.explanationVisibility, "private")
+          : undefined,
       visibility:
         typeof body.visibility === "string"
           ? parseVisibility(body.visibility, "public")
@@ -49,6 +59,10 @@ export async function PATCH(request: Request, { params }: ProblemRouteContext) {
       supportedLanguages: Array.isArray(body.supportedLanguages)
         ? parseLanguages(body.supportedLanguages)
         : undefined,
+      testCaseVisibility:
+        typeof body.testCaseVisibility === "string"
+          ? parseTestCaseVisibility(body.testCaseVisibility, "case_index_only")
+          : undefined,
     });
     return NextResponse.json({ problem });
   } catch (error) {

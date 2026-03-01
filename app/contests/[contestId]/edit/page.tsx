@@ -1,6 +1,12 @@
-﻿import { notFound } from "next/navigation";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ContestEditorForm } from "@/components/contest-editor-form";
-import { getContestForViewer, getCurrentUser, listProblemsForListView } from "@/lib/store";
+import {
+  canEditContestByViewer,
+  getContestForViewer,
+  getCurrentUser,
+  listProblemsForListView,
+} from "@/lib/store";
 
 interface EditContestPageProps {
   params: Promise<{
@@ -15,6 +21,8 @@ export default async function EditContestPage({ params }: EditContestPageProps) 
   if (!contest) {
     notFound();
   }
+
+  const canEdit = canEditContestByViewer(contest, me.id);
   const availableProblems = listProblemsForListView(me.id);
 
   return (
@@ -22,18 +30,28 @@ export default async function EditContestPage({ params }: EditContestPageProps) 
       <section className="page-head">
         <div>
           <h1 className="page-title">Edit Contest</h1>
-          <p className="page-subtitle">
-            {contest.title} の開催情報と問題セットを更新します。
-          </p>
+          <p className="page-subtitle">Update contest window, settings, and problem set.</p>
         </div>
       </section>
-      <section className="panel">
-        <ContestEditorForm
-          mode="edit"
-          initialContest={contest}
-          availableProblems={availableProblems}
-        />
-      </section>
+
+      {canEdit ? (
+        <section className="panel">
+          <ContestEditorForm
+            mode="edit"
+            initialContest={contest}
+            availableProblems={availableProblems}
+          />
+        </section>
+      ) : (
+        <section className="panel stack">
+          <p className="badge badge-red">You do not have permission to edit this contest.</p>
+          <div className="button-row">
+            <Link href={`/contests/${contest.id}`} className="button button-secondary">
+              Back to Contest
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

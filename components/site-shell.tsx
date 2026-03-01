@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthControls } from "@/components/auth-controls";
+import { canCreateProblemByRole, getOptionalCurrentUser } from "@/lib/store";
 
 const links = [
   { href: "/", label: "Dashboard" },
@@ -11,6 +12,9 @@ const links = [
 ];
 
 export async function SiteShell({ children }: { children: React.ReactNode }) {
+  const me = await getOptionalCurrentUser();
+  const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
+
   return (
     <div className="site-root">
       <header className="site-header">
@@ -25,9 +29,11 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
                 {link.label}
               </Link>
             ))}
-            <Link href="/problems/new" className="site-nav-cta">
-              New Problem
-            </Link>
+            {canCreateProblem ? (
+              <Link href="/problems/new" className="site-nav-cta">
+                New Problem
+              </Link>
+            ) : null}
             <AuthControls />
           </nav>
         </div>

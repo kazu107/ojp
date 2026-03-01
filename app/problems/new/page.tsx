@@ -1,6 +1,10 @@
 import { ProblemEditorForm } from "@/components/problem-editor-form";
+import { canCreateProblemByRole, getCurrentUser } from "@/lib/store";
 
-export default function NewProblemPage() {
+export default async function NewProblemPage() {
+  const me = await getCurrentUser();
+  const canCreateProblem = canCreateProblemByRole(me.role);
+
   return (
     <div className="page">
       <section className="page-head">
@@ -12,7 +16,13 @@ export default function NewProblemPage() {
         </div>
       </section>
       <section className="panel">
-        <ProblemEditorForm mode="create" />
+        {canCreateProblem ? (
+          <ProblemEditorForm mode="create" />
+        ) : (
+          <p className="badge badge-red">
+            You need `problem_author` (or admin) role to create problems.
+          </p>
+        )}
       </section>
     </div>
   );

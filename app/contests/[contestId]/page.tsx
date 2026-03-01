@@ -10,11 +10,12 @@ import {
 } from "@/lib/presentation";
 import {
   buildVisibleScoreboard,
+  canEditContestByViewer,
   canViewScoreboardDetails,
   findUser,
   getContestForViewer,
   getContestStatus,
-  getCurrentUser,
+  getOptionalCurrentUser,
   listContestProblems,
 } from "@/lib/store";
 
@@ -26,8 +27,8 @@ interface ContestDetailPageProps {
 
 export default async function ContestDetailPage({ params }: ContestDetailPageProps) {
   const { contestId } = await params;
-  const me = await getCurrentUser();
-  const contest = getContestForViewer(contestId, me.id);
+  const me = await getOptionalCurrentUser();
+  const contest = getContestForViewer(contestId, me?.id ?? "guest");
   if (!contest) {
     notFound();
   }
@@ -36,7 +37,9 @@ export default async function ContestDetailPage({ params }: ContestDetailPagePro
   const contestProblems = listContestProblems(contest);
   const scoreboard = buildVisibleScoreboard(contest.id);
   const showPerProblem = canViewScoreboardDetails(contest);
-  const joined = contest.participantUserIds.includes(me.id);
+  const joined = me ? contest.participantUserIds.includes(me.id) : false;
+  const canEditContest = me ? canEditContestByViewer(contest, me.id) : false;
+  const signInUrl = `/signin?callbackUrl=${encodeURIComponent(`/contests/${contest.id}`)}`;
 
   return (
     <div className="page">
@@ -51,9 +54,11 @@ export default async function ContestDetailPage({ params }: ContestDetailPagePro
           <StatusBadge className={badgeClassForContestStatus(status)}>
             {contestStatusLabel(status)}
           </StatusBadge>
-          <Link href={`/contests/${contest.id}/edit`} className="button button-secondary">
-            編集
-          </Link>
+          {canEditContest ? (
+            <Link href={`/contests/${contest.id}/edit`} className="button button-secondary">
+              編集
+            </Link>
+          ) : null}
           <Link
             href={`/reports/new?targetType=contest&targetId=${contest.id}`}
             className="button button-danger"
@@ -73,7 +78,13 @@ export default async function ContestDetailPage({ params }: ContestDetailPagePro
         <p className="text-soft">
           Scoreboard mode: {contest.scoreboardVisibility} / Joined: {joined ? "yes" : "no"}
         </p>
-        <ContestJoinButton contestId={contest.id} />
+        {me ? (
+          <ContestJoinButton contestId={contest.id} />
+        ) : (
+          <Link href={signInUrl} className="button">
+            Sign in to join
+          </Link>
+        )}
       </section>
 
       <section className="panel stack">

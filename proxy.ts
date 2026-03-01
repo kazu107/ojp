@@ -1,14 +1,39 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 
+const PUBLIC_PAGE_PATTERNS: RegExp[] = [
+  /^\/$/,
+  /^\/signin$/,
+  /^\/problems$/,
+  /^\/problems\/[^/]+$/,
+  /^\/contests$/,
+  /^\/contests\/[^/]+$/,
+  /^\/submissions$/,
+  /^\/submissions\/[^/]+$/,
+];
+
+const PUBLIC_API_GET_PATTERNS: RegExp[] = [
+  /^\/api\/health\/db$/,
+  /^\/api\/problems$/,
+  /^\/api\/problems\/[^/]+$/,
+  /^\/api\/contests$/,
+  /^\/api\/contests\/[^/]+$/,
+  /^\/api\/contests\/[^/]+\/scoreboard$/,
+  /^\/api\/submissions$/,
+  /^\/api\/submissions\/[^/]+$/,
+];
+
+function matchesAny(pathname: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(pathname));
+}
+
 export default auth((request) => {
   const { pathname, search } = request.nextUrl;
-  const isPublicPath =
-    pathname === "/signin" ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/health/");
+  const isPublicPath = pathname.startsWith("/api/auth") || matchesAny(pathname, PUBLIC_PAGE_PATTERNS);
+  const isPublicApiGet =
+    request.method === "GET" && matchesAny(pathname, PUBLIC_API_GET_PATTERNS);
 
-  if (isPublicPath || request.auth) {
+  if (isPublicPath || isPublicApiGet || request.auth) {
     return NextResponse.next();
   }
 

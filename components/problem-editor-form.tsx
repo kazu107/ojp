@@ -2,7 +2,13 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Language, Problem, Visibility } from "@/lib/types";
+import {
+  ExplanationVisibility,
+  Language,
+  Problem,
+  TestCaseVisibility,
+  Visibility,
+} from "@/lib/types";
 
 const LANGUAGE_OPTIONS: Array<{ value: Language; label: string }> = [
   { value: "cpp", label: "C++" },
@@ -29,10 +35,12 @@ interface FormState {
   outputDescription: string;
   constraintsMarkdown: string;
   explanationMarkdown: string;
+  explanationVisibility: ExplanationVisibility;
   visibility: Visibility;
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: Language[];
+  testCaseVisibility: TestCaseVisibility;
 }
 
 function emptyState(): FormState {
@@ -44,10 +52,12 @@ function emptyState(): FormState {
     outputDescription: "",
     constraintsMarkdown: "",
     explanationMarkdown: "",
+    explanationVisibility: "private",
     visibility: "public",
     timeLimitMs: 2000,
     memoryLimitMb: 512,
     supportedLanguages: ["cpp", "python", "java", "javascript"],
+    testCaseVisibility: "case_index_only",
   };
 }
 
@@ -60,10 +70,12 @@ function stateFromProblem(problem: Problem): FormState {
     outputDescription: problem.outputDescription,
     constraintsMarkdown: problem.constraintsMarkdown,
     explanationMarkdown: problem.explanationMarkdown,
+    explanationVisibility: problem.explanationVisibility,
     visibility: problem.visibility,
     timeLimitMs: problem.timeLimitMs,
     memoryLimitMb: problem.memoryLimitMb,
     supportedLanguages: problem.supportedLanguages,
+    testCaseVisibility: problem.testCaseVisibility,
   };
 }
 
@@ -232,6 +244,23 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
           </select>
         </label>
         <label className="field">
+          <span className="field-label">Explanation Visibility</span>
+          <select
+            className="select"
+            value={form.explanationVisibility}
+            onChange={(event) =>
+              setForm((prev) => ({
+                ...prev,
+                explanationVisibility: event.target.value as ExplanationVisibility,
+              }))
+            }
+          >
+            <option value="always">always</option>
+            <option value="contest_end">contest_end</option>
+            <option value="private">private (default)</option>
+          </select>
+        </label>
+        <label className="field">
           <span className="field-label">Time Limit (ms)</span>
           <input
             className="input"
@@ -254,6 +283,26 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               setForm((prev) => ({ ...prev, memoryLimitMb: Number(event.target.value) }))
             }
           />
+        </label>
+        <label className="field">
+          <span className="field-label">Test Case Visibility</span>
+          <select
+            className="select"
+            value={form.testCaseVisibility}
+            onChange={(event) =>
+              setForm((prev) => ({
+                ...prev,
+                testCaseVisibility: event.target.value as TestCaseVisibility,
+              }))
+            }
+          >
+            <option value="group_only">group_only</option>
+            <option value="case_index_only">case_index_only (default)</option>
+            <option value="case_name_visible">case_name_visible</option>
+          </select>
+          <p className="text-soft">
+            「ケース名を公開すると hidden test の意図や構成が推測されやすくなります。通常はケース番号のみ公開を推奨します。」
+          </p>
         </label>
       </div>
 

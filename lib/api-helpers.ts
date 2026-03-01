@@ -1,7 +1,22 @@
-import { Language, Visibility } from "@/lib/types";
+import {
+  ExplanationVisibility,
+  Language,
+  TestCaseVisibility,
+  Visibility,
+} from "@/lib/types";
 
 const ALLOWED_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
 const ALLOWED_VISIBILITIES: Visibility[] = ["public", "unlisted", "private"];
+const ALLOWED_TEST_CASE_VISIBILITIES: TestCaseVisibility[] = [
+  "group_only",
+  "case_index_only",
+  "case_name_visible",
+];
+const ALLOWED_EXPLANATION_VISIBILITIES: ExplanationVisibility[] = [
+  "always",
+  "contest_end",
+  "private",
+];
 
 export function parseVisibility(raw: unknown, fallback: Visibility = "public"): Visibility {
   if (typeof raw === "string" && ALLOWED_VISIBILITIES.includes(raw as Visibility)) {
@@ -56,4 +71,30 @@ export function parseOptionalString(raw: unknown): string | undefined {
     return raw;
   }
   return undefined;
+}
+
+export function parseTestCaseVisibility(
+  raw: unknown,
+  fallback: TestCaseVisibility = "case_index_only",
+): TestCaseVisibility {
+  if (
+    typeof raw === "string" &&
+    ALLOWED_TEST_CASE_VISIBILITIES.includes(raw as TestCaseVisibility)
+  ) {
+    return raw as TestCaseVisibility;
+  }
+  return fallback;
+}
+
+export function parseExplanationVisibility(
+  raw: unknown,
+  fallback: ExplanationVisibility = "private",
+): ExplanationVisibility {
+  if (
+    typeof raw === "string" &&
+    ALLOWED_EXPLANATION_VISIBILITIES.includes(raw as ExplanationVisibility)
+  ) {
+    return raw as ExplanationVisibility;
+  }
+  return fallback;
 }

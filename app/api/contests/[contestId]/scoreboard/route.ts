@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   buildVisibleScoreboard,
   getContestForViewer,
-  getCurrentUser,
+  getOptionalCurrentUser,
 } from "@/lib/store";
 import { errorResponse } from "@/lib/api-response";
 
@@ -15,8 +15,8 @@ interface ScoreboardRouteContext {
 export async function GET(_request: Request, { params }: ScoreboardRouteContext) {
   try {
     const { contestId } = await params;
-    const user = await getCurrentUser();
-    const contest = getContestForViewer(contestId, user.id);
+    const user = await getOptionalCurrentUser();
+    const contest = getContestForViewer(contestId, user?.id ?? "guest");
     if (!contest) {
       return NextResponse.json({ error: "contest not found" }, { status: 404 });
     }

@@ -1,4 +1,4 @@
-﻿import {
+import {
   AuditAction,
   AuditLog,
   Contest,
@@ -20,8 +20,10 @@
   UpdateContestInput,
   UpdateProblemInput,
   User,
+  UserRole,
   Visibility,
 } from "@/lib/types";
+import type { ProblemPackageValidationResult } from "@/lib/problem-package";
 import { auth } from "@/auth";
 const BASE_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
 
@@ -51,6 +53,12 @@ interface Store {
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
   githubIndex: Record<string, string>;
+  judgeQueue: Array<{
+    id: string;
+    submissionId: string;
+    queuedAt: string;
+  }>;
+  judgeWorkerRunning: boolean;
   counters: {
     user: number;
     problem: number;
@@ -60,6 +68,7 @@ interface Store {
     report: number;
     audit: number;
     rejudge: number;
+    judgeJob: number;
   };
   rateLimits: RateLimits;
 }
@@ -153,11 +162,14 @@ function createInitialStore(): Store {
       outputDescription: "N を1行で出力してください。",
       constraintsMarkdown: "- 0 <= N <= 10^9",
       explanationMarkdown: "入力値を受け取り、そのまま標準出力に出せばACになります。",
+      explanationVisibility: "always",
       visibility: "public",
       timeLimitMs: 2000,
       memoryLimitMb: 512,
       supportedLanguages: BASE_LANGUAGES,
       scoringType: "sum",
+      testCaseVisibility: "case_index_only",
+      latestPackageSummary: null,
       createdAt,
       updatedAt: createdAt,
     },
@@ -173,11 +185,14 @@ function createInitialStore(): Store {
       constraintsMarkdown: "-10^9 <= A,B,C <= 10^9",
       explanationMarkdown:
         "64bit整数型での加算を推奨します。Pythonはそのままで問題ありません。",
+      explanationVisibility: "always",
       visibility: "public",
       timeLimitMs: 2000,
       memoryLimitMb: 512,
       supportedLanguages: BASE_LANGUAGES,
       scoringType: "sum",
+      testCaseVisibility: "case_index_only",
+      latestPackageSummary: null,
       createdAt,
       updatedAt: createdAt,
     },
@@ -304,6 +319,8 @@ function createInitialStore(): Store {
     auditLogs,
     rejudgeRequests: [],
     githubIndex: {},
+    judgeQueue: [],
+    judgeWorkerRunning: false,
     counters: {
       user: 4,
       problem: 1002,
@@ -313,6 +330,7 @@ function createInitialStore(): Store {
       report: 1001,
       audit: 1001,
       rejudge: 1000,
+      judgeJob: 1000,
     },
     rateLimits: {
       submissionByUserWindow: {},
@@ -328,6 +346,31 @@ const store = globalStore.__ojpStore ?? createInitialStore();
 if (!globalStore.__ojpStore) {
   globalStore.__ojpStore = store;
 }
+
+if (!Array.isArray(store.judgeQueue)) {
+  store.judgeQueue = [];
+}
+if (typeof store.judgeWorkerRunning !== "boolean") {
+  store.judgeWorkerRunning = false;
+}
+if (typeof store.counters.judgeJob !== "number") {
+  store.counters.judgeJob = 1000;
+}
+for (const problem of store.problems) {
+  if (!problem.explanationVisibility) {
+    problem.explanationVisibility = "private";
+  }
+  if (!problem.testCaseVisibility) {
+    problem.testCaseVisibility = "case_index_only";
+  }
+  const legacyProblem = problem as Problem & {
+    latestPackageSummary?: Problem["latestPackageSummary"];
+  };
+  if (legacyProblem.latestPackageSummary === undefined) {
+    legacyProblem.latestPackageSummary = null;
+  }
+}
+repairJudgeQueueInternal();
 
 function nextUserId(): string {
   const id = `u${store.counters.user}`;
@@ -374,6 +417,12 @@ function nextAuditId(): string {
 function nextRejudgeId(): string {
   const id = `rq${store.counters.rejudge}`;
   store.counters.rejudge += 1;
+  return id;
+}
+
+function nextJudgeJobId(): string {
+  const id = `jq${store.counters.judgeJob}`;
+  store.counters.judgeJob += 1;
   return id;
 }
 
@@ -517,6 +566,136 @@ function buildTestResults(status: SubmissionStatus): Submission["testResults"] {
   ];
 }
 
+function findSubmissionByIdInternal(submissionId: string): Submission | undefined {
+  return store.submissions.find((submission) => submission.id === submissionId);
+}
+
+function hasQueuedJudgeJobForSubmission(submissionId: string): boolean {
+  return store.judgeQueue.some((job) => job.submissionId === submissionId);
+}
+
+function collectWaitingSubmissionIds(): string[] {
+  return store.submissions
+    .filter((submission) => submission.status === "WJ")
+    .map((submission) => submission.id);
+}
+
+function getJudgeQueueStatsInternal(): {
+  queuedJobs: number;
+  waitingSubmissions: number;
+  running: boolean;
+} {
+  return {
+    queuedJobs: store.judgeQueue.length,
+    waitingSubmissions: collectWaitingSubmissionIds().length,
+    running: store.judgeWorkerRunning,
+  };
+}
+
+function getJudgeQueueDiagnosticsInternal(limit = 50): {
+  stats: {
+    queuedJobs: number;
+    waitingSubmissions: number;
+    running: boolean;
+  };
+  jobs: Array<{
+    id: string;
+    submissionId: string;
+    queuedAt: string;
+  }>;
+  orphanWaitingSubmissionIds: string[];
+} {
+  const waitingSubmissionIds = collectWaitingSubmissionIds();
+  const queuedSubmissionIds = new Set(store.judgeQueue.map((job) => job.submissionId));
+  const orphanWaitingSubmissionIds = waitingSubmissionIds.filter(
+    (submissionId) => !queuedSubmissionIds.has(submissionId),
+  );
+
+  return {
+    stats: getJudgeQueueStatsInternal(),
+    jobs: [...store.judgeQueue].slice(0, limit),
+    orphanWaitingSubmissionIds,
+  };
+}
+
+function repairJudgeQueueInternal(): number {
+  const waitingSubmissionIds = collectWaitingSubmissionIds();
+  const queuedSubmissionIds = new Set(store.judgeQueue.map((job) => job.submissionId));
+
+  let requeued = 0;
+  for (const submissionId of waitingSubmissionIds) {
+    if (queuedSubmissionIds.has(submissionId)) {
+      continue;
+    }
+    store.judgeQueue.push({
+      id: nextJudgeJobId(),
+      submissionId,
+      queuedAt: nowIso(),
+    });
+    requeued += 1;
+  }
+
+  if (store.judgeQueue.length > 0) {
+    scheduleJudgeWorker();
+  }
+
+  return requeued;
+}
+
+function runJudgeForSubmission(submissionId: string): void {
+  const submission = findSubmissionByIdInternal(submissionId);
+  if (!submission) {
+    return;
+  }
+
+  const status = evaluateSubmissionStatus(submission.sourceCode);
+  const runtime = runtimeFromSource(submission.sourceCode);
+  submission.status = status;
+  submission.score = status === "AC" ? 100 : 0;
+  submission.totalTimeMs = runtime.timeMs;
+  submission.peakMemoryKb = runtime.memoryKb;
+  submission.judgedAt = nowIso();
+  submission.testResults = buildTestResults(status);
+}
+
+function scheduleJudgeWorker(): void {
+  if (store.judgeWorkerRunning) {
+    return;
+  }
+
+  store.judgeWorkerRunning = true;
+  const tick = () => {
+    const nextJob = store.judgeQueue.shift();
+    if (!nextJob) {
+      store.judgeWorkerRunning = false;
+      return;
+    }
+
+    runJudgeForSubmission(nextJob.submissionId);
+    setTimeout(tick, 50);
+  };
+
+  setTimeout(tick, 100);
+}
+
+function enqueueJudgeJob(submissionId: string): void {
+  const submission = findSubmissionByIdInternal(submissionId);
+  if (!submission || submission.status !== "WJ") {
+    return;
+  }
+  if (hasQueuedJudgeJobForSubmission(submissionId)) {
+    scheduleJudgeWorker();
+    return;
+  }
+
+  store.judgeQueue.push({
+    id: nextJudgeJobId(),
+    submissionId,
+    queuedAt: nowIso(),
+  });
+  scheduleJudgeWorker();
+}
+
 function sortBySubmittedAtAsc<T extends { submittedAt: string }>(items: T[]): T[] {
   return [...items].sort(
     (left, right) =>
@@ -534,6 +713,20 @@ function assertActiveUser(user: User): void {
   if (user.status !== "active") {
     throw new HttpError("user account is not active", 403);
   }
+}
+
+function assertProblemAuthorOrAdmin(user: User): void {
+  if (user.role === "admin" || user.role === "problem_author") {
+    return;
+  }
+  throw new HttpError("problem creation requires problem_author role", 403);
+}
+
+function assertContestOrganizerOrAdmin(user: User): void {
+  if (user.role === "admin" || user.role === "contest_organizer") {
+    return;
+  }
+  throw new HttpError("contest creation requires contest_organizer role", 403);
 }
 
 function isAdminBypass(user: User): boolean {
@@ -801,6 +994,17 @@ export async function getCurrentUser(): Promise<User> {
   });
 }
 
+export async function getOptionalCurrentUser(): Promise<User | null> {
+  try {
+    return await getCurrentUser();
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 export function listUsers(): User[] {
   return [...store.users];
 }
@@ -865,6 +1069,42 @@ export function getProblemById(problemId: string): Problem | undefined {
   return store.problems.find((problem) => problem.id === problemId);
 }
 
+function findContestsIncludingProblem(problemId: string): Contest[] {
+  return store.contests.filter((contest) =>
+    contest.problems.some((contestProblem) => contestProblem.problemId === problemId),
+  );
+}
+
+function maskProblemExplanationByViewer(problem: Problem, viewerId: string): Problem {
+  if (canViewProblemExplanation(problem, viewerId)) {
+    return problem;
+  }
+  return {
+    ...problem,
+    explanationMarkdown: "",
+  };
+}
+
+export function canViewProblemExplanation(problem: Problem, viewerId: string): boolean {
+  const viewer = findUser(viewerId);
+  if (viewer?.role === "admin" || problem.authorId === viewerId) {
+    return true;
+  }
+
+  if (problem.explanationVisibility === "always") {
+    return true;
+  }
+  if (problem.explanationVisibility === "private") {
+    return false;
+  }
+
+  const relatedContests = findContestsIncludingProblem(problem.id);
+  if (relatedContests.length === 0) {
+    return false;
+  }
+  return relatedContests.every((contest) => getContestStatus(contest) === "ended");
+}
+
 export function listProblemsForListView(viewerId: string): Problem[] {
   const viewer = findUser(viewerId);
   const isAdmin = viewer?.role === "admin";
@@ -873,6 +1113,7 @@ export function listProblemsForListView(viewerId: string): Problem[] {
     .filter((problem) =>
       canViewVisibility(problem.visibility, problem.authorId, viewerId, !!isAdmin, false),
     )
+    .map((problem) => maskProblemExplanationByViewer(problem, viewerId))
     .sort(
       (left, right) =>
         new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
@@ -882,6 +1123,7 @@ export function listProblemsForListView(viewerId: string): Problem[] {
 export function listPublicProblems(): Problem[] {
   return [...store.problems]
     .filter((problem) => problem.visibility === "public")
+    .map((problem) => maskProblemExplanationByViewer(problem, "guest"))
     .sort(
       (left, right) =>
         new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
@@ -902,13 +1144,14 @@ export function getProblemForViewer(problemId: string, viewerId: string): Proble
     viewer?.role === "admin",
     true,
   );
-  return allowed ? problem : undefined;
+  return allowed ? maskProblemExplanationByViewer(problem, viewerId) : undefined;
 }
 
 export async function createProblem(input: CreateProblemInput): Promise<Problem> {
   uniqueSlugOrThrow("problem", input.slug);
   const user = await getCurrentUser();
   assertActiveUser(user);
+  assertProblemAuthorOrAdmin(user);
 
   const timestamp = nowIso();
   const problem: Problem = {
@@ -921,11 +1164,14 @@ export async function createProblem(input: CreateProblemInput): Promise<Problem>
     outputDescription: input.outputDescription.trim(),
     constraintsMarkdown: input.constraintsMarkdown.trim(),
     explanationMarkdown: input.explanationMarkdown.trim(),
+    explanationVisibility: input.explanationVisibility,
     visibility: input.visibility,
     timeLimitMs: input.timeLimitMs,
     memoryLimitMb: input.memoryLimitMb,
     supportedLanguages: input.supportedLanguages,
     scoringType: "sum",
+    testCaseVisibility: input.testCaseVisibility,
+    latestPackageSummary: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -966,6 +1212,9 @@ export async function updateProblem(
   if (typeof input.explanationMarkdown === "string") {
     problem.explanationMarkdown = input.explanationMarkdown.trim();
   }
+  if (input.explanationVisibility) {
+    problem.explanationVisibility = input.explanationVisibility;
+  }
   if (input.visibility) {
     problem.visibility = input.visibility;
   }
@@ -978,8 +1227,39 @@ export async function updateProblem(
   if (Array.isArray(input.supportedLanguages) && input.supportedLanguages.length > 0) {
     problem.supportedLanguages = input.supportedLanguages;
   }
+  if (input.testCaseVisibility) {
+    problem.testCaseVisibility = input.testCaseVisibility;
+  }
 
   problem.updatedAt = nowIso();
+  return problem;
+}
+
+export async function applyProblemPackageValidation(
+  problemId: string,
+  validation: ProblemPackageValidationResult,
+): Promise<Problem> {
+  const actor = await getCurrentUser();
+  const problem = resolveProblemIfExists(problemId);
+  if (actor.role !== "admin" && problem.authorId !== actor.id) {
+    throw new HttpError("you cannot upload package for this problem", 403);
+  }
+
+  problem.timeLimitMs = validation.config.timeLimitMs;
+  problem.memoryLimitMb = validation.config.memoryLimitMb;
+  problem.supportedLanguages = validation.config.languages;
+  problem.latestPackageSummary = {
+    fileName: validation.fileName,
+    zipSizeBytes: validation.zipSizeBytes,
+    fileCount: validation.fileCount,
+    samplePairs: validation.samplePairs,
+    testGroupCount: validation.testGroupCount,
+    totalTestPairs: validation.totalTestPairs,
+    warnings: validation.warnings,
+    validatedAt: nowIso(),
+  };
+  problem.updatedAt = nowIso();
+
   return problem;
 }
 
@@ -1032,6 +1312,7 @@ export async function createContest(input: CreateContestInput): Promise<Contest>
   uniqueSlugOrThrow("contest", input.slug);
   const user = await getCurrentUser();
   assertActiveUser(user);
+  assertContestOrganizerOrAdmin(user);
 
   const timestamp = nowIso();
   const contest: Contest = {
@@ -1112,16 +1393,59 @@ export async function joinContest(contestId: string): Promise<Contest> {
   return contest;
 }
 
-export function listSubmissionsForViewer(viewerId: string): Submission[] {
+interface ListSubmissionsOptions {
+  userId?: string;
+  problemId?: string;
+  contestId?: string;
+  language?: Language;
+  status?: SubmissionStatus;
+  limit?: number;
+}
+
+export function listSubmissionsForViewer(
+  viewerId: string,
+  options: ListSubmissionsOptions = {},
+): Submission[] {
   void viewerId;
-  return [...store.submissions]
-    .sort(
-      (left, right) =>
-        new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime(),
-    );
+  repairJudgeQueueInternal();
+  const filtered = [...store.submissions].filter((submission) => {
+    if (options.userId && submission.userId !== options.userId) {
+      return false;
+    }
+    if (options.problemId && submission.problemId !== options.problemId) {
+      return false;
+    }
+    if (typeof options.contestId === "string") {
+      if (options.contestId === "none") {
+        if (submission.contestId !== null) {
+          return false;
+        }
+      } else if (submission.contestId !== options.contestId) {
+        return false;
+      }
+    }
+    if (options.language && submission.language !== options.language) {
+      return false;
+    }
+    if (options.status && submission.status !== options.status) {
+      return false;
+    }
+    return true;
+  });
+
+  const sorted = filtered.sort(
+    (left, right) =>
+      new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime(),
+  );
+
+  if (typeof options.limit === "number" && options.limit > 0) {
+    return sorted.slice(0, options.limit);
+  }
+  return sorted;
 }
 
 export function listRecentSubmissions(limit = 15): Submission[] {
+  repairJudgeQueueInternal();
   return [...store.submissions]
     .sort(
       (left, right) =>
@@ -1131,7 +1455,8 @@ export function listRecentSubmissions(limit = 15): Submission[] {
 }
 
 export function getSubmissionById(submissionId: string): Submission | undefined {
-  return store.submissions.find((submission) => submission.id === submissionId);
+  repairJudgeQueueInternal();
+  return findSubmissionByIdInternal(submissionId);
 }
 
 export async function createSubmission(input: CreateSubmissionInput): Promise<Submission> {
@@ -1146,26 +1471,39 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   let contestId: string | null = null;
   if (input.contestId) {
     const contest = resolveContestIfExists(input.contestId);
-    if (!contest.participantUserIds.includes(currentUser.id)) {
-      throw new HttpError("join contest before submitting", 403);
-    }
-    if (getContestStatus(contest) !== "running") {
+    const contestStatus = getContestStatus(contest);
+    if (contestStatus === "running") {
+      if (!contest.participantUserIds.includes(currentUser.id)) {
+        throw new HttpError("join contest before submitting", 403);
+      }
+      const included = contest.problems.some(
+        (contestProblem) => contestProblem.problemId === problem.id,
+      );
+      if (!included) {
+        throw new HttpError("problem is not included in this contest", 400);
+      }
+      contestId = contest.id;
+    } else if (contestStatus === "scheduled") {
       throw new HttpError("contest submissions are allowed only while running", 403);
     }
-    const included = contest.problems.some(
-      (contestProblem) => contestProblem.problemId === problem.id,
+  }
+
+  if (!contestId) {
+    const canSubmitProblem = canViewVisibility(
+      problem.visibility,
+      problem.authorId,
+      currentUser.id,
+      currentUser.role === "admin",
+      true,
     );
-    if (!included) {
-      throw new HttpError("problem is not included in this contest", 400);
+    if (!canSubmitProblem) {
+      throw new HttpError("you cannot submit to this problem", 403);
     }
-    contestId = contest.id;
   }
 
   enforceSubmissionRateLimit(currentUser.id, problem.id, isAdminBypass(currentUser));
 
-  const status = evaluateSubmissionStatus(input.sourceCode);
-  const runtime = runtimeFromSource(input.sourceCode);
-  const judgedAt = nowIso();
+  const submittedAt = nowIso();
   const submission: Submission = {
     id: nextSubmissionId(),
     userId: currentUser.id,
@@ -1173,16 +1511,17 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     contestId,
     language: input.language,
     sourceCode: input.sourceCode,
-    status,
-    score: status === "AC" ? 100 : 0,
-    totalTimeMs: runtime.timeMs,
-    peakMemoryKb: runtime.memoryKb,
-    submittedAt: judgedAt,
-    judgedAt,
-    testResults: buildTestResults(status),
+    status: "WJ",
+    score: 0,
+    totalTimeMs: 0,
+    peakMemoryKb: 0,
+    submittedAt,
+    judgedAt: null,
+    testResults: [],
   };
 
   store.submissions.unshift(submission);
+  enqueueJudgeJob(submission.id);
   return submission;
 }
 
@@ -1344,6 +1683,40 @@ export function findUser(userId: string): User | undefined {
   return store.users.find((user) => user.id === userId);
 }
 
+export function canCreateProblemByRole(role: UserRole): boolean {
+  return role === "admin" || role === "problem_author";
+}
+
+export function canCreateContestByRole(role: UserRole): boolean {
+  return role === "admin" || role === "contest_organizer";
+}
+
+export function canCreateProblemByViewer(viewerId: string): boolean {
+  const viewer = findUser(viewerId);
+  return viewer ? canCreateProblemByRole(viewer.role) : false;
+}
+
+export function canCreateContestByViewer(viewerId: string): boolean {
+  const viewer = findUser(viewerId);
+  return viewer ? canCreateContestByRole(viewer.role) : false;
+}
+
+export function canEditProblemByViewer(problem: Problem, viewerId: string): boolean {
+  const viewer = findUser(viewerId);
+  if (!viewer) {
+    return false;
+  }
+  return viewer.role === "admin" || problem.authorId === viewer.id;
+}
+
+export function canEditContestByViewer(contest: Contest, viewerId: string): boolean {
+  const viewer = findUser(viewerId);
+  if (!viewer) {
+    return false;
+  }
+  return viewer.role === "admin" || contest.organizerId === viewer.id;
+}
+
 export function dumpStoreSnapshot(): {
   users: User[];
   problems: Problem[];
@@ -1367,6 +1740,87 @@ export function dumpStoreSnapshot(): {
 export function canViewSubmissionSource(submission: Submission, viewerId: string): boolean {
   const viewer = findUser(viewerId);
   return viewer?.role === "admin" || submission.userId === viewerId;
+}
+
+function maskSensitiveJudgeMessage(
+  result: Submission["testResults"][number],
+  canViewSource: boolean,
+): Submission["testResults"][number] {
+  if (canViewSource) {
+    return result;
+  }
+
+  if (result.verdict === "CE" || result.verdict === "IE") {
+    return {
+      ...result,
+      message: "details hidden",
+    };
+  }
+
+  return result;
+}
+
+function buildCaseIndexOnlyResults(
+  results: Submission["testResults"],
+): Submission["testResults"] {
+  const caseIndexByGroup: Record<string, number> = {};
+  return results.map((result) => {
+    const nextIndex = (caseIndexByGroup[result.groupName] ?? 0) + 1;
+    caseIndexByGroup[result.groupName] = nextIndex;
+    return {
+      ...result,
+      testCaseName: `#${nextIndex}`,
+    };
+  });
+}
+
+function pickSummaryVerdict(groupResults: Submission["testResults"]): SubmissionStatus {
+  const firstFailure = groupResults.find((result) => result.verdict !== "AC");
+  return firstFailure?.verdict ?? "AC";
+}
+
+function buildGroupOnlyResults(results: Submission["testResults"]): Submission["testResults"] {
+  const grouped = new Map<string, Submission["testResults"]>();
+  for (const result of results) {
+    const entries = grouped.get(result.groupName) ?? [];
+    entries.push(result);
+    grouped.set(result.groupName, entries);
+  }
+
+  return [...grouped.entries()].map(([groupName, groupResults], index) => {
+    const verdict = pickSummaryVerdict(groupResults);
+    const totalTimeMs = groupResults.reduce((acc, result) => acc + result.timeMs, 0);
+    const peakMemoryKb = groupResults.reduce((max, result) => Math.max(max, result.memoryKb), 0);
+
+    return {
+      id: `group-summary-${groupName}-${index}`,
+      groupName,
+      testCaseName: "-",
+      verdict,
+      timeMs: totalTimeMs,
+      memoryKb: peakMemoryKb,
+      message: verdict === "AC" ? "Accepted (group summary)" : `${verdict} (group summary)`,
+    };
+  });
+}
+
+function applyTestCaseVisibilityPolicy(
+  submission: Submission,
+  canViewSource: boolean,
+): Submission["testResults"] {
+  const problem = getProblemById(submission.problemId);
+  const visibility = problem?.testCaseVisibility ?? "case_index_only";
+  const base = submission.testResults.map((result) =>
+    maskSensitiveJudgeMessage(result, canViewSource),
+  );
+
+  if (canViewSource || visibility === "case_name_visible") {
+    return base;
+  }
+  if (visibility === "group_only") {
+    return buildGroupOnlyResults(base);
+  }
+  return buildCaseIndexOnlyResults(base);
 }
 
 export function canRequestRejudgeByViewer(
@@ -1406,9 +1860,13 @@ export function getSubmissionWithAccess(
   }
 
   const canViewSource = canViewSubmissionSource(submission, viewerId);
+  const visibleTestResults = applyTestCaseVisibilityPolicy(submission, canViewSource);
   if (canViewSource) {
     return {
-      submission,
+      submission: {
+        ...submission,
+        testResults: visibleTestResults,
+      },
       canViewSource: true,
     };
   }
@@ -1417,6 +1875,7 @@ export function getSubmissionWithAccess(
     submission: {
       ...submission,
       sourceCode: "// source code is hidden",
+      testResults: visibleTestResults,
     },
     canViewSource: false,
   };
@@ -1521,6 +1980,61 @@ export async function freezeUserByAdmin(userId: string, reason: string): Promise
   return target;
 }
 
+export async function unfreezeUserByAdmin(userId: string, reason: string): Promise<User> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+  const target = findUserOrThrow(userId);
+  if (target.role === "admin") {
+    throw new HttpError("cannot unfreeze admin user", 400);
+  }
+  target.status = "active";
+  target.updatedAt = nowIso();
+
+  appendAuditLog({
+    actorId: admin.id,
+    action: "admin.user.unfreeze",
+    targetType: "user",
+    targetId: target.id,
+    reason: reason || "user unfrozen by admin",
+  });
+
+  return target;
+}
+
+export async function updateUserRoleByAdmin(
+  userId: string,
+  role: UserRole,
+  reason: string,
+): Promise<User> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+  const target = findUserOrThrow(userId);
+  if (target.role === "admin") {
+    throw new HttpError("cannot update admin role", 400);
+  }
+  if (role === "admin" || role === "guest") {
+    throw new HttpError("invalid role for manual assignment", 400);
+  }
+
+  const previousRole = target.role;
+  target.role = role;
+  target.updatedAt = nowIso();
+
+  appendAuditLog({
+    actorId: admin.id,
+    action: "admin.user.role.update",
+    targetType: "user",
+    targetId: target.id,
+    reason: reason || "user role updated by admin",
+    metadata: {
+      previousRole,
+      nextRole: role,
+    },
+  });
+
+  return target;
+}
+
 export async function hideProblemByAdmin(
   problemId: string,
   reason: string,
@@ -1537,6 +2051,27 @@ export async function hideProblemByAdmin(
     targetType: "problem",
     targetId: problem.id,
     reason: reason || "problem hidden by admin",
+  });
+
+  return problem;
+}
+
+export async function hideProblemExplanationByAdmin(
+  problemId: string,
+  reason: string,
+): Promise<Problem> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+  const problem = resolveProblemIfExists(problemId);
+  problem.explanationVisibility = "private";
+  problem.updatedAt = nowIso();
+
+  appendAuditLog({
+    actorId: admin.id,
+    action: "admin.problem.explanation.hide",
+    targetType: "problem",
+    targetId: problem.id,
+    reason: reason || "problem explanation hidden by admin",
   });
 
   return problem;
@@ -1561,6 +2096,60 @@ export async function hideContestByAdmin(
   });
 
   return contest;
+}
+
+export async function getJudgeQueueStatsForAdmin(): Promise<{
+  queuedJobs: number;
+  waitingSubmissions: number;
+  running: boolean;
+}> {
+  const user = await getCurrentUser();
+  assertAdmin(user);
+  repairJudgeQueueInternal();
+  return getJudgeQueueStatsInternal();
+}
+
+export async function getJudgeQueueDiagnosticsForAdmin(limit = 50): Promise<{
+  stats: {
+    queuedJobs: number;
+    waitingSubmissions: number;
+    running: boolean;
+  };
+  jobs: Array<{
+    id: string;
+    submissionId: string;
+    queuedAt: string;
+  }>;
+  orphanWaitingSubmissionIds: string[];
+}> {
+  const user = await getCurrentUser();
+  assertAdmin(user);
+  return getJudgeQueueDiagnosticsInternal(limit);
+}
+
+export async function repairJudgeQueueByAdmin(): Promise<{
+  requeued: number;
+  diagnostics: {
+    stats: {
+      queuedJobs: number;
+      waitingSubmissions: number;
+      running: boolean;
+    };
+    jobs: Array<{
+      id: string;
+      submissionId: string;
+      queuedAt: string;
+    }>;
+    orphanWaitingSubmissionIds: string[];
+  };
+}> {
+  const user = await getCurrentUser();
+  assertAdmin(user);
+  const requeued = repairJudgeQueueInternal();
+  return {
+    requeued,
+    diagnostics: getJudgeQueueDiagnosticsInternal(),
+  };
 }
 
 export async function listAuditLogsForAdmin(limit = 100): Promise<AuditLog[]> {
@@ -1603,14 +2192,12 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
 
   enforceRejudgeRateLimit(actor.id, problem.id, isAdminBypass(actor));
 
-  const newStatus = evaluateSubmissionStatus(submission.sourceCode);
-  const runtime = runtimeFromSource(submission.sourceCode);
-  submission.status = newStatus;
-  submission.score = newStatus === "AC" ? 100 : 0;
-  submission.totalTimeMs = runtime.timeMs;
-  submission.peakMemoryKb = runtime.memoryKb;
-  submission.judgedAt = nowIso();
-  submission.testResults = buildTestResults(newStatus);
+  submission.status = "WJ";
+  submission.score = 0;
+  submission.totalTimeMs = 0;
+  submission.peakMemoryKb = 0;
+  submission.judgedAt = null;
+  submission.testResults = [];
 
   const request: RejudgeRequest = {
     id: nextRejudgeId(),
@@ -1631,6 +2218,8 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     reason: request.reason,
     metadata: { requestId: request.id, problemId: problem.id },
   });
+
+  enqueueJudgeJob(submission.id);
 
   return { request, submission };
 }

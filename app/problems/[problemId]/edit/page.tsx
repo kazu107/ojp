@@ -1,6 +1,12 @@
-﻿import { notFound } from "next/navigation";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ProblemEditorForm } from "@/components/problem-editor-form";
-import { getCurrentUser, getProblemForViewer } from "@/lib/store";
+import { ProblemPackageUploadForm } from "@/components/problem-package-upload-form";
+import {
+  canEditProblemByViewer,
+  getCurrentUser,
+  getProblemForViewer,
+} from "@/lib/store";
 
 interface EditProblemPageProps {
   params: Promise<{
@@ -16,19 +22,43 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
     notFound();
   }
 
+  const canEdit = canEditProblemByViewer(problem, me.id);
+
   return (
     <div className="page">
       <section className="page-head">
         <div>
           <h1 className="page-title">Edit Problem</h1>
           <p className="page-subtitle">
-            {problem.title} の設定を更新します。公開範囲とジャッジ制限値はそのままAPIへ反映されます。
+            Update statement, limits, language settings, and package validation for this problem.
           </p>
         </div>
       </section>
-      <section className="panel">
-        <ProblemEditorForm mode="edit" initialProblem={problem} />
-      </section>
+
+      {canEdit ? (
+        <>
+          <section className="panel">
+            <ProblemEditorForm mode="edit" initialProblem={problem} />
+          </section>
+          <section className="panel stack">
+            <h2 className="panel-title">Problem Package</h2>
+            <p className="panel-subtitle">
+              Upload a ZIP package to validate required files and apply judge settings from
+              `config.json`.
+            </p>
+            <ProblemPackageUploadForm problemId={problem.id} />
+          </section>
+        </>
+      ) : (
+        <section className="panel stack">
+          <p className="badge badge-red">You do not have permission to edit this problem.</p>
+          <div className="button-row">
+            <Link href={`/problems/${problem.id}`} className="button button-secondary">
+              Back to Problem
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

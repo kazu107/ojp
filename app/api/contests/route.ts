@@ -6,7 +6,7 @@ import {
 } from "@/lib/api-helpers";
 import {
   createContest,
-  getCurrentUser,
+  getOptionalCurrentUser,
   listContestsForListView,
   listPublicProblems,
 } from "@/lib/store";
@@ -45,8 +45,8 @@ function parseContestProblems(raw: unknown): ContestProblem[] {
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    const contests = listContestsForListView(user.id);
+    const user = await getOptionalCurrentUser();
+    const contests = listContestsForListView(user?.id ?? "guest");
     return NextResponse.json({ contests });
   } catch (error) {
     return errorResponse(error, "failed to fetch contests");

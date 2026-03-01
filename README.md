@@ -13,6 +13,7 @@ AtCoder風プラットフォームのMVPプロトタイプです。
 - プロフィール編集（表示名・自己紹介）
 - 通報作成
 - 管理者画面（通報管理、ユーザー凍結、問題/コンテスト非公開化）
+- 管理者画面（通報管理、ユーザー凍結/解除、作成ロール変更、問題/コンテスト非公開化）
 - 再ジャッジ要求
 
 ## 仕様との対応
@@ -22,6 +23,11 @@ AtCoder風プラットフォームのMVPプロトタイプです。
 - 初期言語: `C++ / Python / Java / JavaScript`
 - 順位表: 問題ごとの最高点 + ペナルティで集計
 - 順位表公開: `hidden / partial / full` を反映
+- 提出詳細の公開粒度: `group_only / case_index_only / case_name_visible`
+- 他人提出コードの非公開: 本人または管理者のみ全文閲覧可
+- 作成権限:
+  - 問題作成は `problem_author` または `admin`
+  - コンテスト作成は `contest_organizer` または `admin`
 - 提出レート制限:
   - 同一ユーザー・同一問題の通常提出クールダウン: 10秒
   - 同一ユーザーの通常提出上限: 1分あたり20件
@@ -36,13 +42,17 @@ AtCoder風プラットフォームのMVPプロトタイプです。
   - 30日クールダウン
   - 表示名一意制約
   - 監査ログ記録
+- 問題ZIP検証API:
+  - `POST /api/problems/:problemId/package`
+  - 必須ファイル・`.in/.out` ペア・path traversal・容量上限を検証
+  - 検証成功時に `timeLimitMs / memoryLimitMb / supportedLanguages` を問題設定へ反映
 
 ## 実装上の制約
 
 - 永続化は未実装で、基本はインメモリストアです。
 - 認証は GitHub OAuth ログインです（`next-auth`）。
 - 初回ログイン時は、GitHubアカウント情報からアプリ内ユーザーを自動作成します。
-- ジャッジは疑似判定です。
+- ジャッジは疑似判定です（提出時は一旦 `WJ` となり、非同期で確定します）。
 - Prisma / PostgreSQL を用意して、スナップショットの seed で初期データ投入できます。
 
 疑似判定では提出コードに次の文字列を含めると判定を再現できます。
@@ -158,7 +168,12 @@ npm run build
 - `POST /api/problems`
 - `GET /api/problems/:problemId`
 - `PATCH /api/problems/:problemId`
+- `POST /api/problems/:problemId/package`
+- `GET /api/problems/:problemId/explanation`
+- `PUT /api/problems/:problemId/explanation`
 - `POST /api/submissions`
+- `GET /api/submissions`
+- `GET /api/submissions?mine=1&problemId=&contestId=&status=&language=&limit=`
 - `GET /api/submissions/:submissionId`
 - `POST /api/submissions/:submissionId/rejudge`
 - `GET /api/contests`
@@ -171,5 +186,10 @@ npm run build
 - `GET /api/admin/reports`
 - `POST /api/admin/reports/:reportId/status`
 - `POST /api/admin/users/:userId/freeze`
+- `POST /api/admin/users/:userId/unfreeze`
+- `POST /api/admin/users/:userId/role`
+- `GET /api/admin/judge/queue`
+- `POST /api/admin/judge/queue`
 - `POST /api/admin/problems/:problemId/hide`
+- `POST /api/admin/problems/:problemId/explanation/hide`
 - `POST /api/admin/contests/:contestId/hide`

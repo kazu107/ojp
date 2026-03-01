@@ -1,4 +1,11 @@
-import { ContestStatus, Language, SubmissionStatus, Visibility } from "@/lib/types";
+import {
+  ContestStatus,
+  ExplanationVisibility,
+  Language,
+  SubmissionStatus,
+  TestCaseVisibility,
+  Visibility,
+} from "@/lib/types";
 
 export function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -52,6 +59,32 @@ export function contestStatusLabel(status: ContestStatus): string {
       return "Ended";
     default:
       return status;
+  }
+}
+
+export function testCaseVisibilityLabel(visibility: TestCaseVisibility): string {
+  switch (visibility) {
+    case "group_only":
+      return "Group Only";
+    case "case_index_only":
+      return "Case Index Only";
+    case "case_name_visible":
+      return "Case Name Visible";
+    default:
+      return visibility;
+  }
+}
+
+export function explanationVisibilityLabel(visibility: ExplanationVisibility): string {
+  switch (visibility) {
+    case "always":
+      return "Always";
+    case "contest_end":
+      return "After Contest End";
+    case "private":
+      return "Private";
+    default:
+      return visibility;
   }
 }
 

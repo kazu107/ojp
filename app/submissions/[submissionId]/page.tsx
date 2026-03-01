@@ -1,15 +1,17 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RejudgeRequestForm } from "@/components/rejudge-request-form";
+import { SubmissionLiveRefresh } from "@/components/submission-live-refresh";
 import { StatusBadge } from "@/components/status-badge";
 import {
   badgeClassForSubmission,
   formatDate,
   languageLabel,
+  testCaseVisibilityLabel,
 } from "@/lib/presentation";
 import {
   canRequestRejudgeByViewer,
-  getCurrentUser,
+  getOptionalCurrentUser,
   getProblemById,
   getSubmissionWithAccess,
 } from "@/lib/store";
@@ -22,8 +24,8 @@ interface SubmissionDetailPageProps {
 
 export default async function SubmissionDetailPage({ params }: SubmissionDetailPageProps) {
   const { submissionId } = await params;
-  const me = await getCurrentUser();
-  const result = getSubmissionWithAccess(submissionId, me.id);
+  const me = await getOptionalCurrentUser();
+  const result = getSubmissionWithAccess(submissionId, me?.id ?? "guest");
 
   if (!result) {
     notFound();
@@ -31,7 +33,8 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
 
   const { submission, canViewSource } = result;
   const problem = getProblemById(submission.problemId);
-  const canRequestRejudge = canRequestRejudgeByViewer(submission, me.id);
+  const canRequestRejudge = me ? canRequestRejudgeByViewer(submission, me.id) : false;
+  const testCaseVisibility = problem?.testCaseVisibility ?? "case_index_only";
 
   return (
     <div className="page">
@@ -58,6 +61,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
       </section>
 
       <section className="panel stack">
+        <SubmissionLiveRefresh status={submission.status} />
         <div className="meta-inline">
           <StatusBadge className={badgeClassForSubmission(submission.status)}>
             {submission.status}
@@ -75,6 +79,10 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
 
       <section className="panel stack">
         <h2 className="panel-title">Test Results</h2>
+        <p className="text-soft">
+          Visibility mode: {testCaseVisibilityLabel(testCaseVisibility)}
+          {!canViewSource ? " (applied for non-owner viewers)" : ""}
+        </p>
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -88,20 +96,28 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
               </tr>
             </thead>
             <tbody>
-              {submission.testResults.map((result) => (
-                <tr key={result.id}>
-                  <td>{result.groupName}</td>
-                  <td>{result.testCaseName}</td>
-                  <td>
-                    <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                      {result.verdict}
-                    </StatusBadge>
+              {submission.testResults.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-soft">
+                    No per-test result yet. The submission is still being judged.
                   </td>
-                  <td>{result.timeMs} ms</td>
-                  <td>{result.memoryKb} KB</td>
-                  <td>{result.message}</td>
                 </tr>
-              ))}
+              ) : (
+                submission.testResults.map((result) => (
+                  <tr key={result.id}>
+                    <td>{result.groupName}</td>
+                    <td>{result.testCaseName}</td>
+                    <td>
+                      <StatusBadge className={badgeClassForSubmission(result.verdict)}>
+                        {result.verdict}
+                      </StatusBadge>
+                    </td>
+                    <td>{result.timeMs} ms</td>
+                    <td>{result.memoryKb} KB</td>
+                    <td>{result.message}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

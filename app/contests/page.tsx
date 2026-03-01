@@ -7,13 +7,19 @@ import {
   formatDate,
   visibilityLabel,
 } from "@/lib/presentation";
-import { getContestStatus, getCurrentUser, listContestsForListView } from "@/lib/store";
+import {
+  canCreateContestByRole,
+  getContestStatus,
+  getOptionalCurrentUser,
+  listContestsForListView,
+} from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContestsPage() {
-  const me = await getCurrentUser();
-  const contests = listContestsForListView(me.id);
+  const me = await getOptionalCurrentUser();
+  const canCreateContest = me ? canCreateContestByRole(me.role) : false;
+  const contests = listContestsForListView(me?.id ?? "guest");
 
   return (
     <div className="page">
@@ -25,9 +31,11 @@ export default async function ContestsPage() {
           </p>
         </div>
         <div className="button-row">
-          <Link href="/contests/new" className="button">
-            新規コンテスト
-          </Link>
+          {canCreateContest ? (
+            <Link href="/contests/new" className="button">
+              新規コンテスト
+            </Link>
+          ) : null}
         </div>
       </section>
 

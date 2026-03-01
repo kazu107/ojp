@@ -1,8 +1,13 @@
 import { ContestEditorForm } from "@/components/contest-editor-form";
-import { getCurrentUser, listProblemsForListView } from "@/lib/store";
+import {
+  canCreateContestByRole,
+  getCurrentUser,
+  listProblemsForListView,
+} from "@/lib/store";
 
 export default async function NewContestPage() {
   const me = await getCurrentUser();
+  const canCreateContest = canCreateContestByRole(me.role);
   const availableProblems = listProblemsForListView(me.id);
 
   return (
@@ -16,7 +21,13 @@ export default async function NewContestPage() {
         </div>
       </section>
       <section className="panel">
-        <ContestEditorForm mode="create" availableProblems={availableProblems} />
+        {canCreateContest ? (
+          <ContestEditorForm mode="create" availableProblems={availableProblems} />
+        ) : (
+          <p className="badge badge-red">
+            You need `contest_organizer` (or admin) role to create contests.
+          </p>
+        )}
       </section>
     </div>
   );

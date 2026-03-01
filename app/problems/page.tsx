@@ -6,13 +6,20 @@ import {
   languageLabel,
   visibilityLabel,
 } from "@/lib/presentation";
-import { findUser, getCurrentUser, listProblemsForListView } from "@/lib/store";
+import {
+  canCreateProblemByRole,
+  canEditProblemByViewer,
+  findUser,
+  getOptionalCurrentUser,
+  listProblemsForListView,
+} from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProblemsPage() {
-  const me = await getCurrentUser();
-  const problems = listProblemsForListView(me.id);
+  const me = await getOptionalCurrentUser();
+  const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
+  const problems = listProblemsForListView(me?.id ?? "guest");
 
   return (
     <div className="page">
@@ -24,9 +31,11 @@ export default async function ProblemsPage() {
           </p>
         </div>
         <div className="button-row">
-          <Link href="/problems/new" className="button">
-            新規作成
-          </Link>
+          {canCreateProblem ? (
+            <Link href="/problems/new" className="button">
+              新規作成
+            </Link>
+          ) : null}
         </div>
       </section>
 
@@ -71,9 +80,11 @@ export default async function ProblemsPage() {
                         <Link className="link" href={`/problems/${problem.id}/submit`}>
                           Submit
                         </Link>
-                        <Link className="link" href={`/problems/${problem.id}/edit`}>
-                          Edit
-                        </Link>
+                        {me && canEditProblemByViewer(problem, me.id) ? (
+                          <Link className="link" href={`/problems/${problem.id}/edit`}>
+                            Edit
+                          </Link>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

@@ -24,6 +24,19 @@ export type SubmissionStatus =
 export type Language = "cpp" | "python" | "java" | "javascript";
 
 export type ScoreboardVisibility = "hidden" | "partial" | "full";
+export type TestCaseVisibility = "group_only" | "case_index_only" | "case_name_visible";
+export type ExplanationVisibility = "always" | "contest_end" | "private";
+
+export interface ProblemPackageSummary {
+  fileName: string;
+  zipSizeBytes: number;
+  fileCount: number;
+  samplePairs: number;
+  testGroupCount: number;
+  totalTestPairs: number;
+  warnings: string[];
+  validatedAt: string;
+}
 
 export interface User {
   id: string;
@@ -47,11 +60,14 @@ export interface Problem {
   outputDescription: string;
   constraintsMarkdown: string;
   explanationMarkdown: string;
+  explanationVisibility: ExplanationVisibility;
   visibility: Visibility;
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: Language[];
   scoringType: "sum";
+  testCaseVisibility: TestCaseVisibility;
+  latestPackageSummary: ProblemPackageSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -134,7 +150,10 @@ export type AuditAction =
   | "report.create"
   | "report.status.update"
   | "admin.user.freeze"
+  | "admin.user.unfreeze"
+  | "admin.user.role.update"
   | "admin.problem.hide"
+  | "admin.problem.explanation.hide"
   | "admin.contest.hide"
   | "submission.rejudge.request";
 
@@ -182,10 +201,12 @@ export interface CreateProblemInput {
   outputDescription: string;
   constraintsMarkdown: string;
   explanationMarkdown: string;
+  explanationVisibility: ExplanationVisibility;
   visibility: Visibility;
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: Language[];
+  testCaseVisibility: TestCaseVisibility;
 }
 
 export type UpdateProblemInput = Partial<CreateProblemInput>;

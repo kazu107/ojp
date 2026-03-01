@@ -8,8 +8,9 @@ import {
 } from "@/lib/presentation";
 import {
   buildScoreboard,
+  canCreateProblemByRole,
   getContestStatus,
-  getCurrentUser,
+  getOptionalCurrentUser,
   listContestsForListView,
   listPublicProblems,
   listRecentSubmissions,
@@ -18,9 +19,10 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const me = await getCurrentUser();
+  const me = await getOptionalCurrentUser();
+  const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
   const problems = listPublicProblems();
-  const contests = listContestsForListView(me.id);
+  const contests = listContestsForListView(me?.id ?? "guest");
   const submissions = listRecentSubmissions(8);
   const latestContest = contests[0];
   const latestScoreboard = latestContest ? buildScoreboard(latestContest.id) : [];
@@ -31,16 +33,18 @@ export default async function HomePage() {
         <div>
           <h1 className="page-title">OJP Dashboard</h1>
           <p className="page-subtitle">
-            仕様書 `atcoder_like_platform_spec_draft.md` をもとに、問題管理・提出・コンテスト・順位表の
-            最小MVP導線を実装したプロトタイプです。
+            MVP prototype based on `atcoder_like_platform_spec_draft.md`.
+            You can view recent submissions, contest status, and scoreboard activity here.
           </p>
         </div>
         <div className="button-row">
-          <Link href="/problems/new" className="button">
-            問題を作成
-          </Link>
+          {canCreateProblem ? (
+            <Link href="/problems/new" className="button">
+              Create Problem
+            </Link>
+          ) : null}
           <Link href="/submissions" className="button button-secondary">
-            提出履歴
+            View Submissions
           </Link>
         </div>
       </section>
@@ -48,23 +52,23 @@ export default async function HomePage() {
       <section className="panel">
         <h2 className="panel-title">Platform Snapshot</h2>
         <p className="panel-subtitle">
-          GitHubログイン想定ユーザー: <span className="kpi">{me.displayName}</span>
+          Signed in as: <span className="kpi">{me?.displayName ?? "Guest"}</span>
         </p>
         <div className="metric-grid">
           <article className="metric-card">
-            <p className="metric-label">公開問題数</p>
+            <p className="metric-label">Public Problems</p>
             <p className="metric-value">{problems.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">コンテスト数</p>
+            <p className="metric-label">Contests</p>
             <p className="metric-value">{contests.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">最近の提出</p>
+            <p className="metric-label">Recent Submissions</p>
             <p className="metric-value">{submissions.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">順位表エントリ</p>
+            <p className="metric-label">Scoreboard Entries</p>
             <p className="metric-value">{latestScoreboard.length}</p>
           </article>
         </div>
@@ -75,10 +79,12 @@ export default async function HomePage() {
           <div className="page-head">
             <div>
               <h2 className="panel-title">Latest Submissions</h2>
-              <p className="panel-subtitle">提出ステータス遷移（AC / WA / TLE / ...）を表示します。</p>
+              <p className="panel-subtitle">
+                Recent status transitions (AC / WA / TLE / ...) for the latest submissions.
+              </p>
             </div>
             <Link className="link" href="/submissions">
-              一覧へ
+              View all
             </Link>
           </div>
           <div className="table-wrap">
@@ -117,10 +123,10 @@ export default async function HomePage() {
           <div className="page-head">
             <div>
               <h2 className="panel-title">Contest State</h2>
-              <p className="panel-subtitle">自動状態判定: scheduled / running / ended</p>
+              <p className="panel-subtitle">Automatic state: scheduled / running / ended</p>
             </div>
             <Link className="link" href="/contests">
-              一覧へ
+              View all
             </Link>
           </div>
           {latestContest ? (
@@ -133,14 +139,14 @@ export default async function HomePage() {
               </div>
               <p className="text-soft">{latestContest.descriptionMarkdown}</p>
               <p className="text-soft">
-                開始: {formatDate(latestContest.startAt)} / 終了: {formatDate(latestContest.endAt)}
+                Start: {formatDate(latestContest.startAt)} / End: {formatDate(latestContest.endAt)}
               </p>
               <Link className="button button-secondary" href={`/contests/${latestContest.id}`}>
-                コンテスト詳細と順位表
+                Open contest and scoreboard
               </Link>
             </div>
           ) : (
-            <p className="empty">コンテストデータはまだありません。</p>
+            <p className="empty">No contests available yet.</p>
           )}
         </article>
       </section>

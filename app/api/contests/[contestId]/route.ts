@@ -4,7 +4,11 @@ import {
   parseOptionalString,
   parseVisibility,
 } from "@/lib/api-helpers";
-import { getContestForViewer, getCurrentUser, updateContest } from "@/lib/store";
+import {
+  getContestForViewer,
+  getOptionalCurrentUser,
+  updateContest,
+} from "@/lib/store";
 import { ContestProblem, ScoreboardVisibility } from "@/lib/types";
 import { errorResponse } from "@/lib/api-response";
 
@@ -54,8 +58,8 @@ function parseContestProblems(raw: unknown): ContestProblem[] | undefined {
 export async function GET(_request: Request, { params }: ContestRouteContext) {
   try {
     const { contestId } = await params;
-    const user = await getCurrentUser();
-    const contest = getContestForViewer(contestId, user.id);
+    const user = await getOptionalCurrentUser();
+    const contest = getContestForViewer(contestId, user?.id ?? "guest");
     if (!contest) {
       return NextResponse.json({ error: "contest not found" }, { status: 404 });
     }

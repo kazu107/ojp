@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Contest, Problem, RejudgeRequest, Report, User } from "@/lib/types";
+import { Contest, Problem, RejudgeRequest, Report, User, UserRole } from "@/lib/types";
 import { formatDate } from "@/lib/presentation";
 
 interface AdminConsoleProps {
@@ -11,6 +11,19 @@ interface AdminConsoleProps {
   contests: Contest[];
   reports: Report[];
   rejudgeRequests: RejudgeRequest[];
+  judgeQueueDiagnostics: {
+    stats: {
+      queuedJobs: number;
+      waitingSubmissions: number;
+      running: boolean;
+    };
+    jobs: Array<{
+      id: string;
+      submissionId: string;
+      queuedAt: string;
+    }>;
+    orphanWaitingSubmissionIds: string[];
+  };
 }
 
 export function AdminConsole({
@@ -19,10 +32,13 @@ export function AdminConsole({
   contests,
   reports,
   rejudgeRequests,
+  judgeQueueDiagnostics,
 }: AdminConsoleProps) {
+  const ASSIGNABLE_ROLES: UserRole[] = ["user", "problem_author", "contest_organizer"];
   const router = useRouter();
   const [error, setError] = useState("");
   const [busyKey, setBusyKey] = useState("");
+  const [roleDraftByUserId, setRoleDraftByUserId] = useState<Record<string, UserRole>>({});
 
   async function postJson(url: string, payload: Record<string, string>) {
     setError("");
@@ -48,6 +64,69 @@ export function AdminConsole({
   return (
     <div className="stack">
       {error ? <p className="badge badge-red">{error}</p> : null}
+
+      <section className="panel stack">
+        <h2 className="panel-title">Judge Queue</h2>
+        <p className="text-soft">Queued jobs: {judgeQueueDiagnostics.stats.queuedJobs}</p>
+        <p className="text-soft">
+          Waiting submissions: {judgeQueueDiagnostics.stats.waitingSubmissions}
+        </p>
+        <p className="text-soft">
+          Worker running: {judgeQueueDiagnostics.stats.running ? "yes" : "no"}
+        </p>
+        <p className="text-soft">
+          Orphan waiting submissions: {judgeQueueDiagnostics.orphanWaitingSubmissionIds.length}
+        </p>
+        <div className="button-row">
+          <button
+            className="button"
+            disabled={busyKey === "/api/admin/judge/queue"}
+            onClick={() =>
+              postJson("/api/admin/judge/queue", {
+                reason: "manual queue repair",
+              })
+            }
+          >
+            Repair Queue
+          </button>
+        </div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Submission</th>
+                <th>Queued</th>
+              </tr>
+            </thead>
+            <tbody>
+              {judgeQueueDiagnostics.jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={3}>No queued jobs.</td>
+                </tr>
+              ) : (
+                judgeQueueDiagnostics.jobs.map((job) => (
+                  <tr key={job.id}>
+                    <td>{job.id}</td>
+                    <td>{job.submissionId}</td>
+                    <td>{formatDate(job.queuedAt)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {judgeQueueDiagnostics.orphanWaitingSubmissionIds.length > 0 ? (
+          <div className="stack">
+            <p className="field-label">Orphan WJ Submission IDs</p>
+            {judgeQueueDiagnostics.orphanWaitingSubmissionIds.map((submissionId) => (
+              <p key={submissionId} className="text-soft">
+                - {submissionId}
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </section>
 
       <section className="panel stack">
         <h2 className="panel-title">Reports</h2>
@@ -128,17 +207,65 @@ export function AdminConsole({
                     {user.role === "admin" ? (
                       "-"
                     ) : (
-                      <button
-                        className="button button-danger"
-                        disabled={busyKey.includes(user.id)}
-                        onClick={() =>
-                          postJson(`/api/admin/users/${user.id}/freeze`, {
-                            reason: "manual moderation",
-                          })
-                        }
-                      >
-                        Freeze
-                      </button>
+                      <div className="stack">
+                        <div className="button-row">
+                          {user.status === "frozen" ? (
+                            <button
+                              className="button button-secondary"
+                              disabled={busyKey.includes(user.id)}
+                              onClick={() =>
+                                postJson(`/api/admin/users/${user.id}/unfreeze`, {
+                                  reason: "manual moderation release",
+                                })
+                              }
+                            >
+                              Unfreeze
+                            </button>
+                          ) : (
+                            <button
+                              className="button button-danger"
+                              disabled={busyKey.includes(user.id)}
+                              onClick={() =>
+                                postJson(`/api/admin/users/${user.id}/freeze`, {
+                                  reason: "manual moderation",
+                                })
+                              }
+                            >
+                              Freeze
+                            </button>
+                          )}
+                        </div>
+                        <div className="button-row">
+                          <select
+                            className="select"
+                            value={roleDraftByUserId[user.id] ?? user.role}
+                            onChange={(event) =>
+                              setRoleDraftByUserId((prev) => ({
+                                ...prev,
+                                [user.id]: event.target.value as UserRole,
+                              }))
+                            }
+                          >
+                            {ASSIGNABLE_ROLES.map((role) => (
+                              <option key={role} value={role}>
+                                {role}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="button"
+                            disabled={busyKey.includes(user.id)}
+                            onClick={() =>
+                              postJson(`/api/admin/users/${user.id}/role`, {
+                                role: roleDraftByUserId[user.id] ?? user.role,
+                                reason: "manual role update",
+                              })
+                            }
+                          >
+                            Update Role
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -158,6 +285,7 @@ export function AdminConsole({
                   <th>ID</th>
                   <th>Title</th>
                   <th>Visibility</th>
+                  <th>Explanation</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -167,18 +295,32 @@ export function AdminConsole({
                     <td>{problem.id}</td>
                     <td>{problem.title}</td>
                     <td>{problem.visibility}</td>
+                    <td>{problem.explanationVisibility}</td>
                     <td>
-                      <button
-                        className="button button-danger"
-                        disabled={busyKey.includes(problem.id)}
-                        onClick={() =>
-                          postJson(`/api/admin/problems/${problem.id}/hide`, {
-                            reason: "admin hide operation",
-                          })
-                        }
-                      >
-                        Hide
-                      </button>
+                      <div className="button-row">
+                        <button
+                          className="button button-danger"
+                          disabled={busyKey.includes(problem.id)}
+                          onClick={() =>
+                            postJson(`/api/admin/problems/${problem.id}/hide`, {
+                              reason: "admin hide operation",
+                            })
+                          }
+                        >
+                          Hide Problem
+                        </button>
+                        <button
+                          className="button button-secondary"
+                          disabled={busyKey.includes(problem.id)}
+                          onClick={() =>
+                            postJson(`/api/admin/problems/${problem.id}/explanation/hide`, {
+                              reason: "admin explanation hide operation",
+                            })
+                          }
+                        >
+                          Hide Explanation
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getSubmissionWithAccess } from "@/lib/store";
+import { getOptionalCurrentUser, getSubmissionWithAccess } from "@/lib/store";
 import { errorResponse } from "@/lib/api-response";
 
 interface SubmissionRouteContext {
@@ -11,8 +11,8 @@ interface SubmissionRouteContext {
 export async function GET(_request: Request, { params }: SubmissionRouteContext) {
   try {
     const { submissionId } = await params;
-    const user = await getCurrentUser();
-    const result = getSubmissionWithAccess(submissionId, user.id);
+    const user = await getOptionalCurrentUser();
+    const result = getSubmissionWithAccess(submissionId, user?.id ?? "guest");
     if (!result) {
       return NextResponse.json({ error: "submission not found" }, { status: 404 });
     }

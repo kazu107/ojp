@@ -1,5 +1,6 @@
 import { AdminConsole } from "@/components/admin-console";
 import {
+  getJudgeQueueDiagnosticsForAdmin,
   getCurrentUser,
   listAuditLogsForAdmin,
   listContestsForListView,
@@ -20,6 +21,7 @@ export default async function AdminPage() {
   const contests = listContestsForListView(me.id);
   const audits = await listAuditLogsForAdmin(15);
   const rejudgeRequests = await listRejudgeRequestsForAdmin(20);
+  const judgeQueueDiagnostics = await getJudgeQueueDiagnosticsForAdmin();
 
   return (
     <div className="page">
@@ -27,7 +29,7 @@ export default async function AdminPage() {
         <div>
           <h1 className="page-title">Admin</h1>
           <p className="page-subtitle">
-            通報管理、ユーザー凍結、問題/コンテスト非公開化、再ジャッジ要求履歴を管理します。
+            通報管理、ユーザー凍結、問題/解説/コンテスト非公開化、再ジャッジ要求履歴を管理します。
           </p>
         </div>
       </section>
@@ -66,6 +68,7 @@ export default async function AdminPage() {
         contests={contests}
         reports={reports}
         rejudgeRequests={rejudgeRequests}
+        judgeQueueDiagnostics={judgeQueueDiagnostics}
       />
     </div>
   );
