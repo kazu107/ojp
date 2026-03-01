@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  guest
+  user
+  problem_author
+  contest_organizer
+  admin
+}
+
+enum UserStatus {
+  active
+  frozen
+  deleted
+}
+
+enum Visibility {
+  public
+  unlisted
+  private
+}
+
+enum SubmissionStatus {
+  WJ
+  AC
+  WA
+  TLE
+  MLE
+  RE
+  CE
+  IE
+}
+
+enum Language {
+  cpp
+  python
+  java
+  javascript
+}
+
+enum ScoreboardVisibility {
+  hidden
+  partial
+  full
+}
+
+enum ReportTargetType {
+  problem
+  contest
+  submission
+}
+
+enum ReportStatus {
+  open
+  investigating
+  resolved
+  dismissed
+}
+
+model User {
+  id                   String           @id
+  username             String           @unique
+  displayName          String           @unique
+  bio                  String           @default("")
+  role                 UserRole         @default(user)
+  status               UserStatus       @default(active)
+  displayNameChangedAt DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  authoredProblems     Problem[]
+  organizedContests    Contest[]
+  submissions          Submission[]
+  reports              Report[]
+  auditLogs            AuditLog[]
+  rejudgeRequests      RejudgeRequest[]
+  contestParticipants  ContestParticipant[]
+}
+
+model Problem {
+  id                 String         @id
+  authorId           String
+  title              String
+  slug               String         @unique
+  statementMarkdown  String
+  inputDescription   String
+  outputDescription  String
+  constraintsMarkdown String
+  explanationMarkdown String
+  visibility         Visibility
+  timeLimitMs        Int
+  memoryLimitMb      Int
+  supportedLanguages Language[]
+  scoringType        String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  author             User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  contestProblems    ContestProblem[]
+  submissions        Submission[]
+  rejudgeRequests    RejudgeRequest[]
+}
+
+model Contest {
+  id                  String              @id
+  organizerId         String
+  title               String
+  slug                String              @unique
+  descriptionMarkdown String
+  visibility          Visibility
+  startAt             DateTime
+  endAt               DateTime
+  penaltyMinutes      Int
+  scoreboardVisibility ScoreboardVisibility
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  organizer           User                @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  problems            ContestProblem[]
+  participants        ContestParticipant[]
+  submissions         Submission[]
+}
+
+model ContestProblem {
+  contestId  String
+  problemId  String
+  label      String
+  score      Int
+  orderIndex Int
+  contest    Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  problem    Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@id([contestId, problemId])
+  @@unique([contestId, label])
+}
+
+model ContestParticipant {
+  contestId    String
+  userId       String
+  registeredAt DateTime @default(now())
+  contest      Contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([contestId, userId])
+}
+
+model Submission {
+  id           String            @id
+  userId       String
+  problemId    String
+  contestId    String?
+  language     Language
+  sourceCode   String
+  status       SubmissionStatus
+  score        Int
+  totalTimeMs  Int
+  peakMemoryKb Int
+  submittedAt  DateTime
+  judgedAt     DateTime?
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem      Problem           @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  contest      Contest?          @relation(fields: [contestId], references: [id], onDelete: SetNull)
+  testResults  SubmissionTestResult[]
+  rejudgeRequests RejudgeRequest[]
+}
+
+model SubmissionTestResult {
+  id           String           @id
+  submissionId String
+  groupName    String
+  testCaseName String
+  verdict      SubmissionStatus
+  timeMs       Int
+  memoryKb     Int
+  message      String
+  submission   Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id         String           @id
+  reporterId String
+  targetType ReportTargetType
+  targetId   String
+  reason     String
+  detail     String
+  status     ReportStatus     @default(open)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  reporter   User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id
+  actorId    String
+  action     String
+  targetType String
+  targetId   String
+  reason     String
+  metadata   Json
+  createdAt  DateTime @default(now())
+  actor      User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+}
+
+model RejudgeRequest {
+  id           String   @id
+  requestedBy  String
+  submissionId String
+  problemId    String
+  reason       String
+  detail       String
+  createdAt    DateTime @default(now())
+  requester    User     @relation(fields: [requestedBy], references: [id], onDelete: Cascade)
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  problem      Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,218 @@
+export type UserRole =
+  | "guest"
+  | "user"
+  | "problem_author"
+  | "contest_organizer"
+  | "admin";
+
+export type UserStatus = "active" | "frozen" | "deleted";
+
+export type Visibility = "public" | "unlisted" | "private";
+
+export type ContestStatus = "scheduled" | "running" | "ended";
+
+export type SubmissionStatus =
+  | "WJ"
+  | "AC"
+  | "WA"
+  | "TLE"
+  | "MLE"
+  | "RE"
+  | "CE"
+  | "IE";
+
+export type Language = "cpp" | "python" | "java" | "javascript";
+
+export type ScoreboardVisibility = "hidden" | "partial" | "full";
+
+export interface User {
+  id: string;
+  username: string;
+  displayName: string;
+  bio: string;
+  role: UserRole;
+  status: UserStatus;
+  displayNameChangedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Problem {
+  id: string;
+  authorId: string;
+  title: string;
+  slug: string;
+  statementMarkdown: string;
+  inputDescription: string;
+  outputDescription: string;
+  constraintsMarkdown: string;
+  explanationMarkdown: string;
+  visibility: Visibility;
+  timeLimitMs: number;
+  memoryLimitMb: number;
+  supportedLanguages: Language[];
+  scoringType: "sum";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContestProblem {
+  label: string;
+  problemId: string;
+  score: number;
+  orderIndex: number;
+}
+
+export interface Contest {
+  id: string;
+  organizerId: string;
+  title: string;
+  slug: string;
+  descriptionMarkdown: string;
+  visibility: Visibility;
+  startAt: string;
+  endAt: string;
+  penaltyMinutes: number;
+  scoreboardVisibility: ScoreboardVisibility;
+  problems: ContestProblem[];
+  participantUserIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmissionTestResult {
+  id: string;
+  groupName: string;
+  testCaseName: string;
+  verdict: SubmissionStatus;
+  timeMs: number;
+  memoryKb: number;
+  message: string;
+}
+
+export interface Submission {
+  id: string;
+  userId: string;
+  problemId: string;
+  contestId: string | null;
+  language: Language;
+  sourceCode: string;
+  status: SubmissionStatus;
+  score: number;
+  totalTimeMs: number;
+  peakMemoryKb: number;
+  submittedAt: string;
+  judgedAt: string | null;
+  testResults: SubmissionTestResult[];
+}
+
+export type ReportTargetType = "problem" | "contest" | "submission";
+
+export type ReportStatus = "open" | "investigating" | "resolved" | "dismissed";
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: string;
+  detail: string;
+  status: ReportStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateReportInput {
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: string;
+  detail: string;
+}
+
+export type AuditAction =
+  | "profile.display_name.update"
+  | "report.create"
+  | "report.status.update"
+  | "admin.user.freeze"
+  | "admin.problem.hide"
+  | "admin.contest.hide"
+  | "submission.rejudge.request";
+
+export interface AuditLog {
+  id: string;
+  actorId: string;
+  action: AuditAction;
+  targetType: string;
+  targetId: string;
+  reason: string;
+  metadata: Record<string, string>;
+  createdAt: string;
+}
+
+export interface RejudgeRequest {
+  id: string;
+  requestedBy: string;
+  submissionId: string;
+  problemId: string;
+  reason: string;
+  detail: string;
+  createdAt: string;
+}
+
+export interface ScoreboardProblemCell {
+  label: string;
+  score: number;
+  acceptedAt: string | null;
+  wrongSubmissions: number;
+}
+
+export interface ScoreboardRow {
+  userId: string;
+  rank: number;
+  totalScore: number;
+  penalty: number;
+  cells: ScoreboardProblemCell[];
+}
+
+export interface CreateProblemInput {
+  title: string;
+  slug: string;
+  statementMarkdown: string;
+  inputDescription: string;
+  outputDescription: string;
+  constraintsMarkdown: string;
+  explanationMarkdown: string;
+  visibility: Visibility;
+  timeLimitMs: number;
+  memoryLimitMb: number;
+  supportedLanguages: Language[];
+}
+
+export type UpdateProblemInput = Partial<CreateProblemInput>;
+
+export interface CreateContestInput {
+  title: string;
+  slug: string;
+  descriptionMarkdown: string;
+  visibility: Visibility;
+  startAt: string;
+  endAt: string;
+  penaltyMinutes: number;
+  scoreboardVisibility: ScoreboardVisibility;
+  problems: ContestProblem[];
+}
+
+export type UpdateContestInput = Partial<CreateContestInput>;
+
+export interface CreateSubmissionInput {
+  problemId: string;
+  contestId: string | null;
+  language: Language;
+  sourceCode: string;
+}
+
+export interface RequestRejudgeInput {
+  submissionId: string;
+  reason: string;
+  detail: string;
+}
