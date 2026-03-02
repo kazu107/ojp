@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SubmissionStatus } from "@/lib/types";
+import { isWaitingSubmissionStatus } from "@/lib/submission-status";
 
 interface SubmissionLiveRefreshProps {
   status: SubmissionStatus;
@@ -18,7 +19,7 @@ export function SubmissionLiveRefresh({
   const router = useRouter();
 
   useEffect(() => {
-    if (status !== "WJ") {
+    if (!isWaitingSubmissionStatus(status)) {
       return;
     }
 
@@ -29,7 +30,7 @@ export function SubmissionLiveRefresh({
     return () => clearInterval(timer);
   }, [intervalMs, router, status]);
 
-  if (status !== "WJ") {
+  if (!isWaitingSubmissionStatus(status)) {
     return null;
   }
 

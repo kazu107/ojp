@@ -7,6 +7,7 @@ import {
   badgeClassForSubmission,
   formatDate,
   languageLabel,
+  submissionStatusLabel,
   testCaseVisibilityLabel,
 } from "@/lib/presentation";
 import {
@@ -64,7 +65,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
         <SubmissionLiveRefresh status={submission.status} />
         <div className="meta-inline">
           <StatusBadge className={badgeClassForSubmission(submission.status)}>
-            {submission.status}
+            {submissionStatusLabel(submission.status)}
           </StatusBadge>
           <span className="text-soft">
             Score: {submission.score} / Time: {submission.totalTimeMs} ms / Memory:{" "}
@@ -74,6 +75,11 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
         <p className="text-soft">
           Language: {languageLabel(submission.language)} / Submitted:{" "}
           {formatDate(submission.submittedAt)}
+        </p>
+        <p className="text-soft">
+          Judge Start: {submission.judgeStartedAt ? formatDate(submission.judgeStartedAt) : "-"} /
+          Judged: {submission.judgedAt ? formatDate(submission.judgedAt) : "-"} / Judge Env:{" "}
+          {submission.judgeEnvironmentVersion ?? "-"}
         </p>
       </section>
 
@@ -109,7 +115,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                     <td>{result.testCaseName}</td>
                     <td>
                       <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                        {result.verdict}
+                        {submissionStatusLabel(result.verdict)}
                       </StatusBadge>
                     </td>
                     <td>{result.timeMs} ms</td>

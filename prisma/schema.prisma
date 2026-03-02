@@ -28,14 +28,19 @@ enum Visibility {
 }
 
 enum SubmissionStatus {
-  WJ
-  AC
-  WA
-  TLE
-  MLE
-  RE
-  CE
-  IE
+  pending
+  queued
+  compiling
+  running
+  judging
+  accepted
+  wrong_answer
+  time_limit_exceeded
+  memory_limit_exceeded
+  runtime_error
+  compilation_error
+  internal_error
+  cancelled
 }
 
 enum Language {
@@ -160,7 +165,9 @@ model Submission {
   totalTimeMs  Int
   peakMemoryKb Int
   submittedAt  DateTime
+  judgeStartedAt DateTime?
   judgedAt     DateTime?
+  judgeEnvironmentVersion String?
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem      Problem           @relation(fields: [problemId], references: [id], onDelete: Cascade)
   contest      Contest?          @relation(fields: [contestId], references: [id], onDelete: SetNull)

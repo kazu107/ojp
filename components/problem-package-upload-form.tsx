@@ -86,7 +86,7 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
           </p>
           <p className="text-soft">
             Config: TL {result.config.timeLimitMs} ms / ML {result.config.memoryLimitMb} MB /{" "}
-            {result.config.scoringType}
+            {result.config.scoringType} / {result.config.compareMode}
           </p>
           <p className="text-soft">Languages: {result.config.languages.join(", ")}</p>
           {result.warnings.length > 0 ? (

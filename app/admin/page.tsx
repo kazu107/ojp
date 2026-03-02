@@ -2,6 +2,7 @@ import { AdminConsole } from "@/components/admin-console";
 import {
   getJudgeQueueDiagnosticsForAdmin,
   getCurrentUser,
+  listAnnouncementsForAdmin,
   listAuditLogsForAdmin,
   listContestsForListView,
   listProblemsForListView,
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const me = await getCurrentUser();
   const reports = await listReportsForAdmin();
+  const announcements = await listAnnouncementsForAdmin();
   const users = listUsers();
   const problems = listProblemsForListView(me.id);
   const contests = listContestsForListView(me.id);
@@ -29,7 +31,7 @@ export default async function AdminPage() {
         <div>
           <h1 className="page-title">Admin</h1>
           <p className="page-subtitle">
-            通報管理、ユーザー凍結、問題/解説/コンテスト非公開化、再ジャッジ要求履歴を管理します。
+            お知らせ、通報管理、ユーザー凍結、問題/解説/コンテスト非公開化、再ジャッジ要求履歴を管理します。
           </p>
         </div>
       </section>
@@ -66,6 +68,7 @@ export default async function AdminPage() {
         users={users}
         problems={problems}
         contests={contests}
+        announcements={announcements}
         reports={reports}
         rejudgeRequests={rejudgeRequests}
         judgeQueueDiagnostics={judgeQueueDiagnostics}

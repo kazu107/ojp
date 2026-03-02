@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import {
+  paginateItems,
   parseNonNegativeNumber,
+  parsePaginationQuery,
   parseString,
   parseVisibility,
 } from "@/lib/api-helpers";
@@ -43,11 +45,18 @@ function parseContestProblems(raw: unknown): ContestProblem[] {
     .filter((item): item is ContestProblem => item !== null);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getOptionalCurrentUser();
-    const contests = listContestsForListView(user?.id ?? "guest");
-    return NextResponse.json({ contests });
+    const pagination = parsePaginationQuery(new URL(request.url).searchParams, {
+      defaultLimit: 50,
+      maxLimit: 200,
+    });
+    const { items: contests, meta } = paginateItems(
+      listContestsForListView(user?.id ?? "guest"),
+      pagination,
+    );
+    return NextResponse.json({ contests, pagination: meta });
   } catch (error) {
     return errorResponse(error, "failed to fetch contests");
   }

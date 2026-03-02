@@ -98,3 +98,92 @@ export function parseExplanationVisibility(
   }
   return fallback;
 }
+
+export interface PaginationRequest {
+  page: number;
+  limit: number;
+  cursor: string | null;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  nextCursor: string | null;
+  prevCursor: string | null;
+}
+
+interface ParsePaginationOptions {
+  defaultLimit?: number;
+  maxLimit?: number;
+}
+
+function encodeCursor(offset: number): string {
+  return Buffer.from(String(offset), "utf8").toString("base64url");
+}
+
+function decodeCursor(cursor: string | null): number | null {
+  if (!cursor) {
+    return null;
+  }
+  try {
+    const decoded = Buffer.from(cursor, "base64url").toString("utf8");
+    const offset = Number(decoded);
+    if (!Number.isFinite(offset) || offset < 0) {
+      return null;
+    }
+    return Math.floor(offset);
+  } catch {
+    return null;
+  }
+}
+
+export function parsePaginationQuery(
+  searchParams: URLSearchParams,
+  options: ParsePaginationOptions = {},
+): PaginationRequest {
+  const defaultLimit = options.defaultLimit ?? 50;
+  const maxLimit = options.maxLimit ?? 200;
+
+  const rawPage = Number(searchParams.get("page"));
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+
+  const rawLimit = Number(searchParams.get("limit"));
+  const parsedLimit =
+    Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : defaultLimit;
+  const limit = Math.min(maxLimit, parsedLimit);
+
+  const cursor = searchParams.get("cursor");
+  return { page, limit, cursor };
+}
+
+export function paginateItems<T>(
+  items: T[],
+  pagination: PaginationRequest,
+): { items: T[]; meta: PaginationMeta } {
+  const total = items.length;
+  const offsetFromCursor = decodeCursor(pagination.cursor);
+  const start = offsetFromCursor ?? (pagination.page - 1) * pagination.limit;
+  const safeStart = Math.max(0, Math.min(total, start));
+  const end = Math.min(total, safeStart + pagination.limit);
+  const paged = items.slice(safeStart, end);
+
+  const hasNext = end < total;
+  const hasPrev = safeStart > 0;
+  const page = Math.floor(safeStart / pagination.limit) + 1;
+
+  return {
+    items: paged,
+    meta: {
+      page,
+      limit: pagination.limit,
+      total,
+      hasNext,
+      hasPrev,
+      nextCursor: hasNext ? encodeCursor(end) : null,
+      prevCursor: hasPrev ? encodeCursor(Math.max(0, safeStart - pagination.limit)) : null,
+    },
+  };
+}

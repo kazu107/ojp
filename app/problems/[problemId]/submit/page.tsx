@@ -39,7 +39,7 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
           <p className="page-subtitle">
             {contest
               ? `コンテスト ${contest.title} への提出です。参加済みかつ開催中の場合のみ受理されます。`
-              : "提出後は即時に疑似ジャッジを実行し、提出詳細画面でテストケース別結果を確認できます。"}
+              : "提出後に非同期ジャッジを実行し、提出詳細画面でテストケース別結果を確認できます。"}
           </p>
         </div>
         <div className="button-row">

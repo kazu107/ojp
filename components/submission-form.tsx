@@ -86,7 +86,8 @@ export function SubmissionForm({
       </label>
 
       <p className="text-soft">
-        疑似ジャッジでは `wrong_answer`, `time_limit`, `runtime_error` などの文字列を含めると対応する判定を再現できます。
+        提出は非同期ジャッジされます。対象問題に ZIP パッケージ（tests/config）が未設定の場合は
+        `internal_error` になります。
       </p>
       {contestId ? (
         <p className="text-soft">

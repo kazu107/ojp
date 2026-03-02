@@ -16,6 +16,7 @@ import {
   getOptionalCurrentUser,
   getProblemForViewer,
 } from "@/lib/store";
+import { getJudgeEnvironmentVersion } from "@/lib/judge-config";
 
 interface ProblemDetailPageProps {
   params: Promise<{
@@ -34,6 +35,7 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
   const { problemId } = await params;
   const me = await getOptionalCurrentUser();
   const viewerId = me?.id ?? "guest";
+  const judgeEnvironmentVersion = getJudgeEnvironmentVersion();
   const problem = getProblemForViewer(problemId, viewerId);
   if (!problem) {
     notFound();
@@ -101,6 +103,7 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
           <p className="text-soft">
             Test Case Visibility: {testCaseVisibilityLabel(problem.testCaseVisibility)}
           </p>
+          <p className="text-soft">Judge Environment: {judgeEnvironmentVersion}</p>
         </article>
       </section>
 

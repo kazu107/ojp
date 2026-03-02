@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContestEditorForm } from "@/components/contest-editor-form";
+import { VisibilityActionButtons } from "@/components/visibility-action-buttons";
 import {
   canEditContestByViewer,
   getContestForViewer,
@@ -35,13 +36,26 @@ export default async function EditContestPage({ params }: EditContestPageProps) 
       </section>
 
       {canEdit ? (
-        <section className="panel">
-          <ContestEditorForm
-            mode="edit"
-            initialContest={contest}
-            availableProblems={availableProblems}
-          />
-        </section>
+        <>
+          <section className="panel">
+            <ContestEditorForm
+              mode="edit"
+              initialContest={contest}
+              availableProblems={availableProblems}
+            />
+          </section>
+          <section className="panel stack">
+            <h2 className="panel-title">Publish Settings</h2>
+            <p className="panel-subtitle">
+              Publish makes this contest public. Unpublish makes it private.
+            </p>
+            <VisibilityActionButtons
+              resourceType="contest"
+              resourceId={contest.id}
+              visibility={contest.visibility}
+            />
+          </section>
+        </>
       ) : (
         <section className="panel stack">
           <p className="badge badge-red">You do not have permission to edit this contest.</p>

@@ -25,9 +25,9 @@ export async function POST(request: Request, { params }: ProblemPackageRouteCont
     }
 
     const zipBuffer = Buffer.from(await file.arrayBuffer());
-    const validation = validateProblemPackage(file.name, zipBuffer);
-    const problem = await applyProblemPackageValidation(problemId, validation);
-    return NextResponse.json({ package: validation, problem }, { status: 201 });
+    const extracted = validateProblemPackage(file.name, zipBuffer);
+    const problem = await applyProblemPackageValidation(problemId, extracted);
+    return NextResponse.json({ package: extracted.validation, problem }, { status: 201 });
   } catch (error) {
     return errorResponse(error, "failed to validate problem package");
   }

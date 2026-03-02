@@ -167,7 +167,7 @@ export default async function ContestDetailPage({ params }: ContestDetailPagePro
                             <td key={`${row.userId}-${cell.label}`}>
                               <div className="stack">
                                 <strong>{cell.score}</strong>
-                                <span className="text-soft">WA:{cell.wrongSubmissions}</span>
+                                <span className="text-soft">Fail:{cell.wrongSubmissions}</span>
                               </div>
                             </td>
                           ))

@@ -10,7 +10,7 @@ import {
   updateContest,
 } from "@/lib/store";
 import { ContestProblem, ScoreboardVisibility } from "@/lib/types";
-import { errorResponse } from "@/lib/api-response";
+import { apiError, errorResponse } from "@/lib/api-response";
 
 interface ContestRouteContext {
   params: Promise<{
@@ -61,7 +61,7 @@ export async function GET(_request: Request, { params }: ContestRouteContext) {
     const user = await getOptionalCurrentUser();
     const contest = getContestForViewer(contestId, user?.id ?? "guest");
     if (!contest) {
-      return NextResponse.json({ error: "contest not found" }, { status: 404 });
+      return apiError(404, "contest not found");
     }
     return NextResponse.json({ contest });
   } catch (error) {

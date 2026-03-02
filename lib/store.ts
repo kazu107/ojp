@@ -1,9 +1,11 @@
 import {
+  Announcement,
   AuditAction,
   AuditLog,
   Contest,
   ContestProblem,
   ContestStatus,
+  CreateAnnouncementInput,
   CreateContestInput,
   CreateProblemInput,
   CreateReportInput,
@@ -23,7 +25,16 @@ import {
   UserRole,
   Visibility,
 } from "@/lib/types";
-import type { ProblemPackageValidationResult } from "@/lib/problem-package";
+import type { ProblemPackageExtracted } from "@/lib/problem-package";
+import { executePackageJudge } from "@/lib/judge-runtime";
+import { getJudgeEnvironmentVersion } from "@/lib/judge-config";
+import {
+  isAcceptedSubmissionStatus,
+  isFinalSubmissionStatus,
+  isWaitingSubmissionStatus,
+  normalizeSubmissionStatus,
+  pickHighestPriorityVerdict,
+} from "@/lib/submission-status";
 import { auth } from "@/auth";
 const BASE_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
 
@@ -36,6 +47,7 @@ const REJUDGE_LIMIT_WINDOW_MS = 60_000;
 const REJUDGE_LIMIT_PER_WINDOW = 3;
 
 const DISPLAY_NAME_CHANGE_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
+type JudgeJobReason = "normal" | "rejudge";
 
 interface RateLimits {
   submissionByUserWindow: Record<string, number[]>;
@@ -47,8 +59,10 @@ interface RateLimits {
 interface Store {
   users: User[];
   problems: Problem[];
+  problemPackages: Record<string, ProblemPackageExtracted>;
   contests: Contest[];
   submissions: Submission[];
+  announcements: Announcement[];
   reports: Report[];
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
@@ -57,7 +71,10 @@ interface Store {
     id: string;
     submissionId: string;
     queuedAt: string;
+    reason: JudgeJobReason;
+    requestedAt: string;
   }>;
+  judgeInFlightSubmissionIds: string[];
   judgeWorkerRunning: boolean;
   counters: {
     user: number;
@@ -65,6 +82,7 @@ interface Store {
     contest: number;
     submission: number;
     testResult: number;
+    announcement: number;
     report: number;
     audit: number;
     rejudge: number;
@@ -115,6 +133,7 @@ function trimWindow(values: number[], windowMs: number, now: number): number[] {
 
 function createInitialStore(): Store {
   const createdAt = "2026-02-20T09:00:00.000Z";
+  const judgeEnvironmentVersion = getJudgeEnvironmentVersion();
   const users: User[] = [
     {
       id: "u1",
@@ -228,18 +247,20 @@ function createInitialStore(): Store {
       contestId: "c1000",
       language: "python",
       sourceCode: "print(input())",
-      status: "AC",
+      status: "accepted",
       score: 100,
       totalTimeMs: 12,
       peakMemoryKb: 2200,
       submittedAt: "2026-02-24T12:05:00.000Z",
+      judgeStartedAt: "2026-02-24T12:05:00.100Z",
       judgedAt: "2026-02-24T12:05:01.000Z",
+      judgeEnvironmentVersion,
       testResults: [
         {
           id: "tr1000",
           groupName: "samples",
           testCaseName: "sample1",
-          verdict: "AC",
+          verdict: "accepted",
           timeMs: 5,
           memoryKb: 1100,
           message: "Accepted",
@@ -248,7 +269,7 @@ function createInitialStore(): Store {
           id: "tr1001",
           groupName: "samples",
           testCaseName: "sample2",
-          verdict: "AC",
+          verdict: "accepted",
           timeMs: 7,
           memoryKb: 1100,
           message: "Accepted",
@@ -263,23 +284,44 @@ function createInitialStore(): Store {
       language: "cpp",
       sourceCode:
         "#include <bits/stdc++.h>\\nusing namespace std;\\nint main(){long long n;cin>>n;cout<<n;}",
-      status: "WA",
+      status: "wrong_answer",
       score: 0,
       totalTimeMs: 20,
       peakMemoryKb: 3100,
       submittedAt: "2026-02-24T12:04:00.000Z",
+      judgeStartedAt: "2026-02-24T12:04:00.100Z",
       judgedAt: "2026-02-24T12:04:01.000Z",
+      judgeEnvironmentVersion,
       testResults: [
         {
           id: "tr1002",
           groupName: "samples",
           testCaseName: "sample1",
-          verdict: "WA",
+          verdict: "wrong_answer",
           timeMs: 10,
           memoryKb: 1500,
           message: "Expected output differs.",
         },
       ],
+    },
+  ];
+
+  const announcements: Announcement[] = [
+    {
+      id: "an1000",
+      title: "OJP MVP Open",
+      body: "OJP MVP prototype is now available. Please report issues from the report page.",
+      isHidden: false,
+      createdAt: "2026-02-20T09:05:00.000Z",
+      updatedAt: "2026-02-20T09:05:00.000Z",
+    },
+    {
+      id: "an1001",
+      title: "Judge Queue Monitoring Added",
+      body: "Admin page now shows judge queue diagnostics and manual repair action.",
+      isHidden: false,
+      createdAt: "2026-02-26T08:30:00.000Z",
+      updatedAt: "2026-02-26T08:30:00.000Z",
     },
   ];
 
@@ -310,16 +352,104 @@ function createInitialStore(): Store {
     },
   ];
 
+  const problemPackages: Record<string, ProblemPackageExtracted> = {
+    p1000: {
+      validation: {
+        fileName: "seed-p1000.zip",
+        zipSizeBytes: 0,
+        fileCount: 0,
+        samplePairs: 2,
+        testGroupCount: 1,
+        totalTestPairs: 2,
+        config: {
+          timeLimitMs: 2000,
+          memoryLimitMb: 512,
+          scoringType: "sum_of_groups",
+          checkerType: "exact",
+          compareMode: "exact",
+          languages: [...BASE_LANGUAGES],
+          groups: [{ name: "group1", score: 100, tests: 2 }],
+        },
+        warnings: ["seed package (embedded)"],
+      },
+      scoringType: "sum_of_groups",
+      compareMode: "exact",
+      groups: [
+        {
+          name: "group1",
+          score: 100,
+          orderIndex: 0,
+          tests: [
+            {
+              name: "01",
+              input: "1\n",
+              output: "1\n",
+            },
+            {
+              name: "02",
+              input: "999999999\n",
+              output: "999999999\n",
+            },
+          ],
+        },
+      ],
+    },
+    p1001: {
+      validation: {
+        fileName: "seed-p1001.zip",
+        zipSizeBytes: 0,
+        fileCount: 0,
+        samplePairs: 2,
+        testGroupCount: 1,
+        totalTestPairs: 2,
+        config: {
+          timeLimitMs: 2000,
+          memoryLimitMb: 512,
+          scoringType: "sum_of_groups",
+          checkerType: "exact",
+          compareMode: "exact",
+          languages: [...BASE_LANGUAGES],
+          groups: [{ name: "group1", score: 100, tests: 2 }],
+        },
+        warnings: ["seed package (embedded)"],
+      },
+      scoringType: "sum_of_groups",
+      compareMode: "exact",
+      groups: [
+        {
+          name: "group1",
+          score: 100,
+          orderIndex: 0,
+          tests: [
+            {
+              name: "01",
+              input: "1 2 3\n",
+              output: "6\n",
+            },
+            {
+              name: "02",
+              input: "-5 6 7\n",
+              output: "8\n",
+            },
+          ],
+        },
+      ],
+    },
+  };
+
   return {
     users,
     problems,
+    problemPackages,
     contests,
     submissions,
+    announcements,
     reports,
     auditLogs,
     rejudgeRequests: [],
     githubIndex: {},
     judgeQueue: [],
+    judgeInFlightSubmissionIds: [],
     judgeWorkerRunning: false,
     counters: {
       user: 4,
@@ -327,6 +457,7 @@ function createInitialStore(): Store {
       contest: 1001,
       submission: 1002,
       testResult: 1003,
+      announcement: 1002,
       report: 1001,
       audit: 1001,
       rejudge: 1000,
@@ -350,11 +481,38 @@ if (!globalStore.__ojpStore) {
 if (!Array.isArray(store.judgeQueue)) {
   store.judgeQueue = [];
 }
+for (const job of store.judgeQueue) {
+  const normalizedJob = job as {
+    id: string;
+    submissionId: string;
+    queuedAt: string;
+    reason?: JudgeJobReason;
+    requestedAt?: string;
+  };
+  if (!normalizedJob.reason) {
+    normalizedJob.reason = "normal";
+  }
+  if (!normalizedJob.requestedAt) {
+    normalizedJob.requestedAt = normalizedJob.queuedAt || nowIso();
+  }
+}
+if (!Array.isArray(store.judgeInFlightSubmissionIds)) {
+  store.judgeInFlightSubmissionIds = [];
+}
 if (typeof store.judgeWorkerRunning !== "boolean") {
   store.judgeWorkerRunning = false;
 }
 if (typeof store.counters.judgeJob !== "number") {
   store.counters.judgeJob = 1000;
+}
+if (!store.problemPackages || typeof store.problemPackages !== "object") {
+  store.problemPackages = {};
+}
+if (!Array.isArray(store.announcements)) {
+  store.announcements = [];
+}
+if (typeof store.counters.announcement !== "number") {
+  store.counters.announcement = 1000;
 }
 for (const problem of store.problems) {
   if (!problem.explanationVisibility) {
@@ -369,6 +527,31 @@ for (const problem of store.problems) {
   if (legacyProblem.latestPackageSummary === undefined) {
     legacyProblem.latestPackageSummary = null;
   }
+}
+for (const submission of store.submissions) {
+  const normalizedStatus = normalizeSubmissionStatus(submission.status);
+  submission.status = normalizedStatus ?? "internal_error";
+
+  const legacySubmission = submission as Submission & {
+    judgeStartedAt?: string | null;
+    judgeEnvironmentVersion?: string | null;
+  };
+  if (legacySubmission.judgeStartedAt === undefined) {
+    legacySubmission.judgeStartedAt = submission.judgedAt ? submission.submittedAt : null;
+  }
+  if (legacySubmission.judgeEnvironmentVersion === undefined) {
+    legacySubmission.judgeEnvironmentVersion = submission.judgedAt
+      ? getJudgeEnvironmentVersion()
+      : null;
+  }
+
+  submission.testResults = submission.testResults.map((result) => {
+    const normalizedVerdict = normalizeSubmissionStatus(result.verdict);
+    return {
+      ...result,
+      verdict: normalizedVerdict ?? "internal_error",
+    };
+  });
 }
 repairJudgeQueueInternal();
 
@@ -399,6 +582,12 @@ function nextSubmissionId(): string {
 function nextTestResultId(): string {
   const id = `tr${store.counters.testResult}`;
   store.counters.testResult += 1;
+  return id;
+}
+
+function nextAnnouncementId(): string {
+  const id = `an${store.counters.announcement}`;
+  store.counters.announcement += 1;
   return id;
 }
 
@@ -485,83 +674,21 @@ function uniqueSlugOrThrow(
   }
 }
 
-function evaluateSubmissionStatus(sourceCode: string): SubmissionStatus {
-  const normalized = sourceCode.toLowerCase();
-  if (!sourceCode.trim()) {
-    return "CE";
-  }
-  if (normalized.includes("compile_error")) {
-    return "CE";
-  }
-  if (normalized.includes("runtime_error")) {
-    return "RE";
-  }
-  if (normalized.includes("time_limit")) {
-    return "TLE";
-  }
-  if (normalized.includes("memory_limit")) {
-    return "MLE";
-  }
-  if (normalized.includes("wrong_answer")) {
-    return "WA";
-  }
-  if (normalized.includes("internal_error")) {
-    return "IE";
-  }
-  return "AC";
-}
-
-function runtimeFromSource(sourceCode: string): { timeMs: number; memoryKb: number } {
-  const hash = sourceCode.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const timeMs = 5 + (hash % 70);
-  const memoryKb = 1000 + (hash % 4000);
-  return { timeMs, memoryKb };
-}
-
-function buildTestResults(status: SubmissionStatus): Submission["testResults"] {
-  if (status === "AC") {
-    return [
-      {
-        id: nextTestResultId(),
-        groupName: "samples",
-        testCaseName: "sample1",
-        verdict: "AC",
-        timeMs: 8,
-        memoryKb: 1400,
-        message: "Accepted",
-      },
-      {
-        id: nextTestResultId(),
-        groupName: "samples",
-        testCaseName: "sample2",
-        verdict: "AC",
-        timeMs: 9,
-        memoryKb: 1450,
-        message: "Accepted",
-      },
-    ];
-  }
-
-  const messageByStatus: Record<SubmissionStatus, string> = {
-    WJ: "Waiting for Judge",
-    AC: "Accepted",
-    WA: "Expected output differs.",
-    TLE: "Time limit exceeded.",
-    MLE: "Memory limit exceeded.",
-    RE: "Runtime error.",
-    CE: "Compile error.",
-    IE: "Internal error.",
-  };
-
-  return [
+function markSubmissionAsInternalError(submission: Submission, message: string): void {
+  submission.status = "internal_error";
+  submission.score = 0;
+  submission.totalTimeMs = 0;
+  submission.peakMemoryKb = 0;
+  submission.judgedAt = nowIso();
+  submission.testResults = [
     {
       id: nextTestResultId(),
-      groupName: "samples",
-      testCaseName: "sample1",
-      verdict: status,
-      timeMs: 20,
-      memoryKb: 3000,
-      message: messageByStatus[status],
+      groupName: "system",
+      testCaseName: "-",
+      verdict: "internal_error",
+      timeMs: 0,
+      memoryKb: 0,
+      message,
     },
   ];
 }
@@ -570,13 +697,20 @@ function findSubmissionByIdInternal(submissionId: string): Submission | undefine
   return store.submissions.find((submission) => submission.id === submissionId);
 }
 
+function hasInFlightJudgeForSubmission(submissionId: string): boolean {
+  return store.judgeInFlightSubmissionIds.includes(submissionId);
+}
+
 function hasQueuedJudgeJobForSubmission(submissionId: string): boolean {
-  return store.judgeQueue.some((job) => job.submissionId === submissionId);
+  return (
+    store.judgeQueue.some((job) => job.submissionId === submissionId) ||
+    hasInFlightJudgeForSubmission(submissionId)
+  );
 }
 
 function collectWaitingSubmissionIds(): string[] {
   return store.submissions
-    .filter((submission) => submission.status === "WJ")
+    .filter((submission) => isWaitingSubmissionStatus(submission.status))
     .map((submission) => submission.id);
 }
 
@@ -602,11 +736,16 @@ function getJudgeQueueDiagnosticsInternal(limit = 50): {
     id: string;
     submissionId: string;
     queuedAt: string;
+    reason: JudgeJobReason;
+    requestedAt: string;
   }>;
   orphanWaitingSubmissionIds: string[];
 } {
   const waitingSubmissionIds = collectWaitingSubmissionIds();
-  const queuedSubmissionIds = new Set(store.judgeQueue.map((job) => job.submissionId));
+  const queuedSubmissionIds = new Set<string>([
+    ...store.judgeQueue.map((job) => job.submissionId),
+    ...store.judgeInFlightSubmissionIds,
+  ]);
   const orphanWaitingSubmissionIds = waitingSubmissionIds.filter(
     (submissionId) => !queuedSubmissionIds.has(submissionId),
   );
@@ -620,17 +759,26 @@ function getJudgeQueueDiagnosticsInternal(limit = 50): {
 
 function repairJudgeQueueInternal(): number {
   const waitingSubmissionIds = collectWaitingSubmissionIds();
-  const queuedSubmissionIds = new Set(store.judgeQueue.map((job) => job.submissionId));
+  const queuedSubmissionIds = new Set<string>([
+    ...store.judgeQueue.map((job) => job.submissionId),
+    ...store.judgeInFlightSubmissionIds,
+  ]);
 
   let requeued = 0;
   for (const submissionId of waitingSubmissionIds) {
     if (queuedSubmissionIds.has(submissionId)) {
       continue;
     }
+    const waitingSubmission = findSubmissionByIdInternal(submissionId);
+    if (waitingSubmission?.status === "pending") {
+      waitingSubmission.status = "queued";
+    }
     store.judgeQueue.push({
       id: nextJudgeJobId(),
       submissionId,
       queuedAt: nowIso(),
+      reason: "normal",
+      requestedAt: nowIso(),
     });
     requeued += 1;
   }
@@ -642,20 +790,103 @@ function repairJudgeQueueInternal(): number {
   return requeued;
 }
 
-function runJudgeForSubmission(submissionId: string): void {
+async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReason): Promise<void> {
   const submission = findSubmissionByIdInternal(submissionId);
   if (!submission) {
     return;
   }
+  if (!isWaitingSubmissionStatus(submission.status)) {
+    return;
+  }
+  submission.judgeStartedAt = submission.judgeStartedAt ?? nowIso();
+  submission.judgeEnvironmentVersion = getJudgeEnvironmentVersion();
 
-  const status = evaluateSubmissionStatus(submission.sourceCode);
-  const runtime = runtimeFromSource(submission.sourceCode);
-  submission.status = status;
-  submission.score = status === "AC" ? 100 : 0;
-  submission.totalTimeMs = runtime.timeMs;
-  submission.peakMemoryKb = runtime.memoryKb;
-  submission.judgedAt = nowIso();
-  submission.testResults = buildTestResults(status);
+  const problem = getProblemById(submission.problemId);
+  if (!problem) {
+    markSubmissionAsInternalError(submission, "problem not found while judging");
+    appendAuditLog({
+      actorId: submission.userId,
+      action: "submission.judge",
+      targetType: "submission",
+      targetId: submission.id,
+      reason,
+      metadata: {
+        result: submission.status,
+        score: String(submission.score),
+      },
+    });
+    return;
+  }
+
+  const packageData = store.problemPackages[problem.id];
+  if (!packageData || packageData.groups.length === 0) {
+    markSubmissionAsInternalError(
+      submission,
+      "problem package is not configured. upload ZIP package before judging",
+    );
+    appendAuditLog({
+      actorId: submission.userId,
+      action: "submission.judge",
+      targetType: "submission",
+      targetId: submission.id,
+      reason,
+      metadata: {
+        result: submission.status,
+        score: String(submission.score),
+      },
+    });
+    return;
+  }
+
+  try {
+    submission.status = "compiling";
+
+    const judged = await executePackageJudge({
+      sourceCode: submission.sourceCode,
+      language: submission.language,
+      timeLimitMs: problem.timeLimitMs,
+      memoryLimitMb: problem.memoryLimitMb,
+      packageData,
+      nextTestResultId,
+      onPhaseChange: (phase) => {
+        submission.status = phase;
+      },
+    });
+    submission.status = judged.status;
+    submission.score = judged.score;
+    submission.totalTimeMs = judged.totalTimeMs;
+    submission.peakMemoryKb = judged.peakMemoryKb;
+    submission.judgedAt = nowIso();
+    submission.testResults = judged.testResults;
+
+    appendAuditLog({
+      actorId: submission.userId,
+      action: "submission.judge",
+      targetType: "submission",
+      targetId: submission.id,
+      reason,
+      metadata: {
+        result: submission.status,
+        score: String(submission.score),
+      },
+    });
+  } catch (error) {
+    markSubmissionAsInternalError(
+      submission,
+      error instanceof Error ? error.message : "judge internal error",
+    );
+    appendAuditLog({
+      actorId: submission.userId,
+      action: "submission.judge",
+      targetType: "submission",
+      targetId: submission.id,
+      reason,
+      metadata: {
+        result: submission.status,
+        score: String(submission.score),
+      },
+    });
+  }
 }
 
 function scheduleJudgeWorker(): void {
@@ -664,34 +895,53 @@ function scheduleJudgeWorker(): void {
   }
 
   store.judgeWorkerRunning = true;
-  const tick = () => {
+  const tick = async () => {
     const nextJob = store.judgeQueue.shift();
     if (!nextJob) {
       store.judgeWorkerRunning = false;
       return;
     }
 
-    runJudgeForSubmission(nextJob.submissionId);
-    setTimeout(tick, 50);
+    if (!hasInFlightJudgeForSubmission(nextJob.submissionId)) {
+      store.judgeInFlightSubmissionIds.push(nextJob.submissionId);
+    }
+    try {
+      await runJudgeForSubmission(nextJob.submissionId, nextJob.reason);
+    } finally {
+      store.judgeInFlightSubmissionIds = store.judgeInFlightSubmissionIds.filter(
+        (submissionId) => submissionId !== nextJob.submissionId,
+      );
+    }
+    setTimeout(() => {
+      void tick();
+    }, 50);
   };
 
-  setTimeout(tick, 100);
+  setTimeout(() => {
+    void tick();
+  }, 100);
 }
 
-function enqueueJudgeJob(submissionId: string): void {
+function enqueueJudgeJob(submissionId: string, reason: JudgeJobReason = "normal"): void {
   const submission = findSubmissionByIdInternal(submissionId);
-  if (!submission || submission.status !== "WJ") {
+  if (!submission || isFinalSubmissionStatus(submission.status)) {
     return;
+  }
+  if (submission.status === "pending") {
+    submission.status = "queued";
   }
   if (hasQueuedJudgeJobForSubmission(submissionId)) {
     scheduleJudgeWorker();
     return;
   }
 
+  const requestedAt = nowIso();
   store.judgeQueue.push({
     id: nextJudgeJobId(),
     submissionId,
-    queuedAt: nowIso(),
+    queuedAt: requestedAt,
+    reason,
+    requestedAt,
   });
   scheduleJudgeWorker();
 }
@@ -1009,6 +1259,26 @@ export function listUsers(): User[] {
   return [...store.users];
 }
 
+export function listAnnouncementsForViewer(viewerId: string): Announcement[] {
+  const viewer = findUser(viewerId);
+  const includeHidden = viewer?.role === "admin";
+  return [...store.announcements]
+    .filter((announcement) => includeHidden || !announcement.isHidden)
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    );
+}
+
+export async function listAnnouncementsForAdmin(): Promise<Announcement[]> {
+  const user = await getCurrentUser();
+  assertAdmin(user);
+  return [...store.announcements].sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
+}
+
 export async function updateCurrentUserProfile(payload: {
   displayName?: string;
   bio?: string;
@@ -1237,7 +1507,7 @@ export async function updateProblem(
 
 export async function applyProblemPackageValidation(
   problemId: string,
-  validation: ProblemPackageValidationResult,
+  packageData: ProblemPackageExtracted,
 ): Promise<Problem> {
   const actor = await getCurrentUser();
   const problem = resolveProblemIfExists(problemId);
@@ -1245,19 +1515,22 @@ export async function applyProblemPackageValidation(
     throw new HttpError("you cannot upload package for this problem", 403);
   }
 
-  problem.timeLimitMs = validation.config.timeLimitMs;
-  problem.memoryLimitMb = validation.config.memoryLimitMb;
-  problem.supportedLanguages = validation.config.languages;
+  problem.timeLimitMs = packageData.validation.config.timeLimitMs;
+  problem.memoryLimitMb = packageData.validation.config.memoryLimitMb;
+  problem.supportedLanguages = packageData.validation.config.languages;
+  problem.scoringType =
+    packageData.scoringType === "sum_of_groups" ? "sum_of_groups" : packageData.scoringType;
   problem.latestPackageSummary = {
-    fileName: validation.fileName,
-    zipSizeBytes: validation.zipSizeBytes,
-    fileCount: validation.fileCount,
-    samplePairs: validation.samplePairs,
-    testGroupCount: validation.testGroupCount,
-    totalTestPairs: validation.totalTestPairs,
-    warnings: validation.warnings,
+    fileName: packageData.validation.fileName,
+    zipSizeBytes: packageData.validation.zipSizeBytes,
+    fileCount: packageData.validation.fileCount,
+    samplePairs: packageData.validation.samplePairs,
+    testGroupCount: packageData.validation.testGroupCount,
+    totalTestPairs: packageData.validation.totalTestPairs,
+    warnings: packageData.validation.warnings,
     validatedAt: nowIso(),
   };
+  store.problemPackages[problem.id] = packageData;
   problem.updatedAt = nowIso();
 
   return problem;
@@ -1474,7 +1747,8 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     const contestStatus = getContestStatus(contest);
     if (contestStatus === "running") {
       if (!contest.participantUserIds.includes(currentUser.id)) {
-        throw new HttpError("join contest before submitting", 403);
+        contest.participantUserIds.push(currentUser.id);
+        contest.updatedAt = nowIso();
       }
       const included = contest.problems.some(
         (contestProblem) => contestProblem.problemId === problem.id,
@@ -1511,17 +1785,19 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     contestId,
     language: input.language,
     sourceCode: input.sourceCode,
-    status: "WJ",
+    status: "pending",
     score: 0,
     totalTimeMs: 0,
     peakMemoryKb: 0,
     submittedAt,
+    judgeStartedAt: null,
     judgedAt: null,
+    judgeEnvironmentVersion: null,
     testResults: [],
   };
 
   store.submissions.unshift(submission);
-  enqueueJudgeJob(submission.id);
+  enqueueJudgeJob(submission.id, "normal");
   return submission;
 }
 
@@ -1530,11 +1806,18 @@ function getWrongBeforeAccepted(
   acceptedAt: string | null,
 ): number {
   if (!acceptedAt) {
-    return orderedSubmissions.filter((submission) => submission.status !== "AC").length;
+    return orderedSubmissions.filter(
+      (submission) =>
+        isFinalSubmissionStatus(submission.status) &&
+        !isAcceptedSubmissionStatus(submission.status) &&
+        submission.status !== "cancelled",
+    ).length;
   }
   return orderedSubmissions.filter(
     (submission) =>
-      submission.status !== "AC" &&
+      isFinalSubmissionStatus(submission.status) &&
+      !isAcceptedSubmissionStatus(submission.status) &&
+      submission.status !== "cancelled" &&
       new Date(submission.submittedAt).getTime() < new Date(acceptedAt).getTime(),
   ).length;
 }
@@ -1553,13 +1836,24 @@ function cellPenaltyMinutes(
 export function buildScoreboard(contestId: string): ScoreboardRow[] {
   const contest = resolveContestIfExists(contestId);
   const contestProblems = [...contest.problems].sort((left, right) => left.orderIndex - right.orderIndex);
+  const contestStartMs = new Date(contest.startAt).getTime();
+  const contestEndMs = new Date(contest.endAt).getTime();
   const inContestSubmissions = store.submissions.filter(
-    (submission) => submission.contestId === contestId,
+    (submission) => {
+      if (submission.contestId !== contestId) {
+        return false;
+      }
+      if (!isFinalSubmissionStatus(submission.status) || submission.status === "cancelled") {
+        return false;
+      }
+      const submittedAtMs = new Date(submission.submittedAt).getTime();
+      if (submittedAtMs < contestStartMs || submittedAtMs > contestEndMs) {
+        return false;
+      }
+      return true;
+    },
   );
-  const participantIds = new Set<string>([
-    ...contest.participantUserIds,
-    ...inContestSubmissions.map((submission) => submission.userId),
-  ]);
+  const participantIds = new Set<string>(contest.participantUserIds);
 
   const rows: ScoreboardRow[] = Array.from(participantIds).map((userId) => {
     const cells = contestProblems.map((contestProblem) => {
@@ -1570,7 +1864,7 @@ export function buildScoreboard(contestId: string): ScoreboardRow[] {
         ),
       );
 
-      const accepted = scoped.find((submission) => submission.status === "AC");
+      const accepted = scoped.find((submission) => isAcceptedSubmissionStatus(submission.status));
       const acceptedAt = accepted?.submittedAt ?? null;
       const wrongSubmissions = getWrongBeforeAccepted(scoped, acceptedAt);
       const score = scoped.reduce((maxScore, submission) => Math.max(maxScore, submission.score), 0);
@@ -1598,12 +1892,18 @@ export function buildScoreboard(contestId: string): ScoreboardRow[] {
         )
       );
     }, 0);
+    const acceptedTimes = cells
+      .filter((cell) => cell.acceptedAt)
+      .map((cell) => new Date(cell.acceptedAt as string).getTime());
+    const lastAcceptedAt =
+      acceptedTimes.length > 0 ? new Date(Math.max(...acceptedTimes)).toISOString() : null;
 
     return {
       userId,
       rank: 0,
       totalScore,
       penalty,
+      lastAcceptedAt,
       cells,
     };
   });
@@ -1614,6 +1914,15 @@ export function buildScoreboard(contestId: string): ScoreboardRow[] {
     }
     if (left.penalty !== right.penalty) {
       return left.penalty - right.penalty;
+    }
+    const leftLastAccepted = left.lastAcceptedAt
+      ? new Date(left.lastAcceptedAt).getTime()
+      : Number.POSITIVE_INFINITY;
+    const rightLastAccepted = right.lastAcceptedAt
+      ? new Date(right.lastAcceptedAt).getTime()
+      : Number.POSITIVE_INFINITY;
+    if (leftLastAccepted !== rightLastAccepted) {
+      return leftLastAccepted - rightLastAccepted;
     }
     return left.userId.localeCompare(right.userId);
   });
@@ -1722,6 +2031,7 @@ export function dumpStoreSnapshot(): {
   problems: Problem[];
   contests: Contest[];
   submissions: Submission[];
+  announcements: Announcement[];
   reports: Report[];
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
@@ -1731,6 +2041,7 @@ export function dumpStoreSnapshot(): {
     problems: JSON.parse(JSON.stringify(store.problems)) as Problem[],
     contests: JSON.parse(JSON.stringify(store.contests)) as Contest[],
     submissions: JSON.parse(JSON.stringify(store.submissions)) as Submission[],
+    announcements: JSON.parse(JSON.stringify(store.announcements)) as Announcement[],
     reports: JSON.parse(JSON.stringify(store.reports)) as Report[],
     auditLogs: JSON.parse(JSON.stringify(store.auditLogs)) as AuditLog[],
     rejudgeRequests: JSON.parse(JSON.stringify(store.rejudgeRequests)) as RejudgeRequest[],
@@ -1750,7 +2061,7 @@ function maskSensitiveJudgeMessage(
     return result;
   }
 
-  if (result.verdict === "CE" || result.verdict === "IE") {
+  if (result.verdict === "compilation_error" || result.verdict === "internal_error") {
     return {
       ...result,
       message: "details hidden",
@@ -1775,8 +2086,7 @@ function buildCaseIndexOnlyResults(
 }
 
 function pickSummaryVerdict(groupResults: Submission["testResults"]): SubmissionStatus {
-  const firstFailure = groupResults.find((result) => result.verdict !== "AC");
-  return firstFailure?.verdict ?? "AC";
+  return pickHighestPriorityVerdict(groupResults.map((result) => result.verdict));
 }
 
 function buildGroupOnlyResults(results: Submission["testResults"]): Submission["testResults"] {
@@ -1799,7 +2109,9 @@ function buildGroupOnlyResults(results: Submission["testResults"]): Submission["
       verdict,
       timeMs: totalTimeMs,
       memoryKb: peakMemoryKb,
-      message: verdict === "AC" ? "Accepted (group summary)" : `${verdict} (group summary)`,
+      message: isAcceptedSubmissionStatus(verdict)
+        ? "Accepted (group summary)"
+        : `${verdict} (group summary)`,
     };
   });
 }
@@ -2035,6 +2347,64 @@ export async function updateUserRoleByAdmin(
   return target;
 }
 
+export async function createAnnouncementByAdmin(
+  input: CreateAnnouncementInput,
+  reason: string,
+): Promise<Announcement> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+
+  const title = input.title.trim();
+  if (!title) {
+    throw new HttpError("announcement title is required", 400);
+  }
+
+  const announcement: Announcement = {
+    id: nextAnnouncementId(),
+    title,
+    body: input.body.trim(),
+    isHidden: false,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  store.announcements.unshift(announcement);
+
+  appendAuditLog({
+    actorId: admin.id,
+    action: "admin.announcement.create",
+    targetType: "announcement",
+    targetId: announcement.id,
+    reason: reason || "announcement created by admin",
+  });
+
+  return announcement;
+}
+
+export async function hideAnnouncementByAdmin(
+  announcementId: string,
+  reason: string,
+): Promise<Announcement> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+  const announcement = store.announcements.find((item) => item.id === announcementId);
+  if (!announcement) {
+    throw new HttpError("announcement not found", 404);
+  }
+
+  announcement.isHidden = true;
+  announcement.updatedAt = nowIso();
+
+  appendAuditLog({
+    actorId: admin.id,
+    action: "admin.announcement.hide",
+    targetType: "announcement",
+    targetId: announcement.id,
+    reason: reason || "announcement hidden by admin",
+  });
+
+  return announcement;
+}
+
 export async function hideProblemByAdmin(
   problemId: string,
   reason: string,
@@ -2119,6 +2489,8 @@ export async function getJudgeQueueDiagnosticsForAdmin(limit = 50): Promise<{
     id: string;
     submissionId: string;
     queuedAt: string;
+    reason: JudgeJobReason;
+    requestedAt: string;
   }>;
   orphanWaitingSubmissionIds: string[];
 }> {
@@ -2139,6 +2511,8 @@ export async function repairJudgeQueueByAdmin(): Promise<{
       id: string;
       submissionId: string;
       queuedAt: string;
+      reason: JudgeJobReason;
+      requestedAt: string;
     }>;
     orphanWaitingSubmissionIds: string[];
   };
@@ -2192,11 +2566,13 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
 
   enforceRejudgeRateLimit(actor.id, problem.id, isAdminBypass(actor));
 
-  submission.status = "WJ";
+  submission.status = "pending";
   submission.score = 0;
   submission.totalTimeMs = 0;
   submission.peakMemoryKb = 0;
+  submission.judgeStartedAt = null;
   submission.judgedAt = null;
+  submission.judgeEnvironmentVersion = null;
   submission.testResults = [];
 
   const request: RejudgeRequest = {
@@ -2219,7 +2595,7 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     metadata: { requestId: request.id, problemId: problem.id },
   });
 
-  enqueueJudgeJob(submission.id);
+  enqueueJudgeJob(submission.id, "rejudge");
 
   return { request, submission };
 }

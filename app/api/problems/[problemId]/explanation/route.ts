@@ -3,7 +3,7 @@ import {
   parseExplanationVisibility,
   parseOptionalString,
 } from "@/lib/api-helpers";
-import { errorResponse } from "@/lib/api-response";
+import { apiError, errorResponse } from "@/lib/api-response";
 import {
   canViewProblemExplanation,
   getOptionalCurrentUser,
@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: ProblemExplanationRoute
     const viewerId = user?.id ?? "guest";
     const problem = getProblemForViewer(problemId, viewerId);
     if (!problem) {
-      return NextResponse.json({ error: "problem not found" }, { status: 404 });
+      return apiError(404, "problem not found");
     }
     if (!canViewProblemExplanation(problem, viewerId)) {
       throw new HttpError("you cannot view this explanation", 403);

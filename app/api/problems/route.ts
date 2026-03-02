@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  paginateItems,
   parseExplanationVisibility,
   parseLanguages,
+  parsePaginationQuery,
   parsePositiveNumber,
   parseString,
   parseTestCaseVisibility,
@@ -14,11 +16,18 @@ import {
 } from "@/lib/store";
 import { errorResponse } from "@/lib/api-response";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getOptionalCurrentUser();
-    const problems = listProblemsForListView(user?.id ?? "guest");
-    return NextResponse.json({ problems });
+    const pagination = parsePaginationQuery(new URL(request.url).searchParams, {
+      defaultLimit: 50,
+      maxLimit: 200,
+    });
+    const { items: problems, meta } = paginateItems(
+      listProblemsForListView(user?.id ?? "guest"),
+      pagination,
+    );
+    return NextResponse.json({ problems, pagination: meta });
   } catch (error) {
     return errorResponse(error, "failed to fetch problems");
   }

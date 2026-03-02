@@ -19,7 +19,7 @@ AtCoder風プラットフォームのMVPプロトタイプです。
 ## 仕様との対応
 
 - 公開範囲: `public / unlisted / private`
-- 判定種別: `AC / WA / TLE / MLE / RE / CE / IE / WJ`
+- 提出状態: `pending / queued / compiling / running / judging / accepted / wrong_answer / time_limit_exceeded / memory_limit_exceeded / runtime_error / compilation_error / internal_error / cancelled`
 - 初期言語: `C++ / Python / Java / JavaScript`
 - 順位表: 問題ごとの最高点 + ペナルティで集計
 - 順位表公開: `hidden / partial / full` を反映
@@ -52,17 +52,15 @@ AtCoder風プラットフォームのMVPプロトタイプです。
 - 永続化は未実装で、基本はインメモリストアです。
 - 認証は GitHub OAuth ログインです（`next-auth`）。
 - 初回ログイン時は、GitHubアカウント情報からアプリ内ユーザーを自動作成します。
-- ジャッジは疑似判定です（提出時は一旦 `WJ` となり、非同期で確定します）。
+- ジャッジは非同期です（`pending -> queued -> compiling -> running -> judging -> final`）。
+- 問題ZIPが登録されている問題は、`config.json` と `tests/*` を使って実行ジャッジします。
+  - 対応言語: `C++ / Python / Java / JavaScript`
+  - 比較方式: `exact / ignore_trailing_spaces`
+  - 採点方式: `binary / sum_of_groups`
+- 判定優先順は仕様通り `CE > IE > RE > MLE > TLE > WA > AC` です。
+- 問題ZIPが未登録の問題は `internal_error` になります（seedの `p1000 / p1001` は埋め込みパッケージあり）。
+- 採点時の `judgeEnvironmentVersion` を提出に保存します（既定: `v1`）。
 - Prisma / PostgreSQL を用意して、スナップショットの seed で初期データ投入できます。
-
-疑似判定では提出コードに次の文字列を含めると判定を再現できます。
-
-- `wrong_answer` -> `WA`
-- `time_limit` -> `TLE`
-- `memory_limit` -> `MLE`
-- `runtime_error` -> `RE`
-- `compile_error` -> `CE`
-- `internal_error` -> `IE`
 
 ## 起動
 
@@ -81,6 +79,7 @@ npm run dev
 AUTH_SECRET="replace-with-long-random-string"
 AUTH_GITHUB_ID="github-oauth-client-id"
 AUTH_GITHUB_SECRET="github-oauth-client-secret"
+JUDGE_ENVIRONMENT_VERSION="v1"
 ```
 
 GitHub OAuth App 側には、利用環境に合わせて Callback URL を設定してください。
@@ -168,9 +167,12 @@ npm run build
 - `POST /api/problems`
 - `GET /api/problems/:problemId`
 - `PATCH /api/problems/:problemId`
+- `POST /api/problems/:problemId/publish`
+- `POST /api/problems/:problemId/unpublish`
 - `POST /api/problems/:problemId/package`
 - `GET /api/problems/:problemId/explanation`
 - `PUT /api/problems/:problemId/explanation`
+- `GET /api/announcements`
 - `POST /api/submissions`
 - `GET /api/submissions`
 - `GET /api/submissions?mine=1&problemId=&contestId=&status=&language=&limit=`
@@ -180,16 +182,27 @@ npm run build
 - `POST /api/contests`
 - `GET /api/contests/:contestId`
 - `PATCH /api/contests/:contestId`
+- `POST /api/contests/:contestId/publish`
+- `POST /api/contests/:contestId/unpublish`
 - `POST /api/contests/:contestId/join`
 - `GET /api/contests/:contestId/scoreboard`
+- `POST /api/contests/:contestId/problems`
+- `DELETE /api/contests/:contestId/problems/:contestProblemId`
 - `POST /api/reports`
 - `GET /api/admin/reports`
+- `POST /api/admin/reports/:reportId/resolve`
 - `POST /api/admin/reports/:reportId/status`
 - `POST /api/admin/users/:userId/freeze`
 - `POST /api/admin/users/:userId/unfreeze`
 - `POST /api/admin/users/:userId/role`
+- `GET /api/admin/announcements`
+- `POST /api/admin/announcements`
+- `POST /api/admin/announcements/:announcementId/hide`
 - `GET /api/admin/judge/queue`
 - `POST /api/admin/judge/queue`
 - `POST /api/admin/problems/:problemId/hide`
 - `POST /api/admin/problems/:problemId/explanation/hide`
 - `POST /api/admin/contests/:contestId/hide`
+
+一覧系API (`/api/problems`, `/api/contests`, `/api/submissions`, `/api/admin/reports`) は
+`page`, `limit`, `cursor` クエリをサポートします。

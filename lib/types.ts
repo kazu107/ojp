@@ -12,14 +12,19 @@ export type Visibility = "public" | "unlisted" | "private";
 export type ContestStatus = "scheduled" | "running" | "ended";
 
 export type SubmissionStatus =
-  | "WJ"
-  | "AC"
-  | "WA"
-  | "TLE"
-  | "MLE"
-  | "RE"
-  | "CE"
-  | "IE";
+  | "pending"
+  | "queued"
+  | "compiling"
+  | "running"
+  | "judging"
+  | "accepted"
+  | "wrong_answer"
+  | "time_limit_exceeded"
+  | "memory_limit_exceeded"
+  | "runtime_error"
+  | "compilation_error"
+  | "internal_error"
+  | "cancelled";
 
 export type Language = "cpp" | "python" | "java" | "javascript";
 
@@ -65,7 +70,7 @@ export interface Problem {
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: Language[];
-  scoringType: "sum";
+  scoringType: "sum" | "binary" | "sum_of_groups";
   testCaseVisibility: TestCaseVisibility;
   latestPackageSummary: ProblemPackageSummary | null;
   createdAt: string;
@@ -118,8 +123,19 @@ export interface Submission {
   totalTimeMs: number;
   peakMemoryKb: number;
   submittedAt: string;
+  judgeStartedAt: string | null;
   judgedAt: string | null;
+  judgeEnvironmentVersion: string | null;
   testResults: SubmissionTestResult[];
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  isHidden: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ReportTargetType = "problem" | "contest" | "submission";
@@ -152,9 +168,12 @@ export type AuditAction =
   | "admin.user.freeze"
   | "admin.user.unfreeze"
   | "admin.user.role.update"
+  | "admin.announcement.create"
+  | "admin.announcement.hide"
   | "admin.problem.hide"
   | "admin.problem.explanation.hide"
   | "admin.contest.hide"
+  | "submission.judge"
   | "submission.rejudge.request";
 
 export interface AuditLog {
@@ -190,6 +209,7 @@ export interface ScoreboardRow {
   rank: number;
   totalScore: number;
   penalty: number;
+  lastAcceptedAt: string | null;
   cells: ScoreboardProblemCell[];
 }
 
@@ -230,6 +250,11 @@ export interface CreateSubmissionInput {
   contestId: string | null;
   language: Language;
   sourceCode: string;
+}
+
+export interface CreateAnnouncementInput {
+  title: string;
+  body: string;
 }
 
 export interface RequestRejudgeInput {

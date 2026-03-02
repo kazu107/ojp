@@ -2,13 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Contest, Problem, RejudgeRequest, Report, User, UserRole } from "@/lib/types";
+import {
+  Announcement,
+  Contest,
+  Problem,
+  RejudgeRequest,
+  Report,
+  User,
+  UserRole,
+} from "@/lib/types";
 import { formatDate } from "@/lib/presentation";
 
 interface AdminConsoleProps {
   users: User[];
   problems: Problem[];
   contests: Contest[];
+  announcements: Announcement[];
   reports: Report[];
   rejudgeRequests: RejudgeRequest[];
   judgeQueueDiagnostics: {
@@ -21,6 +30,8 @@ interface AdminConsoleProps {
       id: string;
       submissionId: string;
       queuedAt: string;
+      reason: "normal" | "rejudge";
+      requestedAt: string;
     }>;
     orphanWaitingSubmissionIds: string[];
   };
@@ -30,6 +41,7 @@ export function AdminConsole({
   users,
   problems,
   contests,
+  announcements,
   reports,
   rejudgeRequests,
   judgeQueueDiagnostics,
@@ -39,8 +51,10 @@ export function AdminConsole({
   const [error, setError] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [roleDraftByUserId, setRoleDraftByUserId] = useState<Record<string, UserRole>>({});
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementBody, setAnnouncementBody] = useState("");
 
-  async function postJson(url: string, payload: Record<string, string>) {
+  async function postJson(url: string, payload: Record<string, string>): Promise<boolean> {
     setError("");
     setBusyKey(url);
     try {
@@ -54,8 +68,10 @@ export function AdminConsole({
         throw new Error(body.error ?? "request failed");
       }
       router.refresh();
+      return true;
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "unexpected error");
+      return false;
     } finally {
       setBusyKey("");
     }
@@ -64,6 +80,96 @@ export function AdminConsole({
   return (
     <div className="stack">
       {error ? <p className="badge badge-red">{error}</p> : null}
+
+      <section className="panel stack">
+        <h2 className="panel-title">Announcements</h2>
+        <form
+          className="form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!announcementTitle.trim()) {
+              setError("announcement title is required");
+              return;
+            }
+            const ok = await postJson("/api/admin/announcements", {
+              title: announcementTitle,
+              body: announcementBody,
+              reason: "admin announcement",
+            });
+            if (ok) {
+              setAnnouncementTitle("");
+              setAnnouncementBody("");
+            }
+          }}
+        >
+          <label className="field">
+            <span className="field-label">Title</span>
+            <input
+              className="input"
+              value={announcementTitle}
+              onChange={(event) => setAnnouncementTitle(event.target.value)}
+              placeholder="Maintenance notice"
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">Body</span>
+            <textarea
+              className="textarea"
+              value={announcementBody}
+              onChange={(event) => setAnnouncementBody(event.target.value)}
+              placeholder="Service update details..."
+            />
+          </label>
+          <div className="button-row">
+            <button className="button" type="submit" disabled={busyKey === "/api/admin/announcements"}>
+              Post Announcement
+            </button>
+          </div>
+        </form>
+
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Created</th>
+                <th>Hidden</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {announcements.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>No announcements.</td>
+                </tr>
+              ) : (
+                announcements.map((announcement) => (
+                  <tr key={announcement.id}>
+                    <td>{announcement.id}</td>
+                    <td>{announcement.title}</td>
+                    <td>{formatDate(announcement.createdAt)}</td>
+                    <td>{announcement.isHidden ? "yes" : "no"}</td>
+                    <td>
+                      <button
+                        className="button button-secondary"
+                        disabled={busyKey.includes(announcement.id) || announcement.isHidden}
+                        onClick={() =>
+                          postJson(`/api/admin/announcements/${announcement.id}/hide`, {
+                            reason: "admin hide announcement",
+                          })
+                        }
+                      >
+                        Hide
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="panel stack">
         <h2 className="panel-title">Judge Queue</h2>
@@ -96,19 +202,23 @@ export function AdminConsole({
               <tr>
                 <th>Job ID</th>
                 <th>Submission</th>
+                <th>Reason</th>
+                <th>Requested</th>
                 <th>Queued</th>
               </tr>
             </thead>
             <tbody>
               {judgeQueueDiagnostics.jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={3}>No queued jobs.</td>
+                  <td colSpan={5}>No queued jobs.</td>
                 </tr>
               ) : (
                 judgeQueueDiagnostics.jobs.map((job) => (
                   <tr key={job.id}>
                     <td>{job.id}</td>
                     <td>{job.submissionId}</td>
+                    <td>{job.reason}</td>
+                    <td>{formatDate(job.requestedAt)}</td>
                     <td>{formatDate(job.queuedAt)}</td>
                   </tr>
                 ))
@@ -118,7 +228,7 @@ export function AdminConsole({
         </div>
         {judgeQueueDiagnostics.orphanWaitingSubmissionIds.length > 0 ? (
           <div className="stack">
-            <p className="field-label">Orphan WJ Submission IDs</p>
+            <p className="field-label">Orphan Waiting Submission IDs</p>
             {judgeQueueDiagnostics.orphanWaitingSubmissionIds.map((submissionId) => (
               <p key={submissionId} className="text-soft">
                 - {submissionId}

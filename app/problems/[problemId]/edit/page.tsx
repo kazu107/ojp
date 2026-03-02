@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProblemEditorForm } from "@/components/problem-editor-form";
 import { ProblemPackageUploadForm } from "@/components/problem-package-upload-form";
+import { VisibilityActionButtons } from "@/components/visibility-action-buttons";
 import {
   canEditProblemByViewer,
   getCurrentUser,
@@ -39,6 +40,17 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
         <>
           <section className="panel">
             <ProblemEditorForm mode="edit" initialProblem={problem} />
+          </section>
+          <section className="panel stack">
+            <h2 className="panel-title">Publish Settings</h2>
+            <p className="panel-subtitle">
+              Publish makes this problem public. Unpublish makes it private.
+            </p>
+            <VisibilityActionButtons
+              resourceType="problem"
+              resourceId={problem.id}
+              visibility={problem.visibility}
+            />
           </section>
           <section className="panel stack">
             <h2 className="panel-title">Problem Package</h2>

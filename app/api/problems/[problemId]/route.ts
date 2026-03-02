@@ -12,7 +12,7 @@ import {
   getProblemForViewer,
   updateProblem,
 } from "@/lib/store";
-import { errorResponse } from "@/lib/api-response";
+import { apiError, errorResponse } from "@/lib/api-response";
 
 interface ProblemRouteContext {
   params: Promise<{
@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: ProblemRouteContext) {
     const user = await getOptionalCurrentUser();
     const problem = getProblemForViewer(problemId, user?.id ?? "guest");
     if (!problem) {
-      return NextResponse.json({ error: "problem not found" }, { status: 404 });
+      return apiError(404, "problem not found");
     }
     return NextResponse.json({ problem });
   } catch (error) {

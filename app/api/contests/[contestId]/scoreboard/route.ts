@@ -4,7 +4,7 @@ import {
   getContestForViewer,
   getOptionalCurrentUser,
 } from "@/lib/store";
-import { errorResponse } from "@/lib/api-response";
+import { apiError, errorResponse } from "@/lib/api-response";
 
 interface ScoreboardRouteContext {
   params: Promise<{
@@ -18,7 +18,7 @@ export async function GET(_request: Request, { params }: ScoreboardRouteContext)
     const user = await getOptionalCurrentUser();
     const contest = getContestForViewer(contestId, user?.id ?? "guest");
     if (!contest) {
-      return NextResponse.json({ error: "contest not found" }, { status: 404 });
+      return apiError(404, "contest not found");
     }
     const result = buildVisibleScoreboard(contestId);
     return NextResponse.json({

@@ -5,11 +5,13 @@ import {
   badgeClassForSubmission,
   contestStatusLabel,
   formatDate,
+  submissionStatusLabel,
 } from "@/lib/presentation";
 import {
   buildScoreboard,
   canCreateProblemByRole,
   getContestStatus,
+  listAnnouncementsForViewer,
   getOptionalCurrentUser,
   listContestsForListView,
   listPublicProblems,
@@ -24,6 +26,7 @@ export default async function HomePage() {
   const problems = listPublicProblems();
   const contests = listContestsForListView(me?.id ?? "guest");
   const submissions = listRecentSubmissions(8);
+  const announcements = listAnnouncementsForViewer(me?.id ?? "guest").slice(0, 5);
   const latestContest = contests[0];
   const latestScoreboard = latestContest ? buildScoreboard(latestContest.id) : [];
 
@@ -74,6 +77,30 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="panel stack">
+        <div className="page-head">
+          <div>
+            <h2 className="panel-title">Announcements</h2>
+            <p className="panel-subtitle">Latest platform updates and moderation notices.</p>
+          </div>
+        </div>
+        {announcements.length === 0 ? (
+          <p className="empty">No announcements.</p>
+        ) : (
+          <div className="stack">
+            {announcements.map((announcement) => (
+              <article key={announcement.id} className="stack">
+                <div className="meta-inline">
+                  <strong>{announcement.title}</strong>
+                  <span className="text-soft">{formatDate(announcement.createdAt)}</span>
+                </div>
+                <p className="text-soft">{announcement.body}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className="grid-2">
         <article className="panel stack">
           <div className="page-head">
@@ -108,7 +135,7 @@ export default async function HomePage() {
                     <td>{submission.problemId}</td>
                     <td>
                       <StatusBadge className={badgeClassForSubmission(submission.status)}>
-                        {submission.status}
+                        {submissionStatusLabel(submission.status)}
                       </StatusBadge>
                     </td>
                     <td>{formatDate(submission.submittedAt)}</td>

@@ -46,7 +46,36 @@ export function languageLabel(language: Language): string {
 }
 
 export function submissionStatusLabel(status: SubmissionStatus): string {
-  return status;
+  switch (status) {
+    case "accepted":
+      return "AC";
+    case "wrong_answer":
+      return "WA";
+    case "time_limit_exceeded":
+      return "TLE";
+    case "memory_limit_exceeded":
+      return "MLE";
+    case "runtime_error":
+      return "RE";
+    case "compilation_error":
+      return "CE";
+    case "internal_error":
+      return "IE";
+    case "pending":
+      return "PENDING";
+    case "queued":
+      return "QUEUED";
+    case "compiling":
+      return "COMPILING";
+    case "running":
+      return "RUNNING";
+    case "judging":
+      return "JUDGING";
+    case "cancelled":
+      return "CANCELLED";
+    default:
+      return status;
+  }
 }
 
 export function contestStatusLabel(status: ContestStatus): string {
@@ -103,18 +132,23 @@ export function badgeClassForVisibility(visibility: Visibility): string {
 
 export function badgeClassForSubmission(status: SubmissionStatus): string {
   switch (status) {
-    case "AC":
+    case "accepted":
       return "badge badge-green";
-    case "WA":
+    case "wrong_answer":
       return "badge badge-red";
-    case "TLE":
-    case "MLE":
+    case "time_limit_exceeded":
+    case "memory_limit_exceeded":
       return "badge badge-amber";
-    case "CE":
-    case "RE":
-    case "IE":
+    case "compilation_error":
+    case "runtime_error":
+    case "internal_error":
+    case "cancelled":
       return "badge badge-slate";
-    case "WJ":
+    case "pending":
+    case "queued":
+    case "compiling":
+    case "running":
+    case "judging":
       return "badge badge-blue";
     default:
       return "badge";

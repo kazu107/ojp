@@ -5,6 +5,7 @@ import {
   badgeClassForSubmission,
   formatDate,
   languageLabel,
+  submissionStatusLabel,
 } from "@/lib/presentation";
 import {
   findUser,
@@ -13,6 +14,11 @@ import {
   listSubmissionsForViewer,
 } from "@/lib/store";
 import { Language, SubmissionStatus } from "@/lib/types";
+import {
+  isWaitingSubmissionStatus,
+  normalizeSubmissionStatus,
+  SUBMISSION_STATUS_VALUES,
+} from "@/lib/submission-status";
 
 interface SubmissionsPageProps {
   searchParams: Promise<{
@@ -26,24 +32,12 @@ interface SubmissionsPageProps {
   }>;
 }
 
-const STATUS_FILTER_VALUES: SubmissionStatus[] = [
-  "WJ",
-  "AC",
-  "WA",
-  "TLE",
-  "MLE",
-  "RE",
-  "CE",
-  "IE",
-];
+const STATUS_FILTER_VALUES: SubmissionStatus[] = SUBMISSION_STATUS_VALUES;
 
 const LANGUAGE_FILTER_VALUES: Language[] = ["cpp", "python", "java", "javascript"];
 
 function parseStatusFilter(raw?: string): SubmissionStatus | undefined {
-  if (!raw) {
-    return undefined;
-  }
-  return STATUS_FILTER_VALUES.find((value) => value === raw);
+  return normalizeSubmissionStatus(raw);
 }
 
 function parseLanguageFilter(raw?: string): Language | undefined {
@@ -82,7 +76,9 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
     limit: parseLimitFilter(raw.limit),
   });
 
-  const hasWaitingSubmission = submissions.some((submission) => submission.status === "WJ");
+  const hasWaitingSubmission = submissions.some((submission) =>
+    isWaitingSubmissionStatus(submission.status),
+  );
 
   return (
     <div className="page">
@@ -138,11 +134,15 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
 
             <label className="field">
               <span className="field-label">Status</span>
-              <select className="select" name="status" defaultValue={raw.status ?? ""}>
+              <select
+                className="select"
+                name="status"
+                defaultValue={normalizeSubmissionStatus(raw.status) ?? ""}
+              >
                 <option value="">All</option>
                 {STATUS_FILTER_VALUES.map((status) => (
                   <option key={status} value={status}>
-                    {status}
+                    {submissionStatusLabel(status)}
                   </option>
                 ))}
               </select>
@@ -179,7 +179,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
 
       <section className="panel">
         <SubmissionLiveRefresh
-          status={hasWaitingSubmission ? "WJ" : "AC"}
+          status={hasWaitingSubmission ? "queued" : "accepted"}
           message="Some submissions are waiting for judge. The list refreshes automatically."
         />
         {submissions.length === 0 ? (
@@ -224,7 +224,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                       <td>{languageLabel(submission.language)}</td>
                       <td>
                         <StatusBadge className={badgeClassForSubmission(submission.status)}>
-                          {submission.status}
+                          {submissionStatusLabel(submission.status)}
                         </StatusBadge>
                       </td>
                       <td>{submission.score}</td>
