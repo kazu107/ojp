@@ -1,0 +1,22 @@
+﻿services:
+  postgres:
+    image: postgres:16
+    container_name: ojp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ojp
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ojp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ojp-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  ojp-postgres-data:
+
