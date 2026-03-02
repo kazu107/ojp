@@ -47,6 +47,35 @@ const REJUDGE_LIMIT_WINDOW_MS = 60_000;
 const REJUDGE_LIMIT_PER_WINDOW = 3;
 
 const DISPLAY_NAME_CHANGE_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function parseCsvEnvSet(raw: string | undefined): Set<string> {
+  if (!raw) {
+    return new Set<string>();
+  }
+  return new Set(
+    raw
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length > 0),
+  );
+}
+
+const ADMIN_GITHUB_LOGINS = parseCsvEnvSet(process.env.ADMIN_GITHUB_LOGINS);
+const ADMIN_GITHUB_IDS = parseCsvEnvSet(process.env.ADMIN_GITHUB_IDS);
+
+function shouldGrantAdminFromGitHub(params: { githubLogin: string; githubId?: string }): boolean {
+  const login = params.githubLogin.trim().toLowerCase();
+  if (login && ADMIN_GITHUB_LOGINS.has(login)) {
+    return true;
+  }
+
+  const githubId = params.githubId?.trim().toLowerCase();
+  if (githubId && ADMIN_GITHUB_IDS.has(githubId)) {
+    return true;
+  }
+
+  return false;
+}
 type JudgeJobReason = "normal" | "rejudge";
 
 interface RateLimits {
@@ -1095,6 +1124,10 @@ function findUserOrThrow(userId: string): User {
 }
 
 interface SessionUserLike {
+  oauthProvider?: string;
+  oauthAccountId?: string;
+  oauthLogin?: string;
+  oauthBio?: string | null;
   githubId?: string;
   githubLogin?: string;
   githubBio?: string | null;
@@ -1151,28 +1184,49 @@ function findActiveUserByUsername(username: string): User | undefined {
   );
 }
 
-function upsertUserFromGitHubSession(params: {
-  githubId?: string;
-  githubLogin: string;
+function oauthAccountKey(provider: string, accountId: string): string {
+  return `${provider}:${accountId}`;
+}
+
+function upsertUserFromOAuthSession(params: {
+  provider: string;
+  accountId?: string;
+  login: string;
   name?: string | null;
   bio?: string | null;
 }): User {
-  const normalizedLogin = normalizeUsername(params.githubLogin);
-  const accountId = params.githubId?.trim() ?? "";
+  const normalizedProvider = normalizeUsername(params.provider);
+  const normalizedLogin = normalizeUsername(params.login);
+  const accountId = params.accountId?.trim() ?? "";
+  const accountKey = accountId ? oauthAccountKey(normalizedProvider, accountId) : "";
+  const legacyGitHubAccountKey =
+    normalizedProvider === "github" && accountId ? accountId : "";
+  const shouldGrantAdmin =
+    normalizedProvider === "github"
+      ? shouldGrantAdminFromGitHub({
+          githubLogin: normalizedLogin,
+          githubId: accountId,
+        })
+      : false;
   const timestamp = nowIso();
 
   let user: User | undefined;
-  if (accountId) {
-    const indexedUserId = store.githubIndex[accountId];
+  if (accountKey) {
+    const indexedUserId =
+      store.githubIndex[accountKey] ||
+      (legacyGitHubAccountKey ? store.githubIndex[legacyGitHubAccountKey] : undefined);
     if (indexedUserId) {
       user = findUser(indexedUserId);
       if (!user) {
-        delete store.githubIndex[accountId];
+        delete store.githubIndex[accountKey];
+        if (legacyGitHubAccountKey) {
+          delete store.githubIndex[legacyGitHubAccountKey];
+        }
       }
     }
   }
 
-  if (!user) {
+  if (!user && normalizedProvider === "github") {
     user = findActiveUserByUsername(normalizedLogin);
   }
 
@@ -1183,7 +1237,7 @@ function upsertUserFromGitHubSession(params: {
       username: uniqueUsername(normalizedLogin),
       displayName: uniqueDisplayName(displayNameBase),
       bio: params.bio?.trim() ?? "",
-      role: "user",
+      role: shouldGrantAdmin ? "admin" : "user",
       status: "active",
       displayNameChangedAt: null,
       createdAt: timestamp,
@@ -1205,9 +1259,25 @@ function upsertUserFromGitHubSession(params: {
     user.bio = params.bio.trim();
   }
 
+  if (shouldGrantAdmin && user.role !== "admin") {
+    const previousRole = user.role;
+    user.role = "admin";
+    appendAuditLog({
+      actorId: user.id,
+      action: "admin.user.role.update",
+      targetType: "user",
+      targetId: user.id,
+      reason: "github admin bootstrap",
+      metadata: {
+        previousRole,
+        nextRole: "admin",
+      },
+    });
+  }
+
   user.updatedAt = timestamp;
-  if (accountId) {
-    store.githubIndex[accountId] = user.id;
+  if (accountKey) {
+    store.githubIndex[accountKey] = user.id;
   }
   return user;
 }
@@ -1232,15 +1302,23 @@ export async function getCurrentUser(): Promise<User> {
     throw new HttpError("authentication required", 401);
   }
 
-  if (!sessionUser.githubLogin) {
-    throw new HttpError("github login is missing from session", 401);
+  const provider =
+    sessionUser.oauthProvider ||
+    (sessionUser.githubLogin || sessionUser.githubId ? "github" : undefined);
+  const login =
+    sessionUser.oauthLogin ||
+    sessionUser.githubLogin ||
+    (typeof sessionUser.name === "string" ? sessionUser.name : undefined);
+  if (!provider || !login) {
+    throw new HttpError("oauth profile is missing required fields", 401);
   }
 
-  return upsertUserFromGitHubSession({
-    githubId: sessionUser.githubId,
-    githubLogin: sessionUser.githubLogin,
+  return upsertUserFromOAuthSession({
+    provider,
+    accountId: sessionUser.oauthAccountId ?? sessionUser.githubId,
+    login,
     name: sessionUser.name,
-    bio: sessionUser.githubBio,
+    bio: sessionUser.oauthBio ?? sessionUser.githubBio,
   });
 }
 

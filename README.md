@@ -235,3 +235,18 @@ npm run build
 
 一覧系API (`/api/problems`, `/api/contests`, `/api/submissions`, `/api/admin/reports`) は
 `page`, `limit`, `cursor` クエリをサポートします。
+
+## Google OAuth Setup
+
+To enable Google login, add these env vars (`.env.local` or Heroku Config Vars):
+
+```bash
+AUTH_GOOGLE_ID="google-oauth-client-id"
+AUTH_GOOGLE_SECRET="google-oauth-client-secret"
+```
+
+Google OAuth callback URL:
+- Local: `http://localhost:3000/api/auth/callback/google`
+- Heroku: `https://<your-app-name>.herokuapp.com/api/auth/callback/google`
+
+You can keep GitHub and Google enabled at the same time.

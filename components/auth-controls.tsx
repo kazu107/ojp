@@ -1,31 +1,26 @@
-import { auth, signIn, signOut } from "@/auth";
+import { auth, signOut } from "@/auth";
 
 export async function AuthControls() {
   const session = await auth();
   const sessionUser = session?.user as
     | {
         name?: string | null;
+        oauthLogin?: string;
         githubLogin?: string;
       }
     | undefined;
   const login =
-    typeof sessionUser?.githubLogin === "string" && sessionUser.githubLogin
-      ? sessionUser.githubLogin
-      : sessionUser?.name ?? "signed-in";
+    typeof sessionUser?.oauthLogin === "string" && sessionUser.oauthLogin
+      ? sessionUser.oauthLogin
+      : typeof sessionUser?.githubLogin === "string" && sessionUser.githubLogin
+        ? sessionUser.githubLogin
+        : sessionUser?.name ?? "signed-in";
 
   if (!session?.user) {
     return (
-      <form
-        className="site-nav-form"
-        action={async () => {
-          "use server";
-          await signIn("github", { redirectTo: "/" });
-        }}
-      >
-        <button type="submit" className="site-nav-cta">
-          Sign in
-        </button>
-      </form>
+      <a className="site-nav-cta" href="/signin">
+        Sign in
+      </a>
     );
   }
 
