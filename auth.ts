@@ -30,6 +30,7 @@ function loginFromEmail(email: string | null | undefined): string | undefined {
 const githubClientId = process.env.AUTH_GITHUB_ID ?? process.env.GITHUB_ID ?? "";
 const githubClientSecret =
   process.env.AUTH_GITHUB_SECRET ?? process.env.GITHUB_SECRET ?? "";
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 const googleClientId =
   process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID ?? process.env.GOOGLE_ID ?? "";
 const googleClientSecret =
@@ -44,6 +45,7 @@ export const enabledAuthProviders = {
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: authSecret || undefined,
   trustHost: true,
   providers: [
     ...(enabledAuthProviders.github

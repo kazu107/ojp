@@ -250,3 +250,13 @@ Google OAuth callback URL:
 - Heroku: `https://<your-app-name>.herokuapp.com/api/auth/callback/google`
 
 You can keep GitHub and Google enabled at the same time.
+
+## Auth Secret Note (PKCE)
+
+If OAuth sign-in fails with `InvalidCheck: pkceCodeVerifier value could not be parsed`,
+check secret consistency first.
+
+- Set a fixed `AUTH_SECRET` in Config Vars.
+- If you already use legacy naming, `NEXTAUTH_SECRET` is also accepted by this app.
+- Do not rotate secret between the sign-in request and callback.
+- After changing secret, clear browser cookies once and retry login.
