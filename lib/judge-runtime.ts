@@ -37,6 +37,20 @@ interface JudgeResult {
   testResults: Submission["testResults"];
 }
 
+function resolveTimeWrapperCommand(): string | null {
+  if (process.platform === "win32") {
+    return null;
+  }
+
+  const candidates = ["/usr/bin/time", "/bin/time"];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 function normalizeNewlines(text: string): string {
   return text.replace(/\r\n/g, "\n");
 }
@@ -73,13 +87,14 @@ async function runCommand(
   },
 ): Promise<CommandResult> {
   const startedAt = Date.now();
-  const useTimeWrapper = options.captureMemory && process.platform !== "win32" && existsSync("/usr/bin/time");
+  const timeWrapperCommand = options.captureMemory ? resolveTimeWrapperCommand() : null;
+  const useTimeWrapper = Boolean(timeWrapperCommand);
   const metricsPath = path.join(
     options.cwd,
     `metrics-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`,
   );
 
-  const wrappedCommand = useTimeWrapper ? "/usr/bin/time" : command;
+  const wrappedCommand = timeWrapperCommand ?? command;
   const wrappedArgs = useTimeWrapper
     ? ["-f", "%M", "-o", metricsPath, command, ...args]
     : args;

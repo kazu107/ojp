@@ -8,6 +8,7 @@ RUN apt-get update \
     g++ \
     python3 \
     default-jdk-headless \
+    time \
     tini \
   && rm -rf /var/lib/apt/lists/*
 
