@@ -25,6 +25,7 @@ import {
   UserRole,
   Visibility,
 } from "@/lib/types";
+import type { Prisma } from "@prisma/client";
 import type { ProblemPackageExtracted } from "@/lib/problem-package";
 import { executePackageJudge } from "@/lib/judge-runtime";
 import { getJudgeEnvironmentVersion } from "@/lib/judge-config";
@@ -36,6 +37,7 @@ import {
   pickHighestPriorityVerdict,
 } from "@/lib/submission-status";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db/prisma";
 const BASE_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
 
 const SUBMISSION_COOLDOWN_MS = 10_000;
@@ -47,6 +49,9 @@ const REJUDGE_LIMIT_WINDOW_MS = 60_000;
 const REJUDGE_LIMIT_PER_WINDOW = 3;
 
 const DISPLAY_NAME_CHANGE_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
+const STORE_STATE_ID = "default";
+const STORE_PERSIST_INTERVAL_MS = 3_000;
+const STORE_DB_SYNC_ENABLED = process.env.STORE_DB_SYNC !== "0";
 
 function parseCsvEnvSet(raw: string | undefined): Set<string> {
   if (!raw) {
@@ -120,8 +125,30 @@ interface Store {
   rateLimits: RateLimits;
 }
 
+interface StoreSnapshot {
+  users: User[];
+  problems: Problem[];
+  problemPackages: Record<string, ProblemPackageExtracted>;
+  contests: Contest[];
+  submissions: Submission[];
+  announcements: Announcement[];
+  reports: Report[];
+  auditLogs: AuditLog[];
+  rejudgeRequests: RejudgeRequest[];
+  githubIndex: Record<string, string>;
+  judgeQueue: Store["judgeQueue"];
+  counters: Store["counters"];
+  rateLimits: RateLimits;
+}
+
 const globalStore = globalThis as unknown as {
   __ojpStore?: Store;
+  __ojpStoreDbHydrationStarted?: boolean;
+  __ojpStoreDbHydrated?: boolean;
+  __ojpStorePersistIntervalStarted?: boolean;
+  __ojpStoreLastPersistedSnapshotJson?: string;
+  __ojpStorePersistInFlight?: boolean;
+  __ojpStorePersistQueued?: boolean;
 };
 
 export class HttpError extends Error {
@@ -501,88 +528,236 @@ function createInitialStore(): Store {
   };
 }
 
+function normalizeStoreInPlace(target: Store): void {
+  if (!Array.isArray(target.judgeQueue)) {
+    target.judgeQueue = [];
+  }
+  for (const job of target.judgeQueue) {
+    const normalizedJob = job as {
+      id: string;
+      submissionId: string;
+      queuedAt: string;
+      reason?: JudgeJobReason;
+      requestedAt?: string;
+    };
+    if (!normalizedJob.reason) {
+      normalizedJob.reason = "normal";
+    }
+    if (!normalizedJob.requestedAt) {
+      normalizedJob.requestedAt = normalizedJob.queuedAt || nowIso();
+    }
+  }
+  if (!Array.isArray(target.judgeInFlightSubmissionIds)) {
+    target.judgeInFlightSubmissionIds = [];
+  }
+  if (typeof target.judgeWorkerRunning !== "boolean") {
+    target.judgeWorkerRunning = false;
+  }
+  if (typeof target.counters.judgeJob !== "number") {
+    target.counters.judgeJob = 1000;
+  }
+  if (!target.problemPackages || typeof target.problemPackages !== "object") {
+    target.problemPackages = {};
+  }
+  if (!Array.isArray(target.announcements)) {
+    target.announcements = [];
+  }
+  if (typeof target.counters.announcement !== "number") {
+    target.counters.announcement = 1000;
+  }
+  for (const problem of target.problems) {
+    if (!problem.explanationVisibility) {
+      problem.explanationVisibility = "private";
+    }
+    if (!problem.testCaseVisibility) {
+      problem.testCaseVisibility = "case_index_only";
+    }
+    const legacyProblem = problem as Problem & {
+      latestPackageSummary?: Problem["latestPackageSummary"];
+    };
+    if (legacyProblem.latestPackageSummary === undefined) {
+      legacyProblem.latestPackageSummary = null;
+    }
+  }
+  for (const submission of target.submissions) {
+    const normalizedStatus = normalizeSubmissionStatus(submission.status);
+    submission.status = normalizedStatus ?? "internal_error";
+
+    const legacySubmission = submission as Submission & {
+      judgeStartedAt?: string | null;
+      judgeEnvironmentVersion?: string | null;
+    };
+    if (legacySubmission.judgeStartedAt === undefined) {
+      legacySubmission.judgeStartedAt = submission.judgedAt ? submission.submittedAt : null;
+    }
+    if (legacySubmission.judgeEnvironmentVersion === undefined) {
+      legacySubmission.judgeEnvironmentVersion = submission.judgedAt
+        ? getJudgeEnvironmentVersion()
+        : null;
+    }
+
+    submission.testResults = submission.testResults.map((result) => {
+      const normalizedVerdict = normalizeSubmissionStatus(result.verdict);
+      return {
+        ...result,
+        verdict: normalizedVerdict ?? "internal_error",
+      };
+    });
+  }
+
+  repairJudgeQueueInternal();
+}
+
+function captureStoreSnapshot(target: Store): StoreSnapshot {
+  return JSON.parse(
+    JSON.stringify({
+      users: target.users,
+      problems: target.problems,
+      problemPackages: target.problemPackages,
+      contests: target.contests,
+      submissions: target.submissions,
+      announcements: target.announcements,
+      reports: target.reports,
+      auditLogs: target.auditLogs,
+      rejudgeRequests: target.rejudgeRequests,
+      githubIndex: target.githubIndex,
+      judgeQueue: target.judgeQueue,
+      counters: target.counters,
+      rateLimits: target.rateLimits,
+    }),
+  ) as StoreSnapshot;
+}
+
+function applyStoreSnapshotInPlace(target: Store, snapshot: StoreSnapshot): void {
+  target.users = Array.isArray(snapshot.users) ? snapshot.users : [];
+  target.problems = Array.isArray(snapshot.problems) ? snapshot.problems : [];
+  target.problemPackages =
+    snapshot.problemPackages && typeof snapshot.problemPackages === "object"
+      ? snapshot.problemPackages
+      : {};
+  target.contests = Array.isArray(snapshot.contests) ? snapshot.contests : [];
+  target.submissions = Array.isArray(snapshot.submissions) ? snapshot.submissions : [];
+  target.announcements = Array.isArray(snapshot.announcements) ? snapshot.announcements : [];
+  target.reports = Array.isArray(snapshot.reports) ? snapshot.reports : [];
+  target.auditLogs = Array.isArray(snapshot.auditLogs) ? snapshot.auditLogs : [];
+  target.rejudgeRequests = Array.isArray(snapshot.rejudgeRequests) ? snapshot.rejudgeRequests : [];
+  target.githubIndex =
+    snapshot.githubIndex && typeof snapshot.githubIndex === "object" ? snapshot.githubIndex : {};
+  target.judgeQueue = Array.isArray(snapshot.judgeQueue) ? snapshot.judgeQueue : [];
+  target.counters = {
+    ...target.counters,
+    ...(snapshot.counters ?? {}),
+  };
+  target.rateLimits = {
+    submissionByUserWindow: snapshot.rateLimits?.submissionByUserWindow ?? {},
+    submissionCooldownByProblem: snapshot.rateLimits?.submissionCooldownByProblem ?? {},
+    rejudgeByUserWindow: snapshot.rateLimits?.rejudgeByUserWindow ?? {},
+    rejudgeCooldownByProblem: snapshot.rateLimits?.rejudgeCooldownByProblem ?? {},
+  };
+  target.judgeInFlightSubmissionIds = [];
+  target.judgeWorkerRunning = false;
+}
+
+async function persistStoreSnapshotNow(): Promise<void> {
+  if (!STORE_DB_SYNC_ENABLED) {
+    return;
+  }
+  if (!globalStore.__ojpStoreDbHydrated) {
+    return;
+  }
+  if (globalStore.__ojpStorePersistInFlight) {
+    globalStore.__ojpStorePersistQueued = true;
+    return;
+  }
+
+  globalStore.__ojpStorePersistInFlight = true;
+  try {
+    const snapshot = captureStoreSnapshot(store);
+    const snapshotJson = JSON.stringify(snapshot);
+    if (snapshotJson === globalStore.__ojpStoreLastPersistedSnapshotJson) {
+      return;
+    }
+
+    await prisma.appState.upsert({
+      where: { id: STORE_STATE_ID },
+      update: { snapshot: snapshot as unknown as Prisma.InputJsonValue },
+      create: {
+        id: STORE_STATE_ID,
+        snapshot: snapshot as unknown as Prisma.InputJsonValue,
+      },
+    });
+    globalStore.__ojpStoreLastPersistedSnapshotJson = snapshotJson;
+  } catch (error) {
+    console.error("[store] failed to persist app state:", error);
+  } finally {
+    globalStore.__ojpStorePersistInFlight = false;
+    if (globalStore.__ojpStorePersistQueued) {
+      globalStore.__ojpStorePersistQueued = false;
+      queueMicrotask(() => {
+        void persistStoreSnapshotNow();
+      });
+    }
+  }
+}
+
+async function hydrateStoreFromDb(): Promise<void> {
+  if (!STORE_DB_SYNC_ENABLED) {
+    globalStore.__ojpStoreDbHydrated = true;
+    return;
+  }
+  try {
+    const state = await prisma.appState.findUnique({
+      where: { id: STORE_STATE_ID },
+    });
+    if (!state) {
+      globalStore.__ojpStoreDbHydrated = true;
+      await persistStoreSnapshotNow();
+      return;
+    }
+
+    const snapshot = state.snapshot;
+    if (!snapshot || typeof snapshot !== "object") {
+      globalStore.__ojpStoreDbHydrated = true;
+      await persistStoreSnapshotNow();
+      return;
+    }
+
+    applyStoreSnapshotInPlace(store, snapshot as unknown as StoreSnapshot);
+    normalizeStoreInPlace(store);
+    globalStore.__ojpStoreLastPersistedSnapshotJson = JSON.stringify(captureStoreSnapshot(store));
+    globalStore.__ojpStoreDbHydrated = true;
+  } catch (error) {
+    console.error("[store] failed to hydrate app state:", error);
+    globalStore.__ojpStoreDbHydrated = true;
+  }
+}
+
+function startStorePersistenceLoop(): void {
+  if (!STORE_DB_SYNC_ENABLED || globalStore.__ojpStorePersistIntervalStarted) {
+    return;
+  }
+  globalStore.__ojpStorePersistIntervalStarted = true;
+  const interval = setInterval(() => {
+    void persistStoreSnapshotNow();
+  }, STORE_PERSIST_INTERVAL_MS);
+  interval.unref?.();
+}
+
 const store = globalStore.__ojpStore ?? createInitialStore();
 
 if (!globalStore.__ojpStore) {
   globalStore.__ojpStore = store;
 }
+if (typeof globalStore.__ojpStoreDbHydrated !== "boolean") {
+  globalStore.__ojpStoreDbHydrated = !STORE_DB_SYNC_ENABLED;
+}
 
-if (!Array.isArray(store.judgeQueue)) {
-  store.judgeQueue = [];
+normalizeStoreInPlace(store);
+startStorePersistenceLoop();
+if (STORE_DB_SYNC_ENABLED && !globalStore.__ojpStoreDbHydrationStarted) {
+  globalStore.__ojpStoreDbHydrationStarted = true;
+  void hydrateStoreFromDb();
 }
-for (const job of store.judgeQueue) {
-  const normalizedJob = job as {
-    id: string;
-    submissionId: string;
-    queuedAt: string;
-    reason?: JudgeJobReason;
-    requestedAt?: string;
-  };
-  if (!normalizedJob.reason) {
-    normalizedJob.reason = "normal";
-  }
-  if (!normalizedJob.requestedAt) {
-    normalizedJob.requestedAt = normalizedJob.queuedAt || nowIso();
-  }
-}
-if (!Array.isArray(store.judgeInFlightSubmissionIds)) {
-  store.judgeInFlightSubmissionIds = [];
-}
-if (typeof store.judgeWorkerRunning !== "boolean") {
-  store.judgeWorkerRunning = false;
-}
-if (typeof store.counters.judgeJob !== "number") {
-  store.counters.judgeJob = 1000;
-}
-if (!store.problemPackages || typeof store.problemPackages !== "object") {
-  store.problemPackages = {};
-}
-if (!Array.isArray(store.announcements)) {
-  store.announcements = [];
-}
-if (typeof store.counters.announcement !== "number") {
-  store.counters.announcement = 1000;
-}
-for (const problem of store.problems) {
-  if (!problem.explanationVisibility) {
-    problem.explanationVisibility = "private";
-  }
-  if (!problem.testCaseVisibility) {
-    problem.testCaseVisibility = "case_index_only";
-  }
-  const legacyProblem = problem as Problem & {
-    latestPackageSummary?: Problem["latestPackageSummary"];
-  };
-  if (legacyProblem.latestPackageSummary === undefined) {
-    legacyProblem.latestPackageSummary = null;
-  }
-}
-for (const submission of store.submissions) {
-  const normalizedStatus = normalizeSubmissionStatus(submission.status);
-  submission.status = normalizedStatus ?? "internal_error";
-
-  const legacySubmission = submission as Submission & {
-    judgeStartedAt?: string | null;
-    judgeEnvironmentVersion?: string | null;
-  };
-  if (legacySubmission.judgeStartedAt === undefined) {
-    legacySubmission.judgeStartedAt = submission.judgedAt ? submission.submittedAt : null;
-  }
-  if (legacySubmission.judgeEnvironmentVersion === undefined) {
-    legacySubmission.judgeEnvironmentVersion = submission.judgedAt
-      ? getJudgeEnvironmentVersion()
-      : null;
-  }
-
-  submission.testResults = submission.testResults.map((result) => {
-    const normalizedVerdict = normalizeSubmissionStatus(result.verdict);
-    return {
-      ...result,
-      verdict: normalizedVerdict ?? "internal_error",
-    };
-  });
-}
-repairJudgeQueueInternal();
 
 function nextUserId(): string {
   const id = `u${store.counters.user}`;
@@ -2107,23 +2282,19 @@ export function canEditContestByViewer(contest: Contest, viewerId: string): bool
 export function dumpStoreSnapshot(): {
   users: User[];
   problems: Problem[];
+  problemPackages: Record<string, ProblemPackageExtracted>;
   contests: Contest[];
   submissions: Submission[];
   announcements: Announcement[];
   reports: Report[];
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
+  githubIndex: Record<string, string>;
+  judgeQueue: Store["judgeQueue"];
+  counters: Store["counters"];
+  rateLimits: RateLimits;
 } {
-  return {
-    users: JSON.parse(JSON.stringify(store.users)) as User[],
-    problems: JSON.parse(JSON.stringify(store.problems)) as Problem[],
-    contests: JSON.parse(JSON.stringify(store.contests)) as Contest[],
-    submissions: JSON.parse(JSON.stringify(store.submissions)) as Submission[],
-    announcements: JSON.parse(JSON.stringify(store.announcements)) as Announcement[],
-    reports: JSON.parse(JSON.stringify(store.reports)) as Report[],
-    auditLogs: JSON.parse(JSON.stringify(store.auditLogs)) as AuditLog[],
-    rejudgeRequests: JSON.parse(JSON.stringify(store.rejudgeRequests)) as RejudgeRequest[],
-  };
+  return captureStoreSnapshot(store);
 }
 
 export function canViewSubmissionSource(submission: Submission, viewerId: string): boolean {

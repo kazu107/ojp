@@ -260,3 +260,29 @@ check secret consistency first.
 - If you already use legacy naming, `NEXTAUTH_SECRET` is also accepted by this app.
 - Do not rotate secret between the sign-in request and callback.
 - After changing secret, clear browser cookies once and retry login.
+
+## DB-only Persistence Mode
+
+This app can run without object storage for MVP/small scale operation.
+
+- App state is persisted to Postgres (`AppState` table) as JSON snapshot.
+- Submission source and package-derived data remain in DB-managed state.
+- Set `STORE_DB_SYNC=1` (default) to enable snapshot sync.
+
+Operational notes:
+- Keep `web=1` to avoid multi-process state conflicts.
+- This mode is suitable for small deployments; large test assets should still move to object storage later.
+
+## Legacy DB Enum Migration
+
+If `npm run db:push` fails with an enum error like
+`invalid input value for enum "SubmissionStatus_new": "AC"`,
+run this one-time migration first:
+
+```bash
+npm run db:migrate:legacy-status
+npm run db:push -- --accept-data-loss
+```
+
+This converts old verdict/status values (`AC`, `WA`, etc.) to the current
+values (`accepted`, `wrong_answer`, etc.) before Prisma drops legacy enum variants.

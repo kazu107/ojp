@@ -4,6 +4,7 @@ import { dumpStoreSnapshot } from "../lib/store";
 const prisma = new PrismaClient();
 
 async function clearAll() {
+  await prisma.appState.deleteMany();
   await prisma.rejudgeRequest.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.report.deleteMany();

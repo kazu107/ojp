@@ -12,6 +12,7 @@
     "db:down:volumes": "docker compose -f docker-compose.db.yml down -v",
     "db:generate": "node scripts/prisma-with-default-db-url.mjs generate",
     "db:push": "node scripts/prisma-with-default-db-url.mjs db push",
+    "db:migrate:legacy-status": "node scripts/migrate-legacy-submission-status.mjs",
     "db:studio": "node scripts/prisma-with-default-db-url.mjs studio",
     "db:seed": "node scripts/prisma-with-default-db-url.mjs db seed",
     "db:prepare": "npm run db:up && npm run db:generate && npm run db:push && npm run db:seed"
