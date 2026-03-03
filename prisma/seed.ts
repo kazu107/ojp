@@ -51,6 +51,7 @@ async function seedFromSnapshot() {
         constraintsMarkdown: problem.constraintsMarkdown,
         explanationMarkdown: problem.explanationMarkdown,
         visibility: problem.visibility,
+        difficulty: problem.difficulty,
         timeLimitMs: problem.timeLimitMs,
         memoryLimitMb: problem.memoryLimitMb,
         supportedLanguages: problem.supportedLanguages,

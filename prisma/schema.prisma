@@ -99,6 +99,7 @@ model Problem {
   constraintsMarkdown String
   explanationMarkdown String
   visibility         Visibility
+  difficulty         Int?
   timeLimitMs        Int
   memoryLimitMb      Int
   supportedLanguages Language[]

@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { MarkdownBlock } from "@/components/markdown-block";
 import { StatusBadge } from "@/components/status-badge";
 import {
+  badgeClassForDifficulty,
   badgeClassForVisibility,
+  difficultyLabel,
   explanationVisibilityLabel,
   formatDate,
   languageLabel,
@@ -95,6 +97,12 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
         </article>
         <article className="panel stack">
           <h2 className="panel-title">Judge Settings</h2>
+          <p className="text-soft">
+            Difficulty:{" "}
+            <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
+              {difficultyLabel(problem.difficulty)}
+            </StatusBadge>
+          </p>
           <p className="text-soft">Time Limit: {problem.timeLimitMs} ms</p>
           <p className="text-soft">Memory Limit: {problem.memoryLimitMb} MB</p>
           <p className="text-soft">

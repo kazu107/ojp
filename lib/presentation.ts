@@ -117,6 +117,41 @@ export function explanationVisibilityLabel(visibility: ExplanationVisibility): s
   }
 }
 
+export function difficultyLabel(difficulty: number | null): string {
+  if (difficulty === null) {
+    return "Unrated";
+  }
+  return String(difficulty);
+}
+
+export function badgeClassForDifficulty(difficulty: number | null): string {
+  if (difficulty === null) {
+    return "badge badge-slate";
+  }
+  if (difficulty < 400) {
+    return "badge badge-diff-gray";
+  }
+  if (difficulty < 800) {
+    return "badge badge-diff-brown";
+  }
+  if (difficulty < 1200) {
+    return "badge badge-diff-green";
+  }
+  if (difficulty < 1600) {
+    return "badge badge-diff-cyan";
+  }
+  if (difficulty < 2000) {
+    return "badge badge-diff-blue";
+  }
+  if (difficulty < 2400) {
+    return "badge badge-diff-yellow";
+  }
+  if (difficulty < 2800) {
+    return "badge badge-diff-orange";
+  }
+  return "badge badge-diff-red";
+}
+
 export function badgeClassForVisibility(visibility: Visibility): string {
   switch (visibility) {
     case "public":

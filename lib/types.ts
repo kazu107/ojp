@@ -67,6 +67,7 @@ export interface Problem {
   explanationMarkdown: string;
   explanationVisibility: ExplanationVisibility;
   visibility: Visibility;
+  difficulty: number | null;
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: Language[];
@@ -223,6 +224,7 @@ export interface CreateProblemInput {
   explanationMarkdown: string;
   explanationVisibility: ExplanationVisibility;
   visibility: Visibility;
+  difficulty: number | null;
   timeLimitMs: number;
   memoryLimitMb: number;
   supportedLanguages: Language[];

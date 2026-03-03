@@ -366,6 +366,54 @@ a {
   color: #d8e4f4;
 }
 
+.badge-diff-gray {
+  background: rgba(143, 153, 168, 0.2);
+  border-color: rgba(143, 153, 168, 0.55);
+  color: #eef2f8;
+}
+
+.badge-diff-brown {
+  background: rgba(144, 99, 63, 0.26);
+  border-color: rgba(194, 139, 91, 0.58);
+  color: #ffd9b8;
+}
+
+.badge-diff-green {
+  background: rgba(67, 163, 87, 0.22);
+  border-color: rgba(92, 207, 122, 0.6);
+  color: #d8ffd8;
+}
+
+.badge-diff-cyan {
+  background: rgba(58, 177, 177, 0.24);
+  border-color: rgba(94, 230, 230, 0.62);
+  color: #d6ffff;
+}
+
+.badge-diff-blue {
+  background: rgba(72, 129, 224, 0.26);
+  border-color: rgba(117, 171, 255, 0.6);
+  color: #e2edff;
+}
+
+.badge-diff-yellow {
+  background: rgba(196, 180, 59, 0.26);
+  border-color: rgba(235, 219, 88, 0.62);
+  color: #fff8cc;
+}
+
+.badge-diff-orange {
+  background: rgba(230, 135, 54, 0.25);
+  border-color: rgba(255, 169, 92, 0.62);
+  color: #ffe7cc;
+}
+
+.badge-diff-red {
+  background: rgba(224, 83, 83, 0.24);
+  border-color: rgba(255, 119, 119, 0.62);
+  color: #ffe0e0;
+}
+
 .stack {
   display: grid;
   gap: 0.8rem;

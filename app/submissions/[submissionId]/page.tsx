@@ -4,7 +4,9 @@ import { RejudgeRequestForm } from "@/components/rejudge-request-form";
 import { SubmissionLiveRefresh } from "@/components/submission-live-refresh";
 import { StatusBadge } from "@/components/status-badge";
 import {
+  badgeClassForDifficulty,
   badgeClassForSubmission,
+  difficultyLabel,
   formatDate,
   languageLabel,
   submissionStatusLabel,
@@ -72,6 +74,21 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
             {submission.peakMemoryKb} KB
           </span>
         </div>
+        <p className="text-soft">
+          Problem:{" "}
+          {problem ? (
+            <Link className="link" href={`/problems/${problem.id}`}>
+              {problem.title}
+            </Link>
+          ) : (
+            submission.problemId
+          )}{" "}
+          {problem ? (
+            <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
+              {difficultyLabel(problem.difficulty)}
+            </StatusBadge>
+          ) : null}
+        </p>
         <p className="text-soft">
           Language: {languageLabel(submission.language)} / Submitted:{" "}
           {formatDate(submission.submittedAt)}

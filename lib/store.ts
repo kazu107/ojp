@@ -239,6 +239,7 @@ function createInitialStore(): Store {
       explanationMarkdown: "入力値を受け取り、そのまま標準出力に出せばACになります。",
       explanationVisibility: "always",
       visibility: "public",
+      difficulty: 100,
       timeLimitMs: 2000,
       memoryLimitMb: 512,
       supportedLanguages: BASE_LANGUAGES,
@@ -262,6 +263,7 @@ function createInitialStore(): Store {
         "64bit整数型での加算を推奨します。Pythonはそのままで問題ありません。",
       explanationVisibility: "always",
       visibility: "public",
+      difficulty: 400,
       timeLimitMs: 2000,
       memoryLimitMb: 512,
       supportedLanguages: BASE_LANGUAGES,
@@ -572,9 +574,21 @@ function normalizeStoreInPlace(target: Store): void {
     if (!problem.testCaseVisibility) {
       problem.testCaseVisibility = "case_index_only";
     }
+    if (
+      problem.difficulty !== null &&
+      !(typeof problem.difficulty === "number" && Number.isFinite(problem.difficulty))
+    ) {
+      problem.difficulty = null;
+    } else if (typeof problem.difficulty === "number") {
+      problem.difficulty = Math.trunc(problem.difficulty);
+    }
     const legacyProblem = problem as Problem & {
+      difficulty?: number | null;
       latestPackageSummary?: Problem["latestPackageSummary"];
     };
+    if (legacyProblem.difficulty === undefined) {
+      legacyProblem.difficulty = null;
+    }
     if (legacyProblem.latestPackageSummary === undefined) {
       legacyProblem.latestPackageSummary = null;
     }
@@ -1689,6 +1703,7 @@ export async function createProblem(input: CreateProblemInput): Promise<Problem>
     explanationMarkdown: input.explanationMarkdown.trim(),
     explanationVisibility: input.explanationVisibility,
     visibility: input.visibility,
+    difficulty: input.difficulty,
     timeLimitMs: input.timeLimitMs,
     memoryLimitMb: input.memoryLimitMb,
     supportedLanguages: input.supportedLanguages,
@@ -1740,6 +1755,13 @@ export async function updateProblem(
   }
   if (input.visibility) {
     problem.visibility = input.visibility;
+  }
+  if ("difficulty" in input) {
+    if (input.difficulty === null) {
+      problem.difficulty = null;
+    } else if (typeof input.difficulty === "number" && Number.isFinite(input.difficulty)) {
+      problem.difficulty = Math.trunc(input.difficulty);
+    }
   }
   if (typeof input.timeLimitMs === "number" && input.timeLimitMs > 0) {
     problem.timeLimitMs = input.timeLimitMs;

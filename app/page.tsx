@@ -2,14 +2,17 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import {
   badgeClassForContestStatus,
+  badgeClassForDifficulty,
   badgeClassForSubmission,
   contestStatusLabel,
+  difficultyLabel,
   formatDate,
   submissionStatusLabel,
 } from "@/lib/presentation";
 import {
   buildScoreboard,
   canCreateProblemByRole,
+  getProblemById,
   getContestStatus,
   listAnnouncementsForViewer,
   getOptionalCurrentUser,
@@ -120,27 +123,48 @@ export default async function HomePage() {
                 <tr>
                   <th>ID</th>
                   <th>Problem</th>
+                  <th>Difficulty</th>
                   <th>Status</th>
                   <th>Time</th>
                 </tr>
               </thead>
               <tbody>
-                {submissions.map((submission) => (
-                  <tr key={submission.id}>
-                    <td>
-                      <Link className="link" href={`/submissions/${submission.id}`}>
-                        {submission.id}
-                      </Link>
-                    </td>
-                    <td>{submission.problemId}</td>
-                    <td>
-                      <StatusBadge className={badgeClassForSubmission(submission.status)}>
-                        {submissionStatusLabel(submission.status)}
-                      </StatusBadge>
-                    </td>
-                    <td>{formatDate(submission.submittedAt)}</td>
-                  </tr>
-                ))}
+                {submissions.map((submission) => {
+                  const problem = getProblemById(submission.problemId);
+                  return (
+                    <tr key={submission.id}>
+                      <td>
+                        <Link className="link" href={`/submissions/${submission.id}`}>
+                          {submission.id}
+                        </Link>
+                      </td>
+                      <td>
+                        {problem ? (
+                          <Link className="link" href={`/problems/${problem.id}`}>
+                            {problem.title}
+                          </Link>
+                        ) : (
+                          submission.problemId
+                        )}
+                      </td>
+                      <td>
+                        {problem ? (
+                          <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
+                            {difficultyLabel(problem.difficulty)}
+                          </StatusBadge>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        <StatusBadge className={badgeClassForSubmission(submission.status)}>
+                          {submissionStatusLabel(submission.status)}
+                        </StatusBadge>
+                      </td>
+                      <td>{formatDate(submission.submittedAt)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

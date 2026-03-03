@@ -3,6 +3,7 @@ import {
   paginateItems,
   parseExplanationVisibility,
   parseLanguages,
+  parseOptionalIntegerOrNull,
   parsePaginationQuery,
   parsePositiveNumber,
   parseString,
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
+    const difficulty = parseOptionalIntegerOrNull(body.difficulty);
     const problem = await createProblem({
       title: parseString(body.title).trim(),
       slug: parseString(body.slug).trim(),
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
       explanationMarkdown: parseString(body.explanationMarkdown),
       explanationVisibility: parseExplanationVisibility(body.explanationVisibility, "private"),
       visibility: parseVisibility(body.visibility, "private"),
+      difficulty: difficulty === undefined ? null : difficulty,
       timeLimitMs: parsePositiveNumber(body.timeLimitMs, 2000),
       memoryLimitMb: parsePositiveNumber(body.memoryLimitMb, 512),
       supportedLanguages: parseLanguages(body.supportedLanguages),

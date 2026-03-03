@@ -64,6 +64,11 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
         Required files: `statement.md`, `config.json`, `samples/*.in/.out`,
         `tests/&lt;group&gt;/*.in/.out`
       </p>
+      <p className="text-soft">
+        Group partial scores are optional. If you set `groups[].score`, every group must have it
+        and total score must be exactly 100. If omitted, the judge uses binary scoring (all groups
+        passed = 100).
+      </p>
 
       {error ? <p className="badge badge-red">{error}</p> : null}
 

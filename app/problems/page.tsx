@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import {
+  badgeClassForDifficulty,
   badgeClassForVisibility,
+  difficultyLabel,
   formatDate,
   languageLabel,
   visibilityLabel,
@@ -48,6 +50,7 @@ export default async function ProblemsPage() {
               <thead>
                 <tr>
                   <th>Title</th>
+                  <th>Difficulty</th>
                   <th>Visibility</th>
                   <th>Limits</th>
                   <th>Languages</th>
@@ -63,6 +66,11 @@ export default async function ProblemsPage() {
                       <Link className="link" href={`/problems/${problem.id}`}>
                         {problem.title}
                       </Link>
+                    </td>
+                    <td>
+                      <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
+                        {difficultyLabel(problem.difficulty)}
+                      </StatusBadge>
                     </td>
                     <td>
                       <StatusBadge className={badgeClassForVisibility(problem.visibility)}>

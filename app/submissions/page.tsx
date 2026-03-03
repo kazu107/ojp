@@ -2,7 +2,9 @@ import Link from "next/link";
 import { SubmissionLiveRefresh } from "@/components/submission-live-refresh";
 import { StatusBadge } from "@/components/status-badge";
 import {
+  badgeClassForDifficulty,
   badgeClassForSubmission,
+  difficultyLabel,
   formatDate,
   languageLabel,
   submissionStatusLabel,
@@ -192,6 +194,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                   <th>ID</th>
                   <th>User</th>
                   <th>Problem</th>
+                  <th>Difficulty</th>
                   <th>Language</th>
                   <th>Status</th>
                   <th>Score</th>
@@ -219,6 +222,15 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                           </Link>
                         ) : (
                           submission.problemId
+                        )}
+                      </td>
+                      <td>
+                        {problem ? (
+                          <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
+                            {difficultyLabel(problem.difficulty)}
+                          </StatusBadge>
+                        ) : (
+                          "-"
                         )}
                       </td>
                       <td>{languageLabel(submission.language)}</td>

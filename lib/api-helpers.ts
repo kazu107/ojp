@@ -73,6 +73,28 @@ export function parseOptionalString(raw: unknown): string | undefined {
   return undefined;
 }
 
+export function parseOptionalIntegerOrNull(raw: unknown): number | null | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (raw === null) {
+    return null;
+  }
+  if (typeof raw === "number" && Number.isFinite(raw) && Number.isInteger(raw)) {
+    return raw;
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+    if (/^-?\d+$/.test(trimmed)) {
+      return Number.parseInt(trimmed, 10);
+    }
+  }
+  return undefined;
+}
+
 export function parseTestCaseVisibility(
   raw: unknown,
   fallback: TestCaseVisibility = "case_index_only",

@@ -18,7 +18,7 @@ export type ProblemPackageCompareMode = "exact" | "ignore_trailing_spaces";
 
 interface ConfigGroupSummary {
   name: string;
-  score: number;
+  score: number | null;
   tests: number;
 }
 
@@ -65,7 +65,7 @@ export interface ProblemPackageExtracted {
 
 interface ParsedConfigGroup {
   name: string;
-  score: number;
+  score: number | null;
   tests: string[];
 }
 
@@ -77,6 +77,7 @@ interface ParsedConfig {
   compareMode: ProblemPackageCompareMode;
   languages: Language[];
   groups: ParsedConfigGroup[];
+  warnings: string[];
 }
 
 function normalizePath(entryName: string): string {
@@ -126,7 +127,22 @@ function parsePositiveNumber(value: unknown, fieldName: string): number {
   return value;
 }
 
-function parseScoringType(raw: unknown): ProblemPackageScoringType {
+function parseNonNegativeInteger(value: unknown, fieldName: string): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 0
+  ) {
+    throw new Error(`${fieldName} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function parseScoringType(raw: unknown): ProblemPackageScoringType | undefined {
+  if (raw === undefined || raw === null || raw === "") {
+    return undefined;
+  }
   if (raw === "binary") {
     return "binary";
   }
@@ -173,8 +189,10 @@ function parseConfigGroup(value: unknown, index: number): ParsedConfigGroup {
   if (typeof record.name !== "string" || !record.name.trim()) {
     throw new Error(`config.groups[${index}].name must be a non-empty string`);
   }
-  if (typeof record.score !== "number" || !Number.isFinite(record.score) || record.score < 0) {
-    throw new Error(`config.groups[${index}].score must be a non-negative number`);
+
+  let score: number | null = null;
+  if (record.score !== undefined && record.score !== null && record.score !== "") {
+    score = parseNonNegativeInteger(record.score, `config.groups[${index}].score`);
   }
   if (!Array.isArray(record.tests)) {
     throw new Error(`config.groups[${index}].tests must be an array`);
@@ -189,7 +207,7 @@ function parseConfigGroup(value: unknown, index: number): ParsedConfigGroup {
 
   return {
     name: record.name.trim(),
-    score: record.score,
+    score,
     tests,
   };
 }
@@ -227,15 +245,48 @@ function parseConfig(configJson: unknown): ParsedConfig {
   }
 
   const groups = config.groups.map((group, index) => parseConfigGroup(group, index));
+  const requestedScoringType = parseScoringType(config.scoringType);
+  const warnings: string[] = [];
+  const hasAnyPartialScore = groups.some((group) => group.score !== null);
+  const hasAllPartialScores = groups.every((group) => group.score !== null);
+
+  if (hasAnyPartialScore && !hasAllPartialScores) {
+    throw new Error(
+      "config.groups[*].score must be either set for all groups or omitted for all groups",
+    );
+  }
+
+  let scoringType: ProblemPackageScoringType;
+  if (hasAllPartialScores) {
+    if (requestedScoringType === "binary") {
+      warnings.push(
+        "config.groups[*].score is set, so scoringType is treated as sum_of_groups.",
+      );
+    }
+
+    const totalScore = groups.reduce((acc, group) => acc + (group.score ?? 0), 0);
+    if (totalScore !== 100) {
+      throw new Error("sum of config.groups[*].score must be exactly 100");
+    }
+    scoringType = "sum_of_groups";
+  } else {
+    scoringType = "binary";
+    if (requestedScoringType === "sum_of_groups") {
+      warnings.push(
+        "config.groups[*].score is omitted, so scoringType is treated as binary (all groups must pass for 100 points).",
+      );
+    }
+  }
 
   return {
     timeLimitMs: parsePositiveNumber(config.timeLimitMs, "config.timeLimitMs"),
     memoryLimitMb: parsePositiveNumber(config.memoryLimitMb, "config.memoryLimitMb"),
-    scoringType: parseScoringType(config.scoringType),
+    scoringType,
     checkerType: "exact",
     compareMode: resolveCompareMode(config),
     languages,
     groups,
+    warnings,
   };
 }
 
@@ -423,7 +474,8 @@ export function validateProblemPackage(
   }
 
   const config = parseConfigFromEntry(entryByPath);
-  const { groups, warnings } = buildTestGroups(config, entryByPath, testIn, testOut);
+  const { groups, warnings: groupWarnings } = buildTestGroups(config, entryByPath, testIn, testOut);
+  const warnings = [...config.warnings, ...groupWarnings];
   const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
 
   const validation: ProblemPackageValidationResult = {

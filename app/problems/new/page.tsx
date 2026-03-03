@@ -11,7 +11,12 @@ export default async function NewProblemPage() {
         <div>
           <h1 className="page-title">Create Problem</h1>
           <p className="page-subtitle">
-            問題本文、公開範囲、制限時間、対応言語を登録します。仕様書の問題作成画面要件に合わせたフォームです。
+            Create a new problem, set limits and supported languages, and optionally attach a ZIP
+            package for test cases.
+          </p>
+          <p className="text-soft">
+            If ZIP is selected, it will be validated and registered automatically after the problem
+            is created.
           </p>
         </div>
       </section>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   parseExplanationVisibility,
   parseLanguages,
+  parseOptionalIntegerOrNull,
   parseOptionalString,
   parsePositiveNumber,
   parseTestCaseVisibility,
@@ -54,6 +55,7 @@ export async function PATCH(request: Request, { params }: ProblemRouteContext) {
         typeof body.visibility === "string"
           ? parseVisibility(body.visibility, "public")
           : undefined,
+      difficulty: parseOptionalIntegerOrNull(body.difficulty),
       timeLimitMs: parsePositiveNumber(body.timeLimitMs, -1),
       memoryLimitMb: parsePositiveNumber(body.memoryLimitMb, -1),
       supportedLanguages: Array.isArray(body.supportedLanguages)

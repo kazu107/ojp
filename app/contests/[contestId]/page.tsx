@@ -5,7 +5,9 @@ import { MarkdownBlock } from "@/components/markdown-block";
 import { StatusBadge } from "@/components/status-badge";
 import {
   badgeClassForContestStatus,
+  badgeClassForDifficulty,
   contestStatusLabel,
+  difficultyLabel,
   formatDate,
 } from "@/lib/presentation";
 import {
@@ -95,6 +97,7 @@ export default async function ContestDetailPage({ params }: ContestDetailPagePro
               <tr>
                 <th>Label</th>
                 <th>Title</th>
+                <th>Difficulty</th>
                 <th>Score</th>
                 <th>Action</th>
               </tr>
@@ -104,6 +107,15 @@ export default async function ContestDetailPage({ params }: ContestDetailPagePro
                 <tr key={`${contest.id}-${item.label}`}>
                   <td>{item.label}</td>
                   <td>{item.problem?.title ?? item.problemId}</td>
+                  <td>
+                    {item.problem ? (
+                      <StatusBadge className={badgeClassForDifficulty(item.problem.difficulty)}>
+                        {difficultyLabel(item.problem.difficulty)}
+                      </StatusBadge>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                   <td>{item.score}</td>
                   <td>
                     {item.problem ? (
