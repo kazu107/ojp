@@ -11,17 +11,46 @@ import {
   submissionStatusLabel,
   testCaseVisibilityLabel,
 } from "@/lib/presentation";
+import { pickHighestPriorityVerdict } from "@/lib/submission-status";
 import {
   canRequestRejudgeByViewer,
   getOptionalCurrentUser,
   getProblemById,
   getSubmissionWithAccess,
 } from "@/lib/store";
+import { Submission, SubmissionStatus } from "@/lib/types";
 
 interface SubmissionDetailPageProps {
   params: Promise<{
     submissionId: string;
   }>;
+}
+
+interface GroupedTestResults {
+  groupName: string;
+  verdict: SubmissionStatus;
+  caseCount: number;
+  totalTimeMs: number;
+  peakMemoryKb: number;
+  cases: Submission["testResults"];
+}
+
+function groupTestResults(results: Submission["testResults"]): GroupedTestResults[] {
+  const grouped = new Map<string, Submission["testResults"]>();
+  for (const result of results) {
+    const entries = grouped.get(result.groupName) ?? [];
+    entries.push(result);
+    grouped.set(result.groupName, entries);
+  }
+
+  return [...grouped.entries()].map(([groupName, cases]) => ({
+    groupName,
+    verdict: pickHighestPriorityVerdict(cases.map((entry) => entry.verdict)),
+    caseCount: cases.length,
+    totalTimeMs: cases.reduce((acc, entry) => acc + entry.timeMs, 0),
+    peakMemoryKb: cases.reduce((max, entry) => Math.max(max, entry.memoryKb), 0),
+    cases,
+  }));
 }
 
 export default async function SubmissionDetailPage({ params }: SubmissionDetailPageProps) {
@@ -37,6 +66,8 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
   const problem = getProblemById(submission.problemId);
   const canRequestRejudge = me ? canRequestRejudgeByViewer(submission, me.id) : false;
   const testCaseVisibility = problem?.testCaseVisibility ?? "case_index_only";
+  const groupedResults = groupTestResults(submission.testResults);
+  const canExpandCaseDetails = canViewSource || testCaseVisibility !== "group_only";
 
   return (
     <div className="page">
@@ -102,44 +133,61 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
           Visibility mode: {testCaseVisibilityLabel(testCaseVisibility)}
           {!canViewSource ? " (applied for non-owner viewers)" : ""}
         </p>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Group</th>
-                <th>Case</th>
-                <th>Verdict</th>
-                <th>Time</th>
-                <th>Memory</th>
-                <th>Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              {submission.testResults.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-soft">
-                    No per-test result yet. The submission is still being judged.
-                  </td>
-                </tr>
-              ) : (
-                submission.testResults.map((result) => (
-                  <tr key={result.id}>
-                    <td>{result.groupName}</td>
-                    <td>{result.testCaseName}</td>
-                    <td>
-                      <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                        {submissionStatusLabel(result.verdict)}
-                      </StatusBadge>
-                    </td>
-                    <td>{result.timeMs} ms</td>
-                    <td>{result.memoryKb} KB</td>
-                    <td>{result.message}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {submission.testResults.length === 0 ? (
+          <p className="empty">No per-test result yet. The submission is still being judged.</p>
+        ) : (
+          <div className="stack">
+            {groupedResults.map((group) => (
+              <details key={group.groupName} className="result-group">
+                <summary className="result-group-summary">
+                  <span className="kpi">{group.groupName}</span>
+                  <StatusBadge className={badgeClassForSubmission(group.verdict)}>
+                    {submissionStatusLabel(group.verdict)}
+                  </StatusBadge>
+                  <span className="result-group-meta">Cases: {group.caseCount}</span>
+                  <span className="result-group-meta">Time: {group.totalTimeMs} ms</span>
+                  <span className="result-group-meta">Memory: {group.peakMemoryKb} KB</span>
+                </summary>
+                <div className="result-group-body">
+                  {canExpandCaseDetails ? (
+                    <div className="table-wrap">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Case</th>
+                            <th>Verdict</th>
+                            <th>Time</th>
+                            <th>Memory</th>
+                            <th>Message</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.cases.map((result) => (
+                            <tr key={result.id}>
+                              <td>{result.testCaseName}</td>
+                              <td>
+                                <StatusBadge className={badgeClassForSubmission(result.verdict)}>
+                                  {submissionStatusLabel(result.verdict)}
+                                </StatusBadge>
+                              </td>
+                              <td>{result.timeMs} ms</td>
+                              <td>{result.memoryKb} KB</td>
+                              <td>{result.message}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-soft">
+                      Individual test cases are hidden by test case visibility policy.
+                    </p>
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="panel stack">

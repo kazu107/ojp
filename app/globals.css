@@ -497,6 +497,50 @@ a {
   align-items: center;
 }
 
+.result-group {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+  padding: 0.7rem 0.8rem;
+}
+
+.result-group[open] {
+  border-color: rgba(127, 188, 255, 0.4);
+}
+
+.result-group-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.result-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.result-group-summary::before {
+  content: "▸";
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.result-group[open] .result-group-summary::before {
+  content: "▾";
+}
+
+.result-group-meta {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-family: var(--font-jp-mono), monospace;
+}
+
+.result-group-body {
+  margin-top: 0.65rem;
+}
+
 .text-soft {
   color: var(--text-soft);
 }
