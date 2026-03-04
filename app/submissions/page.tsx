@@ -6,6 +6,7 @@ import {
   badgeClassForSubmission,
   difficultyLabel,
   formatDate,
+  languageLabel,
   submissionStatusLabel,
 } from "@/lib/presentation";
 import {
@@ -14,7 +15,7 @@ import {
   getProblemById,
   listSubmissionsForViewer,
 } from "@/lib/store";
-import { SubmissionStatus } from "@/lib/types";
+import { Language, SubmissionStatus } from "@/lib/types";
 import {
   isWaitingSubmissionStatus,
   normalizeSubmissionStatus,
@@ -28,14 +29,23 @@ interface SubmissionsPageProps {
     problemId?: string;
     contestId?: string;
     status?: string;
+    language?: string;
     limit?: string;
   }>;
 }
 
 const STATUS_FILTER_VALUES: SubmissionStatus[] = SUBMISSION_STATUS_VALUES;
+const LANGUAGE_FILTER_VALUES: Language[] = ["cpp", "python", "java", "javascript"];
 
 function parseStatusFilter(raw?: string): SubmissionStatus | undefined {
   return normalizeSubmissionStatus(raw);
+}
+
+function parseLanguageFilter(raw?: string): Language | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  return LANGUAGE_FILTER_VALUES.find((value) => value === raw);
 }
 
 function parseLimitFilter(raw?: string): number | undefined {
@@ -63,6 +73,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
     problemId: raw.problemId?.trim() || undefined,
     contestId: raw.contestId?.trim() || undefined,
     status: parseStatusFilter(raw.status),
+    language: parseLanguageFilter(raw.language),
     limit: parseLimitFilter(raw.limit),
   });
 
@@ -76,7 +87,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
         <div>
           <h1 className="page-title">Submissions</h1>
           <p className="page-subtitle">
-            Filter by user/problem/contest/status. Source code is visible only to submitter and admin.
+            Filter by user/problem/contest/status/language. Source code is visible only to submitter and admin.
           </p>
         </div>
       </section>
@@ -139,6 +150,18 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
             </label>
 
             <label className="field">
+              <span className="field-label">Language</span>
+              <select className="select" name="language" defaultValue={raw.language ?? ""}>
+                <option value="">All</option>
+                {LANGUAGE_FILTER_VALUES.map((language) => (
+                  <option key={language} value={language}>
+                    {languageLabel(language)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
               <span className="field-label">Limit</span>
               <input className="input" name="limit" defaultValue={raw.limit ?? ""} placeholder="50" />
             </label>
@@ -171,6 +194,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                   <th>User</th>
                   <th>Problem</th>
                   <th>Difficulty</th>
+                  <th>Language</th>
                   <th>Status</th>
                   <th>Score</th>
                   <th>Time</th>
@@ -208,6 +232,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                           "-"
                         )}
                       </td>
+                      <td>{languageLabel(submission.language)}</td>
                       <td>
                         <StatusBadge className={badgeClassForSubmission(submission.status)}>
                           {submissionStatusLabel(submission.status)}

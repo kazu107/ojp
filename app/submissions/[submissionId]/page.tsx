@@ -8,6 +8,7 @@ import {
   badgeClassForSubmission,
   difficultyLabel,
   formatDate,
+  languageLabel,
   submissionStatusLabel,
   testCaseVisibilityLabel,
 } from "@/lib/presentation";
@@ -30,7 +31,7 @@ interface GroupedTestResults {
   groupName: string;
   verdict: SubmissionStatus;
   caseCount: number;
-  totalTimeMs: number;
+  averageTimeMs: number;
   peakMemoryKb: number;
   cases: Submission["testResults"];
 }
@@ -47,10 +48,17 @@ function groupTestResults(results: Submission["testResults"]): GroupedTestResult
     groupName,
     verdict: pickHighestPriorityVerdict(cases.map((entry) => entry.verdict)),
     caseCount: cases.length,
-    totalTimeMs: cases.reduce((acc, entry) => acc + entry.timeMs, 0),
+    averageTimeMs: cases.reduce((acc, entry) => acc + entry.timeMs, 0) / cases.length,
     peakMemoryKb: cases.reduce((max, entry) => Math.max(max, entry.memoryKb), 0),
     cases,
   }));
+}
+
+function formatAverageTimeMs(value: number): string {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  return value.toFixed(1);
 }
 
 export default async function SubmissionDetailPage({ params }: SubmissionDetailPageProps) {
@@ -119,7 +127,9 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
             </StatusBadge>
           ) : null}
         </p>
-        <p className="text-soft">Submitted: {formatDate(submission.submittedAt)}</p>
+        <p className="text-soft">
+          Language: {languageLabel(submission.language)} / Submitted: {formatDate(submission.submittedAt)}
+        </p>
         <p className="text-soft">
           Judge Start: {submission.judgeStartedAt ? formatDate(submission.judgeStartedAt) : "-"} /
           Judged: {submission.judgedAt ? formatDate(submission.judgedAt) : "-"} / Judge Env:{" "}
@@ -145,7 +155,9 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                     {submissionStatusLabel(group.verdict)}
                   </StatusBadge>
                   <span className="result-group-meta">Cases: {group.caseCount}</span>
-                  <span className="result-group-meta">Time: {group.totalTimeMs} ms</span>
+                  <span className="result-group-meta">
+                    Time(avg): {formatAverageTimeMs(group.averageTimeMs)} ms
+                  </span>
                   <span className="result-group-meta">Memory: {group.peakMemoryKb} KB</span>
                 </summary>
                 <div className="result-group-body">

@@ -164,7 +164,7 @@ npm run build
 - `GET /api/announcements`
 - `POST /api/submissions`
 - `GET /api/submissions`
-- `GET /api/submissions?mine=1&problemId=&contestId=&status=&limit=`
+- `GET /api/submissions?mine=1&problemId=&contestId=&status=&language=&limit=`
 - `GET /api/submissions/:submissionId`
 - `POST /api/submissions/:submissionId/rejudge`
 - `GET /api/contests`
