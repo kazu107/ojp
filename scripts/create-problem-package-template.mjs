@@ -23,6 +23,10 @@ Options:
       --tests-per-group <n>    Number of tests per group (default: ${DEFAULT_TESTS_PER_GROUP})
   -f, --force                  Overwrite output file if it already exists
   -h, --help                   Show this help
+
+Generated config.json group format:
+  binary mode: ["group1", "group2", ...]
+  partial mode: [{ "name": "group1", "score": 50 }, ...]
 `);
 }
 
@@ -154,22 +158,14 @@ function distributeScores(groupCount) {
 function buildConfig(options) {
   const scores = options.mode === "partial" ? distributeScores(options.groups) : null;
   const groups = Array.from({ length: options.groups }, (_, groupIndex) => {
-    const tests = Array.from({ length: options.testsPerGroup }, (_, caseIndex) =>
-      makeCaseName(caseIndex),
-    );
-
     if (scores) {
       return {
         name: makeGroupName(groupIndex),
         score: scores[groupIndex],
-        tests,
       };
     }
 
-    return {
-      name: makeGroupName(groupIndex),
-      tests,
-    };
+    return makeGroupName(groupIndex);
   });
 
   return {
@@ -177,7 +173,6 @@ function buildConfig(options) {
     memoryLimitMb: 512,
     scoringType: options.mode === "partial" ? "sum_of_groups" : "binary",
     compareMode: "exact",
-    languages: ["cpp", "python", "java", "javascript"],
     groups,
   };
 }

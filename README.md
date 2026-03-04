@@ -34,7 +34,7 @@
 - 蝠城｡兄IP讀懆ｨｼAPI:
   - `POST /api/problems/:problemId/package`
   - 蠢・医ヵ繧｡繧､繝ｫ繝ｻ`.in/.out` 繝壹い繝ｻpath traversal繝ｻ螳ｹ驥丈ｸ企剞繧呈､懆ｨｼ
-  - 讀懆ｨｼ謌仙粥譎ゅ↓ `timeLimitMs / memoryLimitMb / supportedLanguages` 繧貞撫鬘瑚ｨｭ螳壹∈蜿肴丐
+  - 讀懆ｨｼ謌仙粥譎ゅ↓ `timeLimitMs / memoryLimitMb / scoringType` 繧貞撫鬘瑚ｨｭ螳壹∈蜿肴丐
 
 ## 螳溯｣・ｸ翫・蛻ｶ邏・
 - 豌ｸ邯壼喧縺ｯ譛ｪ螳溯｣・〒縲∝渕譛ｬ縺ｯ繧､繝ｳ繝｡繝｢繝ｪ繧ｹ繝医い縺ｧ縺吶・- 隱崎ｨｼ縺ｯ GitHub OAuth 繝ｭ繧ｰ繧､繝ｳ縺ｧ縺呻ｼ・next-auth`・峨・- 蛻晏屓繝ｭ繧ｰ繧､繝ｳ譎ゅ・縲；itHub繧｢繧ｫ繧ｦ繝ｳ繝域ュ蝣ｱ縺九ｉ繧｢繝励Μ蜀・Θ繝ｼ繧ｶ繝ｼ繧定・蜍穂ｽ懈・縺励∪縺吶・- 繧ｸ繝｣繝・ず縺ｯ髱槫酔譛溘〒縺呻ｼ・pending -> queued -> compiling -> running -> judging -> final`・峨・- 蝠城｡兄IP縺檎匳骭ｲ縺輔ｌ縺ｦ縺・ｋ蝠城｡後・縲～config.json` 縺ｨ `tests/*` 繧剃ｽｿ縺｣縺ｦ螳溯｡後ず繝｣繝・ず縺励∪縺吶・  - 蟇ｾ蠢懆ｨ隱・ `C++ / Python / Java / JavaScript`
@@ -164,7 +164,7 @@ npm run build
 - `GET /api/announcements`
 - `POST /api/submissions`
 - `GET /api/submissions`
-- `GET /api/submissions?mine=1&problemId=&contestId=&status=&language=&limit=`
+- `GET /api/submissions?mine=1&problemId=&contestId=&status=&limit=`
 - `GET /api/submissions/:submissionId`
 - `POST /api/submissions/:submissionId/rejudge`
 - `GET /api/contests`
@@ -276,8 +276,7 @@ problem-package.zip
 - `timeLimitMs` (number)
 - `memoryLimitMb` (number)
 - `scoringType` (optional: `binary` or `sum_of_groups`)
-- `languages` (array of `cpp|python|java|javascript`)
-- `groups` (each item has `name`, `tests[]`, and optional `score`)
+- `groups` (each item is either group name string or `{ name, score? }`)
 
 Scoring rules:
 - If every group has integer `score`, the sum must be exactly `100` (partial scoring mode).
@@ -286,6 +285,7 @@ Scoring rules:
 
 Validation rules:
 - `.in/.out` pairs are required for `samples/` and `tests/<group>/`.
+- Group test case names are auto-detected from `tests/<group>/` (no `tests[]` list required).
 - Path traversal and oversized ZIP/file payloads are rejected.
 
 Template generator:

@@ -5,18 +5,10 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ExplanationVisibility,
-  Language,
   Problem,
   TestCaseVisibility,
   Visibility,
 } from "@/lib/types";
-
-const LANGUAGE_OPTIONS: Array<{ value: Language; label: string }> = [
-  { value: "cpp", label: "C++" },
-  { value: "python", label: "Python" },
-  { value: "java", label: "Java" },
-  { value: "javascript", label: "JavaScript" },
-];
 
 type ProblemEditorFormProps =
   | {
@@ -41,7 +33,6 @@ interface FormState {
   difficulty: string;
   timeLimitMs: number;
   memoryLimitMb: number;
-  supportedLanguages: Language[];
   testCaseVisibility: TestCaseVisibility;
 }
 
@@ -59,7 +50,6 @@ function emptyState(): FormState {
     difficulty: "",
     timeLimitMs: 2000,
     memoryLimitMb: 512,
-    supportedLanguages: ["cpp", "python", "java", "javascript"],
     testCaseVisibility: "case_index_only",
   };
 }
@@ -78,7 +68,6 @@ function stateFromProblem(problem: Problem): FormState {
     difficulty: problem.difficulty === null ? "" : String(problem.difficulty),
     timeLimitMs: problem.timeLimitMs,
     memoryLimitMb: problem.memoryLimitMb,
-    supportedLanguages: problem.supportedLanguages,
     testCaseVisibility: problem.testCaseVisibility,
   };
 }
@@ -127,11 +116,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (form.supportedLanguages.length === 0) {
-      setError("Select at least one language.");
-      return;
-    }
-
     const parsedDifficulty = parseDifficultyInput(form.difficulty);
     if (!parsedDifficulty.ok) {
       setError(parsedDifficulty.message);
@@ -184,18 +168,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     } finally {
       setIsSaving(false);
     }
-  }
-
-  function toggleLanguage(language: Language) {
-    setForm((prev) => {
-      const exists = prev.supportedLanguages.includes(language);
-      return {
-        ...prev,
-        supportedLanguages: exists
-          ? prev.supportedLanguages.filter((item) => item !== language)
-          : [...prev.supportedLanguages, language],
-      };
-    });
   }
 
   return (
@@ -374,31 +346,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         </label>
       </div>
 
-      <fieldset className="field">
-        <legend className="field-label">Supported Languages</legend>
-        <div className="button-row">
-          {LANGUAGE_OPTIONS.map((option) => {
-            const selected = form.supportedLanguages.includes(option.value);
-            return (
-              <button
-                type="button"
-                key={option.value}
-                className="button"
-                style={{
-                  background: selected
-                    ? "linear-gradient(120deg, var(--accent), var(--accent-soft))"
-                    : undefined,
-                  color: selected ? "#0f1218" : undefined,
-                }}
-                onClick={() => toggleLanguage(option.value)}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
-
       {props.mode === "create" ? (
         <label className="field">
           <span className="field-label">Problem Package (ZIP, optional)</span>
@@ -417,8 +364,12 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
           </p>
           <p className="text-soft">
             In <code>config.json</code>, define <code>timeLimitMs</code>,{" "}
-            <code>memoryLimitMb</code>, <code>scoringType</code>, <code>languages</code>, and{" "}
-            <code>groups</code>.
+            <code>memoryLimitMb</code>, <code>scoringType</code>, and <code>groups</code>.
+          </p>
+          <p className="text-soft">
+            Group syntax is simplified: use either <code>&quot;group1&quot;</code> or{" "}
+            <code>{`{ "name": "group1", "score": 50 }`}</code>. Test case names are auto-detected
+            from <code>tests/&lt;group&gt;/</code>.
           </p>
           <p className="text-soft">
             Group partial scores are optional. If scores are set, the total must be exactly 100.

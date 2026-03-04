@@ -1,17 +1,9 @@
 ﻿import AdmZip from "adm-zip";
-import { Language } from "@/lib/types";
 
 const MAX_ZIP_BYTES = 64 * 1024 * 1024;
 const MAX_SINGLE_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_FILES = 1000;
 const MAX_EXPANDED_BYTES = 128 * 1024 * 1024;
-
-const ALLOWED_LANGUAGES: ReadonlySet<Language> = new Set([
-  "cpp",
-  "python",
-  "java",
-  "javascript",
-]);
 
 export type ProblemPackageScoringType = "binary" | "sum_of_groups";
 export type ProblemPackageCompareMode = "exact" | "ignore_trailing_spaces";
@@ -28,7 +20,6 @@ interface ConfigSummary {
   scoringType: ProblemPackageScoringType;
   checkerType: "exact";
   compareMode: ProblemPackageCompareMode;
-  languages: Language[];
   groups: ConfigGroupSummary[];
 }
 
@@ -75,7 +66,6 @@ interface ParsedConfig {
   scoringType: ProblemPackageScoringType;
   checkerType: "exact";
   compareMode: ProblemPackageCompareMode;
-  languages: Language[];
   groups: ParsedConfigGroup[];
   warnings: string[];
 }
@@ -181,8 +171,20 @@ function resolveCompareMode(config: Record<string, unknown>): ProblemPackageComp
 }
 
 function parseConfigGroup(value: unknown, index: number): ParsedConfigGroup {
+  if (typeof value === "string") {
+    const name = value.trim();
+    if (!name) {
+      throw new Error(`config.groups[${index}] must not be empty`);
+    }
+    return {
+      name,
+      score: null,
+      tests: [],
+    };
+  }
+
   if (!value || typeof value !== "object") {
-    throw new Error(`config.groups[${index}] must be an object`);
+    throw new Error(`config.groups[${index}] must be a string or object`);
   }
 
   const record = value as Record<string, unknown>;
@@ -194,16 +196,20 @@ function parseConfigGroup(value: unknown, index: number): ParsedConfigGroup {
   if (record.score !== undefined && record.score !== null && record.score !== "") {
     score = parseNonNegativeInteger(record.score, `config.groups[${index}].score`);
   }
-  if (!Array.isArray(record.tests)) {
-    throw new Error(`config.groups[${index}].tests must be an array`);
-  }
 
-  const tests = record.tests.map((item, testIndex) => {
-    if (typeof item !== "string" || !item.trim()) {
-      throw new Error(`config.groups[${index}].tests[${testIndex}] must be a non-empty string`);
+  const testsRaw = record.tests;
+  let tests: string[] = [];
+  if (testsRaw !== undefined && testsRaw !== null && testsRaw !== "") {
+    if (!Array.isArray(testsRaw)) {
+      throw new Error(`config.groups[${index}].tests must be an array when provided`);
     }
-    return item.trim();
-  });
+    tests = testsRaw.map((item, testIndex) => {
+      if (typeof item !== "string" || !item.trim()) {
+        throw new Error(`config.groups[${index}].tests[${testIndex}] must be a non-empty string`);
+      }
+      return item.trim();
+    });
+  }
 
   return {
     name: record.name.trim(),
@@ -225,20 +231,6 @@ function parseConfig(configJson: unknown): ParsedConfig {
   ) {
     throw new Error("config.checkerType currently supports only 'exact'");
   }
-
-  if (!Array.isArray(config.languages) || config.languages.length === 0) {
-    throw new Error("config.languages must be a non-empty array");
-  }
-
-  const languages = config.languages.map((item, index) => {
-    if (typeof item !== "string") {
-      throw new Error(`config.languages[${index}] must be a string`);
-    }
-    if (!ALLOWED_LANGUAGES.has(item as Language)) {
-      throw new Error(`config.languages[${index}] is not supported: ${item}`);
-    }
-    return item as Language;
-  });
 
   if (!Array.isArray(config.groups) || config.groups.length === 0) {
     throw new Error("config.groups must be a non-empty array");
@@ -284,7 +276,6 @@ function parseConfig(configJson: unknown): ParsedConfig {
     scoringType,
     checkerType: "exact",
     compareMode: resolveCompareMode(config),
-    languages,
     groups,
     warnings,
   };
@@ -477,6 +468,7 @@ export function validateProblemPackage(
   const { groups, warnings: groupWarnings } = buildTestGroups(config, entryByPath, testIn, testOut);
   const warnings = [...config.warnings, ...groupWarnings];
   const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
+  const testsByGroupName = new Map(groups.map((group) => [group.name, group.tests.length]));
 
   const validation: ProblemPackageValidationResult = {
     fileName,
@@ -491,11 +483,10 @@ export function validateProblemPackage(
       scoringType: config.scoringType,
       checkerType: config.checkerType,
       compareMode: config.compareMode,
-      languages: config.languages,
       groups: config.groups.map((group) => ({
         name: group.name,
         score: group.score,
-        tests: group.tests.length,
+        tests: testsByGroupName.get(group.name) ?? 0,
       })),
     },
     warnings,

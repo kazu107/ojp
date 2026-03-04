@@ -65,6 +65,11 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
         `tests/&lt;group&gt;/*.in/.out`
       </p>
       <p className="text-soft">
+        In <code>config.json</code>, each group can be either <code>&quot;group1&quot;</code> or{" "}
+        <code>{`{ "name": "group1", "score": 50 }`}</code>. Test files are auto-detected from
+        each <code>tests/&lt;group&gt;/</code> directory.
+      </p>
+      <p className="text-soft">
         Group partial scores are optional. If you set `groups[].score`, every group must have it
         and total score must be exactly 100. If omitted, the judge uses binary scoring (all groups
         passed = 100).
@@ -93,7 +98,6 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
             Config: TL {result.config.timeLimitMs} ms / ML {result.config.memoryLimitMb} MB /{" "}
             {result.config.scoringType} / {result.config.compareMode}
           </p>
-          <p className="text-soft">Languages: {result.config.languages.join(", ")}</p>
           {result.warnings.length > 0 ? (
             <div className="stack">
               <p className="field-label">Warnings</p>

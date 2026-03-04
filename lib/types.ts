@@ -70,7 +70,6 @@ export interface Problem {
   difficulty: number | null;
   timeLimitMs: number;
   memoryLimitMb: number;
-  supportedLanguages: Language[];
   scoringType: "sum" | "binary" | "sum_of_groups";
   testCaseVisibility: TestCaseVisibility;
   latestPackageSummary: ProblemPackageSummary | null;
@@ -227,7 +226,6 @@ export interface CreateProblemInput {
   difficulty: number | null;
   timeLimitMs: number;
   memoryLimitMb: number;
-  supportedLanguages: Language[];
   testCaseVisibility: TestCaseVisibility;
 }
 

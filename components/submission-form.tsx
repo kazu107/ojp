@@ -6,17 +6,16 @@ import { Language } from "@/lib/types";
 
 interface SubmissionFormProps {
   problemId: string;
-  allowedLanguages: Language[];
   contestId?: string | null;
 }
 
+const DEFAULT_SUBMISSION_LANGUAGE: Language = "python";
+
 export function SubmissionForm({
   problemId,
-  allowedLanguages,
   contestId = null,
 }: SubmissionFormProps) {
   const router = useRouter();
-  const [language, setLanguage] = useState<Language>(allowedLanguages[0] ?? "python");
   const [sourceCode, setSourceCode] = useState<string>(
     "def solve():\n    n = int(input())\n    print(n)\n\nsolve()",
   );
@@ -37,7 +36,7 @@ export function SubmissionForm({
         body: JSON.stringify({
           problemId,
           contestId,
-          language,
+          language: DEFAULT_SUBMISSION_LANGUAGE,
           sourceCode,
         }),
       });
@@ -59,21 +58,6 @@ export function SubmissionForm({
 
   return (
     <form className="form" onSubmit={onSubmit}>
-      <label className="field">
-        <span className="field-label">Language</span>
-        <select
-          className="select"
-          value={language}
-          onChange={(event) => setLanguage(event.target.value as Language)}
-        >
-          {allowedLanguages.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-      </label>
-
       <label className="field">
         <span className="field-label">Source Code</span>
         <textarea

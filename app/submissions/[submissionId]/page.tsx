@@ -8,7 +8,6 @@ import {
   badgeClassForSubmission,
   difficultyLabel,
   formatDate,
-  languageLabel,
   submissionStatusLabel,
   testCaseVisibilityLabel,
 } from "@/lib/presentation";
@@ -89,10 +88,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
             </StatusBadge>
           ) : null}
         </p>
-        <p className="text-soft">
-          Language: {languageLabel(submission.language)} / Submitted:{" "}
-          {formatDate(submission.submittedAt)}
-        </p>
+        <p className="text-soft">Submitted: {formatDate(submission.submittedAt)}</p>
         <p className="text-soft">
           Judge Start: {submission.judgeStartedAt ? formatDate(submission.judgeStartedAt) : "-"} /
           Judged: {submission.judgedAt ? formatDate(submission.judgedAt) : "-"} / Judge Env:{" "}

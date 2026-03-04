@@ -11,8 +11,7 @@ export default async function NewProblemPage() {
         <div>
           <h1 className="page-title">Create Problem</h1>
           <p className="page-subtitle">
-            Create a new problem, set limits and supported languages, and optionally attach a ZIP
-            package for test cases.
+            Create a new problem, set limits, and optionally attach a ZIP package for test cases.
           </p>
           <p className="text-soft">
             If ZIP is selected, it will be validated and registered automatically after the problem

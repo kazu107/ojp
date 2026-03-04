@@ -31,7 +31,7 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
         <div>
           <h1 className="page-title">Edit Problem</h1>
           <p className="page-subtitle">
-            Update statement, limits, language settings, and package validation for this problem.
+            Update statement, limits, and package validation for this problem.
           </p>
         </div>
       </section>

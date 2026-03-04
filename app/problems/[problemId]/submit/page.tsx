@@ -52,7 +52,6 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
       <section className="panel">
         <SubmissionForm
           problemId={problem.id}
-          allowedLanguages={problem.supportedLanguages}
           contestId={contest?.id ?? null}
         />
       </section>

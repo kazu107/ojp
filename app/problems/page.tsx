@@ -5,7 +5,6 @@ import {
   badgeClassForVisibility,
   difficultyLabel,
   formatDate,
-  languageLabel,
   visibilityLabel,
 } from "@/lib/presentation";
 import {
@@ -29,7 +28,7 @@ export default async function ProblemsPage() {
         <div>
           <h1 className="page-title">Problems</h1>
           <p className="page-subtitle">
-            問題一覧です。`public / unlisted / private` の公開範囲と、制約・言語情報を一覧で確認できます。
+            問題一覧です。公開範囲と制約情報を確認できます。
           </p>
         </div>
         <div className="button-row">
@@ -43,7 +42,7 @@ export default async function ProblemsPage() {
 
       <section className="panel">
         {problems.length === 0 ? (
-          <p className="empty">問題がまだ登録されていません。</p>
+          <p className="empty">表示できる問題がありません。</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -53,7 +52,6 @@ export default async function ProblemsPage() {
                   <th>Difficulty</th>
                   <th>Visibility</th>
                   <th>Limits</th>
-                  <th>Languages</th>
                   <th>Author</th>
                   <th>Updated</th>
                   <th>Actions</th>
@@ -80,7 +78,6 @@ export default async function ProblemsPage() {
                     <td>
                       {problem.timeLimitMs} ms / {problem.memoryLimitMb} MB
                     </td>
-                    <td>{problem.supportedLanguages.map((language) => languageLabel(language)).join(", ")}</td>
                     <td>{findUser(problem.authorId)?.displayName ?? problem.authorId}</td>
                     <td>{formatDate(problem.updatedAt)}</td>
                     <td>

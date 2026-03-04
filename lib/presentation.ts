@@ -1,7 +1,6 @@
 import {
   ContestStatus,
   ExplanationVisibility,
-  Language,
   SubmissionStatus,
   TestCaseVisibility,
   Visibility,
@@ -27,21 +26,6 @@ export function visibilityLabel(visibility: Visibility): string {
       return "Private";
     default:
       return visibility;
-  }
-}
-
-export function languageLabel(language: Language): string {
-  switch (language) {
-    case "cpp":
-      return "C++";
-    case "python":
-      return "Python";
-    case "java":
-      return "Java";
-    case "javascript":
-      return "JavaScript";
-    default:
-      return language;
   }
 }
 

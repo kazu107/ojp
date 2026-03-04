@@ -8,12 +8,10 @@ import {
 } from "@/lib/api-helpers";
 import { createSubmission, getOptionalCurrentUser, listSubmissionsForViewer } from "@/lib/store";
 import { apiError, errorResponse } from "@/lib/api-response";
-import { Language, SubmissionStatus } from "@/lib/types";
+import { SubmissionStatus } from "@/lib/types";
 import { normalizeSubmissionStatus, SUBMISSION_STATUS_VALUES } from "@/lib/submission-status";
 
 const STATUS_FILTER_VALUES: SubmissionStatus[] = SUBMISSION_STATUS_VALUES;
-
-const LANGUAGE_FILTER_VALUES: Language[] = ["cpp", "python", "java", "javascript"];
 
 function parseStatusFilter(raw: string | null): SubmissionStatus | undefined {
   const normalized = normalizeSubmissionStatus(raw);
@@ -21,13 +19,6 @@ function parseStatusFilter(raw: string | null): SubmissionStatus | undefined {
     return undefined;
   }
   return STATUS_FILTER_VALUES.find((value) => value === normalized);
-}
-
-function parseLanguageFilter(raw: string | null): Language | undefined {
-  if (!raw) {
-    return undefined;
-  }
-  return LANGUAGE_FILTER_VALUES.find((value) => value === raw);
 }
 
 export async function GET(request: Request) {
@@ -49,7 +40,6 @@ export async function GET(request: Request) {
       problemId: params.get("problemId") || undefined,
       contestId: params.get("contestId") || undefined,
       status: parseStatusFilter(params.get("status")),
-      language: parseLanguageFilter(params.get("language")),
     });
 
     const { items, meta } = paginateItems(filtered, pagination);

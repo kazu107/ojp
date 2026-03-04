@@ -25,19 +25,6 @@ export function parseVisibility(raw: unknown, fallback: Visibility = "public"): 
   return fallback;
 }
 
-export function parseLanguages(raw: unknown, fallback: Language[] = ALLOWED_LANGUAGES): Language[] {
-  if (!Array.isArray(raw)) {
-    return fallback;
-  }
-
-  const languages = raw.filter(
-    (item): item is Language =>
-      typeof item === "string" && ALLOWED_LANGUAGES.includes(item as Language),
-  );
-
-  return languages.length > 0 ? languages : fallback;
-}
-
 export function parseLanguage(raw: unknown, fallback: Language = "python"): Language {
   if (typeof raw === "string" && ALLOWED_LANGUAGES.includes(raw as Language)) {
     return raw as Language;

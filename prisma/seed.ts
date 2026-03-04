@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { dumpStoreSnapshot } from "../lib/store";
 
 const prisma = new PrismaClient();
+const DEFAULT_SUBMISSION_LANGUAGES = ["cpp", "python", "java", "javascript"] as const;
 
 async function clearAll() {
   await prisma.appState.deleteMany();
@@ -54,7 +55,7 @@ async function seedFromSnapshot() {
         difficulty: problem.difficulty,
         timeLimitMs: problem.timeLimitMs,
         memoryLimitMb: problem.memoryLimitMb,
-        supportedLanguages: problem.supportedLanguages,
+        supportedLanguages: [...DEFAULT_SUBMISSION_LANGUAGES],
         scoringType: problem.scoringType,
         createdAt: new Date(problem.createdAt),
         updatedAt: new Date(problem.updatedAt),

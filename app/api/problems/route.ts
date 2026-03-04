@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   paginateItems,
   parseExplanationVisibility,
-  parseLanguages,
   parseOptionalIntegerOrNull,
   parsePaginationQuery,
   parsePositiveNumber,
@@ -51,7 +50,6 @@ export async function POST(request: Request) {
       difficulty: difficulty === undefined ? null : difficulty,
       timeLimitMs: parsePositiveNumber(body.timeLimitMs, 2000),
       memoryLimitMb: parsePositiveNumber(body.memoryLimitMb, 512),
-      supportedLanguages: parseLanguages(body.supportedLanguages),
       testCaseVisibility: parseTestCaseVisibility(body.testCaseVisibility, "case_index_only"),
     });
     return NextResponse.json({ problem }, { status: 201 });

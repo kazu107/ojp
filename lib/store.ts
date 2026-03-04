@@ -38,7 +38,6 @@ import {
 } from "@/lib/submission-status";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
-const BASE_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
 
 const SUBMISSION_COOLDOWN_MS = 10_000;
 const SUBMISSION_LIMIT_WINDOW_MS = 60_000;
@@ -242,7 +241,6 @@ function createInitialStore(): Store {
       difficulty: 100,
       timeLimitMs: 2000,
       memoryLimitMb: 512,
-      supportedLanguages: BASE_LANGUAGES,
       scoringType: "sum",
       testCaseVisibility: "case_index_only",
       latestPackageSummary: null,
@@ -266,7 +264,6 @@ function createInitialStore(): Store {
       difficulty: 400,
       timeLimitMs: 2000,
       memoryLimitMb: 512,
-      supportedLanguages: BASE_LANGUAGES,
       scoringType: "sum",
       testCaseVisibility: "case_index_only",
       latestPackageSummary: null,
@@ -425,7 +422,6 @@ function createInitialStore(): Store {
           scoringType: "sum_of_groups",
           checkerType: "exact",
           compareMode: "exact",
-          languages: [...BASE_LANGUAGES],
           groups: [{ name: "group1", score: 100, tests: 2 }],
         },
         warnings: ["seed package (embedded)"],
@@ -466,7 +462,6 @@ function createInitialStore(): Store {
           scoringType: "sum_of_groups",
           checkerType: "exact",
           compareMode: "exact",
-          languages: [...BASE_LANGUAGES],
           groups: [{ name: "group1", score: 100, tests: 2 }],
         },
         warnings: ["seed package (embedded)"],
@@ -1706,7 +1701,6 @@ export async function createProblem(input: CreateProblemInput): Promise<Problem>
     difficulty: input.difficulty,
     timeLimitMs: input.timeLimitMs,
     memoryLimitMb: input.memoryLimitMb,
-    supportedLanguages: input.supportedLanguages,
     scoringType: "sum",
     testCaseVisibility: input.testCaseVisibility,
     latestPackageSummary: null,
@@ -1769,9 +1763,6 @@ export async function updateProblem(
   if (typeof input.memoryLimitMb === "number" && input.memoryLimitMb > 0) {
     problem.memoryLimitMb = input.memoryLimitMb;
   }
-  if (Array.isArray(input.supportedLanguages) && input.supportedLanguages.length > 0) {
-    problem.supportedLanguages = input.supportedLanguages;
-  }
   if (input.testCaseVisibility) {
     problem.testCaseVisibility = input.testCaseVisibility;
   }
@@ -1792,7 +1783,6 @@ export async function applyProblemPackageValidation(
 
   problem.timeLimitMs = packageData.validation.config.timeLimitMs;
   problem.memoryLimitMb = packageData.validation.config.memoryLimitMb;
-  problem.supportedLanguages = packageData.validation.config.languages;
   problem.scoringType =
     packageData.scoringType === "sum_of_groups" ? "sum_of_groups" : packageData.scoringType;
   problem.latestPackageSummary = {
@@ -2012,9 +2002,6 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   assertActiveUser(currentUser);
 
   const problem = resolveProblemIfExists(input.problemId);
-  if (!problem.supportedLanguages.includes(input.language)) {
-    throw new HttpError("unsupported language", 400);
-  }
 
   let contestId: string | null = null;
   if (input.contestId) {

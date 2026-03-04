@@ -8,7 +8,6 @@ import {
   difficultyLabel,
   explanationVisibilityLabel,
   formatDate,
-  languageLabel,
   testCaseVisibilityLabel,
   visibilityLabel,
 } from "@/lib/presentation";
@@ -105,9 +104,6 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
           </p>
           <p className="text-soft">Time Limit: {problem.timeLimitMs} ms</p>
           <p className="text-soft">Memory Limit: {problem.memoryLimitMb} MB</p>
-          <p className="text-soft">
-            Languages: {problem.supportedLanguages.map((language) => languageLabel(language)).join(", ")}
-          </p>
           <p className="text-soft">
             Test Case Visibility: {testCaseVisibilityLabel(problem.testCaseVisibility)}
           </p>
