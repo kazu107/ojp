@@ -428,6 +428,18 @@ function createInitialStore(): Store {
       },
       scoringType: "sum_of_groups",
       compareMode: "exact",
+      samples: [
+        {
+          name: "sample1",
+          input: "1\n",
+          output: "1\n",
+        },
+        {
+          name: "sample2",
+          input: "42\n",
+          output: "42\n",
+        },
+      ],
       groups: [
         {
           name: "group1",
@@ -468,6 +480,18 @@ function createInitialStore(): Store {
       },
       scoringType: "sum_of_groups",
       compareMode: "exact",
+      samples: [
+        {
+          name: "sample1",
+          input: "1 2 3\n",
+          output: "6\n",
+        },
+        {
+          name: "sample2",
+          input: "-5 6 7\n",
+          output: "8\n",
+        },
+      ],
       groups: [
         {
           name: "group1",
@@ -1677,6 +1701,10 @@ export function getProblemForViewer(problemId: string, viewerId: string): Proble
     true,
   );
   return allowed ? maskProblemExplanationByViewer(problem, viewerId) : undefined;
+}
+
+export function getProblemPackageData(problemId: string): ProblemPackageExtracted | undefined {
+  return store.problemPackages[problemId];
 }
 
 export async function createProblem(input: CreateProblemInput): Promise<Problem> {

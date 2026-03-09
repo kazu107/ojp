@@ -3,21 +3,28 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ProblemPackageDraftEditor } from "@/components/problem-package-draft-editor";
 import {
   ExplanationVisibility,
   Problem,
   TestCaseVisibility,
   Visibility,
 } from "@/lib/types";
+import {
+  ProblemPackageEditorDraft,
+  ProblemPackageInspectResult,
+} from "@/lib/problem-package-types";
 
 type ProblemEditorFormProps =
   | {
       mode: "create";
       initialProblem?: undefined;
+      initialPackageDraft?: ProblemPackageEditorDraft | null;
     }
   | {
       mode: "edit";
       initialProblem: Problem;
+      initialPackageDraft?: ProblemPackageEditorDraft | null;
     };
 
 interface FormState {
@@ -72,7 +79,46 @@ function stateFromProblem(problem: Problem): FormState {
   };
 }
 
-function parseDifficultyInput(raw: string): { ok: true; value: number | null } | { ok: false; message: string } {
+function createId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createBlankPackageDraft(): ProblemPackageEditorDraft {
+  return {
+    sourceLabel: "manual-package",
+    compareMode: "exact",
+    zipSizeBytes: 0,
+    fileCount: 0,
+    samples: [
+      {
+        id: createId("sample"),
+        name: "sample1",
+        input: "",
+        output: "",
+      },
+    ],
+    warnings: [],
+    groups: [
+      {
+        id: createId("group"),
+        name: "group1",
+        score: null,
+        tests: [
+          {
+            id: createId("case"),
+            name: "01",
+            input: "",
+            output: "",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function parseDifficultyInput(
+  raw: string,
+): { ok: true; value: number | null } | { ok: false; message: string } {
   const trimmed = raw.trim();
   if (trimmed.length === 0) {
     return { ok: true, value: null };
@@ -89,8 +135,13 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     props.mode === "edit" ? stateFromProblem(props.initialProblem) : emptyState(),
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [isInspectingPackage, setIsInspectingPackage] = useState(false);
   const [error, setError] = useState<string>("");
-  const [packageFile, setPackageFile] = useState<File | null>(null);
+  const [packageError, setPackageError] = useState<string>("");
+  const [packageNotice, setPackageNotice] = useState<string>("");
+  const [packageDraft, setPackageDraft] = useState<ProblemPackageEditorDraft | null>(
+    props.initialPackageDraft ?? null,
+  );
   const [createdProblemId, setCreatedProblemId] = useState<string | null>(null);
 
   const endpoint = useMemo(() => {
@@ -112,6 +163,91 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       // no-op
     }
     return fallback;
+  }
+
+  async function inspectPackage(file: File) {
+    setIsInspectingPackage(true);
+    setPackageError("");
+    setPackageNotice("");
+
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const response = await fetch("/api/problem-packages/inspect", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        const message = await parseErrorMessage(response, "failed to inspect ZIP package");
+        throw new Error(message);
+      }
+
+      const inspected = (await response.json()) as ProblemPackageInspectResult;
+      setForm((prev) => ({
+        ...prev,
+        title: inspected.prefill.title || prev.title,
+        slug: inspected.prefill.slugSuggestion || prev.slug,
+        statementMarkdown: inspected.prefill.statementMarkdown,
+        inputDescription: inspected.prefill.inputDescription,
+        outputDescription: inspected.prefill.outputDescription,
+        constraintsMarkdown: inspected.prefill.constraintsMarkdown,
+        explanationMarkdown: inspected.prefill.explanationMarkdown,
+        timeLimitMs: inspected.prefill.timeLimitMs,
+        memoryLimitMb: inspected.prefill.memoryLimitMb,
+      }));
+      setPackageDraft(inspected.draft);
+      setPackageNotice(`Imported ${inspected.package.fileName} and filled the form fields.`);
+    } catch (inspectError) {
+      setPackageError(
+        inspectError instanceof Error ? inspectError.message : "failed to inspect ZIP package",
+      );
+    } finally {
+      setIsInspectingPackage(false);
+    }
+  }
+
+  async function saveProblemPackage(problemId: string) {
+    if (!packageDraft) {
+      return;
+    }
+
+    const response = await fetch(`/api/problems/${problemId}/package/manual`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sourceLabel: packageDraft.sourceLabel,
+        compareMode: packageDraft.compareMode,
+        zipSizeBytes: packageDraft.zipSizeBytes,
+        fileCount: packageDraft.fileCount,
+        samples: packageDraft.samples.map((sample) => ({
+          name: sample.name,
+          input: sample.input,
+          output: sample.output,
+        })),
+        warnings: packageDraft.warnings,
+        timeLimitMs: form.timeLimitMs,
+        memoryLimitMb: form.memoryLimitMb,
+        groups: packageDraft.groups.map((group) => ({
+          name: group.name,
+          score: group.score,
+          tests: group.tests.map((testCase) => ({
+            name: testCase.name,
+            input: testCase.input,
+            output: testCase.output,
+          })),
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      const packageMessage = await parseErrorMessage(
+        response,
+        "failed to save problem package",
+      );
+      throw new Error(packageMessage);
+    }
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -144,22 +280,10 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       }
 
       const body = (await response.json()) as { problem: Problem };
-      if (props.mode === "create" && packageFile) {
-        const formData = new FormData();
-        formData.set("file", packageFile);
-        const packageResponse = await fetch(`/api/problems/${body.problem.id}/package`, {
-          method: "POST",
-          body: formData,
-        });
-        if (!packageResponse.ok) {
-          const packageError = await parseErrorMessage(
-            packageResponse,
-            "failed to register ZIP package",
-          );
-          setCreatedProblemId(body.problem.id);
-          throw new Error(`Problem was created, but ZIP registration failed: ${packageError}`);
-        }
+      if (props.mode === "create") {
+        setCreatedProblemId(body.problem.id);
       }
+      await saveProblemPackage(body.problem.id);
 
       router.push(`/problems/${body.problem.id}`);
       router.refresh();
@@ -346,40 +470,93 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         </label>
       </div>
 
-      {props.mode === "create" ? (
+      <section className="panel stack">
+        <div>
+          <h2 className="panel-title">Judge Package</h2>
+          <p className="panel-subtitle">
+            Import ZIP to auto-fill the form, or build groups and test cases manually on this page.
+          </p>
+        </div>
+
         <label className="field">
-          <span className="field-label">Problem Package (ZIP, optional)</span>
+          <span className="field-label">Import ZIP</span>
           <input
             className="input"
             type="file"
             accept=".zip,application/zip"
-            onChange={(event) => setPackageFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              if (file) {
+                void inspectPackage(file);
+              }
+            }}
           />
           <p className="text-soft">
-            If selected, ZIP will be validated and registered right after problem creation.
-          </p>
-          <p className="text-soft">
-            Required files: <code>statement.md</code>, <code>config.json</code>,{" "}
-            <code>samples/*.in/.out</code>, <code>tests/&lt;group&gt;/*.in/.out</code>
-          </p>
-          <p className="text-soft">
-            In <code>config.json</code>, define <code>timeLimitMs</code>,{" "}
-            <code>memoryLimitMb</code>, <code>scoringType</code>, and <code>groups</code>.
-          </p>
-          <p className="text-soft">
-            Group syntax is simplified: use either <code>&quot;group1&quot;</code> or{" "}
-            <code>{`{ "name": "group1", "score": 50 }`}</code>. Test case names are auto-detected
-            from <code>tests/&lt;group&gt;/</code>.
-          </p>
-          <p className="text-soft">
-            Group partial scores are optional. If scores are set, the total must be exactly 100.
-            If scores are omitted, all groups passed gives 100 points.
+            Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields,
+            and converts its tests into the editor below.
           </p>
         </label>
-      ) : null}
+
+        <div className="button-row">
+          {!packageDraft ? (
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                setPackageDraft(createBlankPackageDraft());
+                setPackageNotice("Started a blank manual package.");
+                setPackageError("");
+              }}
+            >
+              Start Manual Package
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  setPackageDraft(createBlankPackageDraft());
+                  setPackageNotice("Reset the package editor to a blank template.");
+                  setPackageError("");
+                }}
+              >
+                Reset to Blank
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  setPackageDraft(null);
+                  setPackageNotice(
+                    props.mode === "edit"
+                      ? "Package editor disabled. Existing package stays unchanged on save."
+                      : "Package editor cleared. This problem will be created without a package.",
+                  );
+                  setPackageError("");
+                }}
+              >
+                Clear Package
+              </button>
+            </>
+          )}
+        </div>
+
+        {isInspectingPackage ? <p className="badge badge-blue">Inspecting ZIP...</p> : null}
+        {packageNotice ? <p className="badge badge-blue">{packageNotice}</p> : null}
+        {packageError ? <p className="badge badge-red">{packageError}</p> : null}
+
+        {packageDraft ? (
+          <ProblemPackageDraftEditor draft={packageDraft} onChange={setPackageDraft} />
+        ) : (
+          <p className="empty">
+            No package is attached yet. Start from a blank manual package or import a ZIP.
+          </p>
+        )}
+      </section>
 
       {error ? <p className="badge badge-red">{error}</p> : null}
-      {createdProblemId ? (
+      {props.mode === "create" && createdProblemId ? (
         <div className="button-row">
           <Link className="button button-secondary" href={`/problems/${createdProblemId}/edit`}>
             Open Created Problem
@@ -388,7 +565,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       ) : null}
 
       <div className="button-row">
-        <button className="button" type="submit" disabled={isSaving}>
+        <button className="button" type="submit" disabled={isSaving || isInspectingPackage}>
           {isSaving ? "Saving..." : props.mode === "edit" ? "Update" : "Create"}
         </button>
       </div>

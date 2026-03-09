@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProblemEditorForm } from "@/components/problem-editor-form";
-import { ProblemPackageUploadForm } from "@/components/problem-package-upload-form";
 import { VisibilityActionButtons } from "@/components/visibility-action-buttons";
+import { buildEditorDraftFromExtracted } from "@/lib/problem-package";
 import {
   canEditProblemByViewer,
   getCurrentUser,
+  getProblemPackageData,
   getProblemForViewer,
 } from "@/lib/store";
 
@@ -24,6 +25,12 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
   }
 
   const canEdit = canEditProblemByViewer(problem, me.id);
+  const packageDraft = canEdit
+    ? (() => {
+        const packageData = getProblemPackageData(problem.id);
+        return packageData ? buildEditorDraftFromExtracted(packageData) : null;
+      })()
+    : null;
 
   return (
     <div className="page">
@@ -31,7 +38,8 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
         <div>
           <h1 className="page-title">Edit Problem</h1>
           <p className="page-subtitle">
-            Update statement, limits, and package validation for this problem.
+            Update statement, limits, and the judge package, including manual test groups and ZIP
+            import.
           </p>
         </div>
       </section>
@@ -39,7 +47,11 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
       {canEdit ? (
         <>
           <section className="panel">
-            <ProblemEditorForm mode="edit" initialProblem={problem} />
+            <ProblemEditorForm
+              mode="edit"
+              initialProblem={problem}
+              initialPackageDraft={packageDraft}
+            />
           </section>
           <section className="panel stack">
             <h2 className="panel-title">Publish Settings</h2>
@@ -51,14 +63,6 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
               resourceId={problem.id}
               visibility={problem.visibility}
             />
-          </section>
-          <section className="panel stack">
-            <h2 className="panel-title">Problem Package</h2>
-            <p className="panel-subtitle">
-              Upload a ZIP package to validate required files and apply judge settings from
-              `config.json`.
-            </p>
-            <ProblemPackageUploadForm problemId={problem.id} />
           </section>
         </>
       ) : (

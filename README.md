@@ -158,7 +158,9 @@ npm run build
 - `PATCH /api/problems/:problemId`
 - `POST /api/problems/:problemId/publish`
 - `POST /api/problems/:problemId/unpublish`
+- `POST /api/problem-packages/inspect`
 - `POST /api/problems/:problemId/package`
+- `POST /api/problems/:problemId/package/manual`
 - `GET /api/problems/:problemId/explanation`
 - `PUT /api/problems/:problemId/explanation`
 - `GET /api/announcements`
@@ -249,6 +251,10 @@ values (`accepted`, `wrong_answer`, etc.) before Prisma drops legacy enum varian
 ## Problem ZIP Format
 
 You can register problem test cases by uploading one ZIP package.
+
+Problem create/edit page also supports:
+- ZIP import with automatic form prefill from `statement.md` and `config.json`
+- Manual judge package editing on the page (samples, groups, cases, scores, compare mode)
 
 Expected structure:
 

@@ -11,11 +11,11 @@ export default async function NewProblemPage() {
         <div>
           <h1 className="page-title">Create Problem</h1>
           <p className="page-subtitle">
-            Create a new problem, set limits, and optionally attach a ZIP package for test cases.
+            Create a new problem, import a ZIP to auto-fill fields, or build test groups and cases
+            manually on the page.
           </p>
           <p className="text-soft">
-            If ZIP is selected, it will be validated and registered automatically after the problem
-            is created.
+            ZIP import and manual test case editing are both handled from the main form below.
           </p>
         </div>
       </section>

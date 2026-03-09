@@ -1,12 +1,27 @@
 ﻿import AdmZip from "adm-zip";
 
+import {
+  ProblemPackageCompareMode,
+  ProblemPackageEditorDraft,
+  ProblemPackageEditorGroup,
+  ProblemPackageEditorTestCase,
+  ProblemPackageInspectResult,
+  ProblemPackagePrefill,
+  ProblemPackageScoringType,
+} from "@/lib/problem-package-types";
+
 const MAX_ZIP_BYTES = 64 * 1024 * 1024;
 const MAX_SINGLE_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_FILES = 1000;
 const MAX_EXPANDED_BYTES = 128 * 1024 * 1024;
 
-export type ProblemPackageScoringType = "binary" | "sum_of_groups";
-export type ProblemPackageCompareMode = "exact" | "ignore_trailing_spaces";
+export type {
+  ProblemPackageCompareMode,
+  ProblemPackageEditorDraft,
+  ProblemPackageInspectResult,
+  ProblemPackagePrefill,
+  ProblemPackageScoringType,
+};
 
 interface ConfigGroupSummary {
   name: string;
@@ -51,6 +66,7 @@ export interface ProblemPackageExtracted {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
   compareMode: ProblemPackageCompareMode;
+  samples: ProblemPackageTestCase[];
   groups: ProblemPackageTestGroup[];
 }
 
@@ -303,6 +319,30 @@ function casePath(groupName: string, caseName: string, ext: "in" | "out"): strin
   return `tests/${groupName}/${caseName}.${ext}`;
 }
 
+function samplePath(caseName: string, ext: "in" | "out"): string {
+  return `samples/${caseName}.${ext}`;
+}
+
+function buildSampleCases(
+  entryByPath: ReadonlyMap<string, AdmZip.IZipEntry>,
+  sampleIn: ReadonlySet<string>,
+): ProblemPackageTestCase[] {
+  return [...sampleIn]
+    .sort((a, b) => a.localeCompare(b))
+    .map((caseName) => {
+      const inEntry = entryByPath.get(samplePath(caseName, "in"));
+      const outEntry = entryByPath.get(samplePath(caseName, "out"));
+      if (!inEntry || !outEntry) {
+        throw new Error(`samples/${caseName}.in/.out is required`);
+      }
+      return {
+        name: caseName,
+        input: inEntry.getData().toString("utf8"),
+        output: outEntry.getData().toString("utf8"),
+      };
+    });
+}
+
 function buildTestGroups(
   config: ParsedConfig,
   entryByPath: ReadonlyMap<string, AdmZip.IZipEntry>,
@@ -458,6 +498,7 @@ export function validateProblemPackage(
   }
 
   validatePairs(sampleIn, sampleOut, "samples");
+  const samples = buildSampleCases(entryByPath, sampleIn);
 
   const groupNames = new Set<string>([...testIn.keys(), ...testOut.keys()]);
   if (groupNames.size === 0) {
@@ -496,6 +537,328 @@ export function validateProblemPackage(
     validation,
     scoringType: config.scoringType,
     compareMode: config.compareMode,
+    samples,
     groups,
+  };
+}
+
+function trimBlankLines(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/^\s*\n+|\n+\s*$/g, "").trimEnd();
+}
+
+function toSlugSuggestion(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeSectionHeading(raw: string): "input" | "output" | "constraints" | "explanation" | null {
+  const normalized = raw.trim().toLowerCase().replace(/[：:]/g, "").replace(/\s+/g, "");
+  if (normalized === "input" || normalized === "入力") {
+    return "input";
+  }
+  if (normalized === "output" || normalized === "出力") {
+    return "output";
+  }
+  if (normalized === "constraints" || normalized === "constraint" || normalized === "制約") {
+    return "constraints";
+  }
+  if (normalized === "explanation" || normalized === "editorial" || normalized === "解説") {
+    return "explanation";
+  }
+  return null;
+}
+
+function buildPrefillFromStatement(
+  statementMarkdown: string,
+  options: {
+    timeLimitMs: number;
+    memoryLimitMb: number;
+  },
+): ProblemPackagePrefill {
+  const normalized = statementMarkdown.replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n");
+  const sections = {
+    statement: [] as string[],
+    input: [] as string[],
+    output: [] as string[],
+    constraints: [] as string[],
+    explanation: [] as string[],
+  };
+
+  let currentSection: keyof typeof sections = "statement";
+  let title = "";
+  let firstContentSeen = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!firstContentSeen && trimmed.length === 0) {
+      continue;
+    }
+
+    if (!firstContentSeen && /^#\s+/.test(trimmed)) {
+      title = trimmed.replace(/^#\s+/, "").trim();
+      firstContentSeen = true;
+      continue;
+    }
+
+    firstContentSeen = true;
+
+    const headingMatch = /^##\s+(.+)$/.exec(trimmed);
+    if (headingMatch) {
+      const nextSection = normalizeSectionHeading(headingMatch[1]);
+      if (nextSection) {
+        currentSection = nextSection;
+        continue;
+      }
+    }
+
+    sections[currentSection].push(line);
+  }
+
+  const statementBody = trimBlankLines(sections.statement.join("\n"));
+  const inputDescription = trimBlankLines(sections.input.join("\n"));
+  const outputDescription = trimBlankLines(sections.output.join("\n"));
+  const constraintsMarkdown = trimBlankLines(sections.constraints.join("\n"));
+  const explanationMarkdown = trimBlankLines(sections.explanation.join("\n"));
+  const fallbackStatement = title ? trimBlankLines(normalized.replace(/^#\s+.+(\n|$)/, "")) : trimBlankLines(normalized);
+
+  return {
+    title,
+    slugSuggestion: title ? toSlugSuggestion(title) : "",
+    statementMarkdown: statementBody || fallbackStatement,
+    inputDescription,
+    outputDescription,
+    constraintsMarkdown,
+    explanationMarkdown,
+    timeLimitMs: options.timeLimitMs,
+    memoryLimitMb: options.memoryLimitMb,
+  };
+}
+
+function readStatementMarkdown(zipBuffer: Buffer): string {
+  const zip = new AdmZip(zipBuffer);
+  const entry =
+    zip
+      .getEntries()
+      .find((candidate) => !candidate.isDirectory && normalizePath(candidate.entryName) === "statement.md") ??
+    null;
+  if (!entry) {
+    throw new Error("statement.md is required");
+  }
+  return entry.getData().toString("utf8");
+}
+
+function sanitizeGroupName(name: string, fieldName: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error(`${fieldName} must be a non-empty string`);
+  }
+  if (trimmed.includes("/") || trimmed.includes("\\")) {
+    throw new Error(`${fieldName} must not include '/' or '\\'`);
+  }
+  return trimmed;
+}
+
+function buildScoringTypeFromEditorGroups(
+  groups: Array<{ score: number | null }>,
+): ProblemPackageScoringType {
+  const hasAnyPartialScore = groups.some((group) => group.score !== null);
+  const hasAllPartialScores = groups.every((group) => group.score !== null);
+
+  if (hasAnyPartialScore && !hasAllPartialScores) {
+    throw new Error("all group scores must be set together, or all omitted");
+  }
+
+  if (hasAllPartialScores) {
+    const totalScore = groups.reduce((acc, group) => acc + (group.score ?? 0), 0);
+    if (totalScore !== 100) {
+      throw new Error("sum of group scores must be exactly 100");
+    }
+    return "sum_of_groups";
+  }
+
+  return "binary";
+}
+
+export function buildEditorDraftFromExtracted(
+  extracted: ProblemPackageExtracted,
+): ProblemPackageEditorDraft {
+  return {
+    sourceLabel: extracted.validation.fileName,
+    compareMode: extracted.compareMode,
+    zipSizeBytes: extracted.validation.zipSizeBytes,
+    fileCount: extracted.validation.fileCount,
+    samples: extracted.samples.map((sample, sampleIndex): ProblemPackageEditorTestCase => ({
+      id: `sample-${sampleIndex + 1}`,
+      name: sample.name,
+      input: sample.input,
+      output: sample.output,
+    })),
+    warnings: [...extracted.validation.warnings],
+    groups: extracted.groups.map((group, groupIndex): ProblemPackageEditorGroup => ({
+      id: `group-${groupIndex + 1}`,
+      name: group.name,
+      score: extracted.scoringType === "sum_of_groups" ? group.score : null,
+      tests: group.tests.map((test, testIndex): ProblemPackageEditorTestCase => ({
+        id: `group-${groupIndex + 1}-case-${testIndex + 1}`,
+        name: test.name,
+        input: test.input,
+        output: test.output,
+      })),
+    })),
+  };
+}
+
+export function buildProblemPackageFromEditorDraft(input: {
+  sourceLabel?: string;
+  timeLimitMs: number;
+  memoryLimitMb: number;
+  compareMode?: ProblemPackageCompareMode;
+  zipSizeBytes?: number;
+  fileCount?: number;
+  samples?: ProblemPackageEditorTestCase[];
+  warnings?: string[];
+  groups: ProblemPackageEditorGroup[];
+}): ProblemPackageExtracted {
+  const timeLimitMs = parsePositiveNumber(input.timeLimitMs, "timeLimitMs");
+  const memoryLimitMb = parsePositiveNumber(input.memoryLimitMb, "memoryLimitMb");
+
+  if (!Array.isArray(input.groups) || input.groups.length === 0) {
+    throw new Error("at least one test group is required");
+  }
+
+  const seenGroupNames = new Set<string>();
+  const groups = input.groups.map((group, groupIndex) => {
+    const groupName = sanitizeGroupName(group.name, `groups[${groupIndex}].name`);
+    if (seenGroupNames.has(groupName)) {
+      throw new Error(`duplicate group name: ${groupName}`);
+    }
+    seenGroupNames.add(groupName);
+
+    let score: number | null = null;
+    if (group.score !== null && group.score !== undefined) {
+      score = parseNonNegativeInteger(group.score, `groups[${groupIndex}].score`);
+    }
+
+    if (!Array.isArray(group.tests) || group.tests.length === 0) {
+      throw new Error(`groups[${groupIndex}] must contain at least one test case`);
+    }
+
+    const seenCaseNames = new Set<string>();
+    const tests = group.tests.map((test, testIndex) => {
+      const caseName = sanitizeGroupName(
+        test.name,
+        `groups[${groupIndex}].tests[${testIndex}].name`,
+      );
+      if (seenCaseNames.has(caseName)) {
+        throw new Error(`duplicate test case name in ${groupName}: ${caseName}`);
+      }
+      seenCaseNames.add(caseName);
+
+      if (typeof test.input !== "string" || typeof test.output !== "string") {
+        throw new Error(`groups[${groupIndex}].tests[${testIndex}] must include input/output`);
+      }
+
+      return {
+        name: caseName,
+        input: test.input,
+        output: test.output,
+      };
+    });
+
+    return {
+      name: groupName,
+      score,
+      orderIndex: groupIndex,
+      tests,
+    };
+  });
+
+  const scoringType = buildScoringTypeFromEditorGroups(groups);
+  const seenSampleNames = new Set<string>();
+  const samples = Array.isArray(input.samples)
+    ? input.samples.map((sample, sampleIndex) => {
+        const caseName = sanitizeGroupName(sample.name, `samples[${sampleIndex}].name`);
+        if (seenSampleNames.has(caseName)) {
+          throw new Error(`duplicate sample name: ${caseName}`);
+        }
+        seenSampleNames.add(caseName);
+        if (typeof sample.input !== "string" || typeof sample.output !== "string") {
+          throw new Error(`samples[${sampleIndex}] must include input/output`);
+        }
+        return {
+          name: caseName,
+          input: sample.input,
+          output: sample.output,
+        };
+      })
+    : [];
+
+  const compareMode = input.compareMode ?? "exact";
+  const fileName = input.sourceLabel?.trim() || "manual-package";
+  const zipSizeBytes = parseNonNegativeInteger(input.zipSizeBytes ?? 0, "zipSizeBytes");
+  const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
+  const computedFileCount = 2 + (samples.length + totalTestPairs) * 2;
+  const requestedFileCount =
+    input.fileCount === undefined || input.fileCount === null || input.fileCount <= 0
+      ? computedFileCount
+      : input.fileCount;
+  const fileCount = parseNonNegativeInteger(requestedFileCount, "fileCount");
+  const samplePairs = samples.length;
+  const warnings = Array.isArray(input.warnings)
+    ? input.warnings.filter((warning): warning is string => typeof warning === "string" && warning.trim().length > 0)
+    : [];
+
+  return {
+    validation: {
+      fileName,
+      zipSizeBytes,
+      fileCount,
+      samplePairs,
+      testGroupCount: groups.length,
+      totalTestPairs,
+      config: {
+        timeLimitMs,
+        memoryLimitMb,
+        scoringType,
+        checkerType: "exact",
+        compareMode,
+        groups: groups.map((group) => ({
+          name: group.name,
+          score: scoringType === "sum_of_groups" ? group.score : null,
+          tests: group.tests.length,
+        })),
+      },
+      warnings,
+    },
+    scoringType,
+    compareMode,
+    samples,
+    groups: groups.map((group) => ({
+      name: group.name,
+      score: group.score ?? 0,
+      orderIndex: group.orderIndex,
+      tests: group.tests,
+    })),
+  };
+}
+
+export function inspectProblemPackage(
+  fileName: string,
+  zipBuffer: Buffer,
+): ProblemPackageInspectResult {
+  const extracted = validateProblemPackage(fileName, zipBuffer);
+  const statementMarkdown = readStatementMarkdown(zipBuffer);
+
+  return {
+    package: extracted.validation,
+    prefill: buildPrefillFromStatement(statementMarkdown, {
+      timeLimitMs: extracted.validation.config.timeLimitMs,
+      memoryLimitMb: extracted.validation.config.memoryLimitMb,
+    }),
+    draft: buildEditorDraftFromExtracted(extracted),
   };
 }
