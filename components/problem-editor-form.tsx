@@ -88,6 +88,9 @@ function createId(prefix: string): string {
 function createBlankPackageDraft(): ProblemPackageEditorDraft {
   return {
     sourceLabel: "manual-package",
+    checkerType: "exact",
+    checkerLanguage: "python",
+    checkerSourceCode: "",
     compareMode: "exact",
     zipSizeBytes: 0,
     fileCount: 0,
@@ -220,6 +223,9 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       },
       body: JSON.stringify({
         sourceLabel: packageDraft.sourceLabel,
+        checkerType: packageDraft.checkerType,
+        checkerLanguage: packageDraft.checkerLanguage,
+        checkerSourceCode: packageDraft.checkerSourceCode,
         compareMode: packageDraft.compareMode,
         zipSizeBytes: packageDraft.zipSizeBytes,
         fileCount: packageDraft.fileCount,

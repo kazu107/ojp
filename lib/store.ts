@@ -421,12 +421,16 @@ function createInitialStore(): Store {
           memoryLimitMb: 512,
           scoringType: "sum_of_groups",
           checkerType: "exact",
+          checkerLanguage: null,
           compareMode: "exact",
           groups: [{ name: "group1", score: 100, tests: 2 }],
         },
         warnings: ["seed package (embedded)"],
       },
       scoringType: "sum_of_groups",
+      checkerType: "exact",
+      checkerLanguage: null,
+      checkerSourceCode: null,
       compareMode: "exact",
       samples: [
         {
@@ -473,12 +477,16 @@ function createInitialStore(): Store {
           memoryLimitMb: 512,
           scoringType: "sum_of_groups",
           checkerType: "exact",
+          checkerLanguage: null,
           compareMode: "exact",
           groups: [{ name: "group1", score: 100, tests: 2 }],
         },
         warnings: ["seed package (embedded)"],
       },
       scoringType: "sum_of_groups",
+      checkerType: "exact",
+      checkerLanguage: null,
+      checkerSourceCode: null,
       compareMode: "exact",
       samples: [
         {

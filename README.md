@@ -285,6 +285,8 @@ problem-package.zip
 - `timeLimitMs` (number)
 - `memoryLimitMb` (number)
 - `scoringType` (optional: `binary` or `sum_of_groups`)
+- `checkerType` (optional: `exact` or `special_judge`)
+- `checkerLanguage` (required when `checkerType` is `special_judge`)
 - `groups` (each item is either group name string or `{ name, score? }`)
 
 Scoring rules:
@@ -295,6 +297,7 @@ Scoring rules:
 Validation rules:
 - `.in/.out` pairs are required for `samples/` and `tests/<group>/`.
 - Group test case names are auto-detected from `tests/<group>/` (no `tests[]` list required).
+- For special judge, add checker source at `checker/Main.cpp`, `checker/Main.py`, `checker/Main.java`, or `checker/Main.js`.
 - Path traversal and oversized ZIP/file payloads are rejected.
 
 Template generator:

@@ -1,9 +1,12 @@
 "use client";
 
+import { CodeEditor } from "@/components/code-editor";
 import {
   ProblemPackageCompareMode,
+  ProblemPackageCheckerType,
   ProblemPackageEditorDraft,
 } from "@/lib/problem-package-types";
+import { Language } from "@/lib/types";
 
 interface ProblemPackageDraftEditorProps {
   draft: ProblemPackageEditorDraft;
@@ -70,7 +73,10 @@ export function ProblemPackageDraftEditor({
   const totalCases = draft.groups.reduce((acc, group) => acc + group.tests.length, 0);
   const totalSamples = draft.samples.length;
   const displayedFileCount =
-    draft.fileCount > 0 ? draft.fileCount : 2 + (totalSamples + totalCases) * 2;
+    draft.fileCount > 0
+      ? draft.fileCount
+      : 2 + (totalSamples + totalCases) * 2 + (draft.checkerType === "special_judge" ? 1 : 0);
+  const outputLabel = draft.checkerType === "special_judge" ? "Reference Output" : "Expected Output";
 
   function patchDraft(
     updater: (current: ProblemPackageEditorDraft) => ProblemPackageEditorDraft,
@@ -214,6 +220,42 @@ export function ProblemPackageDraftEditor({
     <div className="stack">
       <div className="form-grid">
         <label className="field">
+          <span className="field-label">Checker Type</span>
+          <select
+            className="select"
+            value={draft.checkerType}
+            onChange={(event) =>
+              patchDraft((current) => ({
+                ...current,
+                checkerType: event.target.value as ProblemPackageCheckerType,
+              }))
+            }
+          >
+            <option value="exact">exact</option>
+            <option value="special_judge">special_judge</option>
+          </select>
+        </label>
+        {draft.checkerType === "special_judge" ? (
+          <label className="field">
+            <span className="field-label">Checker Language</span>
+            <select
+              className="select"
+              value={draft.checkerLanguage}
+              onChange={(event) =>
+                patchDraft((current) => ({
+                  ...current,
+                  checkerLanguage: event.target.value as Language,
+                }))
+              }
+            >
+              <option value="cpp">cpp</option>
+              <option value="python">python</option>
+              <option value="java">java</option>
+              <option value="javascript">javascript</option>
+            </select>
+          </label>
+        ) : null}
+        <label className="field">
           <span className="field-label">Source Label</span>
           <input
             className="input"
@@ -229,6 +271,7 @@ export function ProblemPackageDraftEditor({
           <select
             className="select"
             value={draft.compareMode}
+            disabled={draft.checkerType === "special_judge"}
             onChange={(event) =>
               patchDraft((current) => ({
                 ...current,
@@ -241,6 +284,30 @@ export function ProblemPackageDraftEditor({
           </select>
         </label>
       </div>
+
+      {draft.checkerType === "special_judge" ? (
+        <div className="stack">
+          <p className="text-soft">
+            Special judge is called with three arguments: input file path, reference output path,
+            and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge
+            error.
+          </p>
+          <div className="field">
+            <span className="field-label">Checker Source Code</span>
+            <CodeEditor
+              language={draft.checkerLanguage}
+              minHeight={220}
+              value={draft.checkerSourceCode}
+              onChange={(value) =>
+                patchDraft((current) => ({
+                  ...current,
+                  checkerSourceCode: value,
+                }))
+              }
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="meta-inline">
         <span className={summary.badgeClass}>{summary.label}</span>
@@ -542,7 +609,7 @@ export function ProblemPackageDraftEditor({
                   />
                 </label>
                 <label className="field">
-                  <span className="field-label">Expected Output</span>
+                  <span className="field-label">{outputLabel}</span>
                   <textarea
                     className="textarea"
                     value={testCase.output}

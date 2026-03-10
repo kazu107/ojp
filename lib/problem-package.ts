@@ -2,6 +2,7 @@
 
 import {
   ProblemPackageCompareMode,
+  ProblemPackageCheckerType,
   ProblemPackageEditorDraft,
   ProblemPackageEditorGroup,
   ProblemPackageEditorTestCase,
@@ -9,6 +10,7 @@ import {
   ProblemPackagePrefill,
   ProblemPackageScoringType,
 } from "@/lib/problem-package-types";
+import { Language } from "@/lib/types";
 
 const MAX_ZIP_BYTES = 64 * 1024 * 1024;
 const MAX_SINGLE_FILE_BYTES = 8 * 1024 * 1024;
@@ -17,6 +19,7 @@ const MAX_EXPANDED_BYTES = 128 * 1024 * 1024;
 
 export type {
   ProblemPackageCompareMode,
+  ProblemPackageCheckerType,
   ProblemPackageEditorDraft,
   ProblemPackageInspectResult,
   ProblemPackagePrefill,
@@ -33,7 +36,8 @@ interface ConfigSummary {
   timeLimitMs: number;
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
-  checkerType: "exact";
+  checkerType: ProblemPackageCheckerType;
+  checkerLanguage: Language | null;
   compareMode: ProblemPackageCompareMode;
   groups: ConfigGroupSummary[];
 }
@@ -65,6 +69,9 @@ export interface ProblemPackageTestGroup {
 export interface ProblemPackageExtracted {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
+  checkerType: ProblemPackageCheckerType;
+  checkerLanguage: Language | null;
+  checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
   samples: ProblemPackageTestCase[];
   groups: ProblemPackageTestGroup[];
@@ -80,7 +87,9 @@ interface ParsedConfig {
   timeLimitMs: number;
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
-  checkerType: "exact";
+  checkerType: ProblemPackageCheckerType;
+  checkerLanguage: Language | null;
+  checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
   groups: ParsedConfigGroup[];
   warnings: string[];
@@ -158,6 +167,23 @@ function parseScoringType(raw: unknown): ProblemPackageScoringType | undefined {
   throw new Error("config.scoringType must be one of: binary, sum_of_groups");
 }
 
+function parseCheckerType(raw: unknown): ProblemPackageCheckerType {
+  if (raw === undefined || raw === null || raw === "" || raw === "exact") {
+    return "exact";
+  }
+  if (raw === "special_judge" || raw === "custom_checker") {
+    return "special_judge";
+  }
+  throw new Error("config.checkerType must be one of: exact, special_judge");
+}
+
+function parseCheckerLanguage(raw: unknown): Language {
+  if (raw === "cpp" || raw === "python" || raw === "java" || raw === "javascript") {
+    return raw;
+  }
+  throw new Error("config.checkerLanguage must be one of: cpp, python, java, javascript");
+}
+
 function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
   if (raw === undefined || raw === null || raw === "") {
     return "exact";
@@ -184,6 +210,21 @@ function resolveCompareMode(config: Record<string, unknown>): ProblemPackageComp
     return parseCompareMode(config.output_compare_mode);
   }
   return "exact";
+}
+
+function checkerSourceFileName(language: Language): string {
+  switch (language) {
+    case "cpp":
+      return "checker/Main.cpp";
+    case "python":
+      return "checker/Main.py";
+    case "java":
+      return "checker/Main.java";
+    case "javascript":
+      return "checker/Main.js";
+    default:
+      return "checker/Main.txt";
+  }
 }
 
 function parseConfigGroup(value: unknown, index: number): ParsedConfigGroup {
@@ -241,11 +282,10 @@ function parseConfig(configJson: unknown): ParsedConfig {
 
   const config = configJson as Record<string, unknown>;
 
-  if (
-    typeof config.checkerType === "string" &&
-    config.checkerType !== "exact"
-  ) {
-    throw new Error("config.checkerType currently supports only 'exact'");
+  const checkerType = parseCheckerType(config.checkerType);
+  let checkerLanguage: Language | null = null;
+  if (checkerType === "special_judge") {
+    checkerLanguage = parseCheckerLanguage(config.checkerLanguage);
   }
 
   if (!Array.isArray(config.groups) || config.groups.length === 0) {
@@ -290,7 +330,9 @@ function parseConfig(configJson: unknown): ParsedConfig {
     timeLimitMs: parsePositiveNumber(config.timeLimitMs, "config.timeLimitMs"),
     memoryLimitMb: parsePositiveNumber(config.memoryLimitMb, "config.memoryLimitMb"),
     scoringType,
-    checkerType: "exact",
+    checkerType,
+    checkerLanguage,
+    checkerSourceCode: null,
     compareMode: resolveCompareMode(config),
     groups,
     warnings,
@@ -312,7 +354,22 @@ function parseConfigFromEntry(
     throw new Error("config.json must be valid UTF-8 JSON");
   }
 
-  return parseConfig(parsed);
+  const config = parseConfig(parsed);
+  if (config.checkerType !== "special_judge" || !config.checkerLanguage) {
+    return config;
+  }
+
+  const checkerEntry = entryByPath.get(checkerSourceFileName(config.checkerLanguage));
+  if (!checkerEntry) {
+    throw new Error(
+      `${checkerSourceFileName(config.checkerLanguage)} is required for special_judge`,
+    );
+  }
+
+  return {
+    ...config,
+    checkerSourceCode: checkerEntry.getData().toString("utf8"),
+  };
 }
 
 function casePath(groupName: string, caseName: string, ext: "in" | "out"): string {
@@ -523,6 +580,7 @@ export function validateProblemPackage(
       memoryLimitMb: config.memoryLimitMb,
       scoringType: config.scoringType,
       checkerType: config.checkerType,
+      checkerLanguage: config.checkerLanguage,
       compareMode: config.compareMode,
       groups: config.groups.map((group) => ({
         name: group.name,
@@ -536,6 +594,9 @@ export function validateProblemPackage(
   return {
     validation,
     scoringType: config.scoringType,
+    checkerType: config.checkerType,
+    checkerLanguage: config.checkerLanguage,
+    checkerSourceCode: config.checkerSourceCode,
     compareMode: config.compareMode,
     samples,
     groups,
@@ -688,6 +749,9 @@ export function buildEditorDraftFromExtracted(
 ): ProblemPackageEditorDraft {
   return {
     sourceLabel: extracted.validation.fileName,
+    checkerType: extracted.checkerType,
+    checkerLanguage: extracted.checkerLanguage ?? "python",
+    checkerSourceCode: extracted.checkerSourceCode ?? "",
     compareMode: extracted.compareMode,
     zipSizeBytes: extracted.validation.zipSizeBytes,
     fileCount: extracted.validation.fileCount,
@@ -714,6 +778,9 @@ export function buildEditorDraftFromExtracted(
 
 export function buildProblemPackageFromEditorDraft(input: {
   sourceLabel?: string;
+  checkerType?: ProblemPackageCheckerType;
+  checkerLanguage?: Language;
+  checkerSourceCode?: string;
   timeLimitMs: number;
   memoryLimitMb: number;
   compareMode?: ProblemPackageCompareMode;
@@ -778,6 +845,13 @@ export function buildProblemPackageFromEditorDraft(input: {
   });
 
   const scoringType = buildScoringTypeFromEditorGroups(groups);
+  const checkerType = input.checkerType ?? "exact";
+  const checkerLanguage = checkerType === "special_judge" ? input.checkerLanguage ?? "python" : null;
+  const checkerSourceCode =
+    checkerType === "special_judge" ? (input.checkerSourceCode ?? "").trim() : null;
+  if (checkerType === "special_judge" && !checkerSourceCode) {
+    throw new Error("checker source code is required for special judge");
+  }
   const seenSampleNames = new Set<string>();
   const samples = Array.isArray(input.samples)
     ? input.samples.map((sample, sampleIndex) => {
@@ -801,7 +875,7 @@ export function buildProblemPackageFromEditorDraft(input: {
   const fileName = input.sourceLabel?.trim() || "manual-package";
   const zipSizeBytes = parseNonNegativeInteger(input.zipSizeBytes ?? 0, "zipSizeBytes");
   const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
-  const computedFileCount = 2 + (samples.length + totalTestPairs) * 2;
+  const computedFileCount = 2 + (samples.length + totalTestPairs) * 2 + (checkerType === "special_judge" ? 1 : 0);
   const requestedFileCount =
     input.fileCount === undefined || input.fileCount === null || input.fileCount <= 0
       ? computedFileCount
@@ -824,7 +898,8 @@ export function buildProblemPackageFromEditorDraft(input: {
         timeLimitMs,
         memoryLimitMb,
         scoringType,
-        checkerType: "exact",
+        checkerType,
+        checkerLanguage,
         compareMode,
         groups: groups.map((group) => ({
           name: group.name,
@@ -835,6 +910,9 @@ export function buildProblemPackageFromEditorDraft(input: {
       warnings,
     },
     scoringType,
+    checkerType,
+    checkerLanguage,
+    checkerSourceCode,
     compareMode,
     samples,
     groups: groups.map((group) => ({

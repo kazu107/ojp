@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
 import { buildProblemPackageFromEditorDraft } from "@/lib/problem-package";
 import { applyProblemPackageValidation } from "@/lib/store";
-import { ProblemPackageCompareMode, ProblemPackageEditorGroup } from "@/lib/problem-package-types";
+import {
+  ProblemPackageCheckerType,
+  ProblemPackageCompareMode,
+  ProblemPackageEditorGroup,
+} from "@/lib/problem-package-types";
+import { Language } from "@/lib/types";
 
 interface ProblemPackageManualRouteContext {
   params: Promise<{
@@ -17,11 +22,28 @@ function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
   return "exact";
 }
 
+function parseCheckerType(raw: unknown): ProblemPackageCheckerType {
+  if (raw === "special_judge") {
+    return raw;
+  }
+  return "exact";
+}
+
+function parseCheckerLanguage(raw: unknown): Language {
+  if (raw === "cpp" || raw === "python" || raw === "java" || raw === "javascript") {
+    return raw;
+  }
+  return "python";
+}
+
 export async function POST(request: Request, { params }: ProblemPackageManualRouteContext) {
   try {
     const { problemId } = await params;
     const body = (await request.json()) as {
       sourceLabel?: unknown;
+      checkerType?: unknown;
+      checkerLanguage?: unknown;
+      checkerSourceCode?: unknown;
       timeLimitMs?: unknown;
       memoryLimitMb?: unknown;
       compareMode?: unknown;
@@ -32,6 +54,10 @@ export async function POST(request: Request, { params }: ProblemPackageManualRou
 
     const extracted = buildProblemPackageFromEditorDraft({
       sourceLabel: typeof body.sourceLabel === "string" ? body.sourceLabel : undefined,
+      checkerType: parseCheckerType(body.checkerType),
+      checkerLanguage: parseCheckerLanguage(body.checkerLanguage),
+      checkerSourceCode:
+        typeof body.checkerSourceCode === "string" ? body.checkerSourceCode : undefined,
       timeLimitMs: typeof body.timeLimitMs === "number" ? body.timeLimitMs : Number(body.timeLimitMs),
       memoryLimitMb:
         typeof body.memoryLimitMb === "number" ? body.memoryLimitMb : Number(body.memoryLimitMb),

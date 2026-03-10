@@ -1,5 +1,8 @@
+import { Language } from "@/lib/types";
+
 export type ProblemPackageScoringType = "binary" | "sum_of_groups";
 export type ProblemPackageCompareMode = "exact" | "ignore_trailing_spaces";
+export type ProblemPackageCheckerType = "exact" | "special_judge";
 
 export interface ProblemPackageEditorTestCase {
   id: string;
@@ -17,6 +20,9 @@ export interface ProblemPackageEditorGroup {
 
 export interface ProblemPackageEditorDraft {
   sourceLabel: string;
+  checkerType: ProblemPackageCheckerType;
+  checkerLanguage: Language;
+  checkerSourceCode: string;
   compareMode: ProblemPackageCompareMode;
   zipSizeBytes: number;
   fileCount: number;
@@ -49,7 +55,8 @@ export interface ProblemPackageInspectResult {
       timeLimitMs: number;
       memoryLimitMb: number;
       scoringType: ProblemPackageScoringType;
-      checkerType: "exact";
+      checkerType: ProblemPackageCheckerType;
+      checkerLanguage: Language | null;
       compareMode: ProblemPackageCompareMode;
       groups: Array<{
         name: string;

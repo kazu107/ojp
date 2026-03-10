@@ -70,6 +70,10 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
         each <code>tests/&lt;group&gt;/</code> directory.
       </p>
       <p className="text-soft">
+        For special judge, set <code>checkerType</code> to <code>special_judge</code>, set{" "}
+        <code>checkerLanguage</code>, and include the checker source at <code>checker/Main.*</code>.
+      </p>
+      <p className="text-soft">
         Group partial scores are optional. If you set `groups[].score`, every group must have it
         and total score must be exactly 100. If omitted, the judge uses binary scoring (all groups
         passed = 100).
@@ -96,7 +100,9 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
           </p>
           <p className="text-soft">
             Config: TL {result.config.timeLimitMs} ms / ML {result.config.memoryLimitMb} MB /{" "}
-            {result.config.scoringType} / {result.config.compareMode}
+            {result.config.scoringType} / {result.config.checkerType}
+            {result.config.checkerLanguage ? `(${result.config.checkerLanguage})` : ""} /{" "}
+            {result.config.compareMode}
           </p>
           {result.warnings.length > 0 ? (
             <div className="stack">
