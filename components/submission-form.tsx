@@ -12,6 +12,39 @@ interface SubmissionFormProps {
 
 const SUBMISSION_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
 const DEFAULT_SUBMISSION_LANGUAGE: Language = "python";
+const LANGUAGE_TEMPLATES: Record<Language, string> = {
+  cpp: [
+    "#include <bits/stdc++.h>",
+    "using namespace std;",
+    "",
+    "int main() {",
+    "  ios::sync_with_stdio(false);",
+    "  cin.tie(nullptr);",
+    "",
+    "  return 0;",
+    "}",
+  ].join("\n"),
+  python: ["def solve():", "    pass", "", "", "if __name__ == '__main__':", "    solve()"].join(
+    "\n",
+  ),
+  java: [
+    "import java.io.*;",
+    "import java.util.*;",
+    "",
+    "public class Main {",
+    "  public static void main(String[] args) throws Exception {",
+    "  }",
+    "}",
+  ].join("\n"),
+  javascript: [
+    "'use strict';",
+    "",
+    "function main(input) {",
+    "}",
+    "",
+    "main(require('fs').readFileSync(0, 'utf8'));",
+  ].join("\n"),
+};
 
 export function SubmissionForm({
   problemId,
@@ -19,11 +52,12 @@ export function SubmissionForm({
 }: SubmissionFormProps) {
   const router = useRouter();
   const [language, setLanguage] = useState<Language>(DEFAULT_SUBMISSION_LANGUAGE);
-  const [sourceCode, setSourceCode] = useState<string>(
-    "def solve():\n    n = int(input())\n    print(n)\n\nsolve()",
+  const [draftsByLanguage, setDraftsByLanguage] = useState<Record<Language, string>>(
+    LANGUAGE_TEMPLATES,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const sourceCode = draftsByLanguage[language];
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,7 +116,12 @@ export function SubmissionForm({
           language={language}
           minHeight={320}
           value={sourceCode}
-          onChange={setSourceCode}
+          onChange={(value) =>
+            setDraftsByLanguage((current) => ({
+              ...current,
+              [language]: value,
+            }))
+          }
         />
       </div>
 

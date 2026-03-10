@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthControls } from "@/components/auth-controls";
+import { SITE_SOCIAL_LINKS } from "@/lib/site-links";
 import { canCreateProblemByRole, getOptionalCurrentUser } from "@/lib/store";
 
 const links = [
@@ -29,6 +30,22 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
                 {link.label}
               </Link>
             ))}
+            <a
+              className="site-nav-link"
+              href={SITE_SOCIAL_LINKS.twitter}
+              target="_blank"
+              rel="noreferrer"
+            >
+              X / Twitter
+            </a>
+            <a
+              className="site-nav-link"
+              href={SITE_SOCIAL_LINKS.github}
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
             {canCreateProblem ? (
               <Link href="/problems/new" className="site-nav-cta">
                 New Problem
