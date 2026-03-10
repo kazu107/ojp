@@ -77,6 +77,17 @@ export function AdminConsole({
     }
   }
 
+  async function confirmAndPost(
+    message: string,
+    url: string,
+    payload: Record<string, string>,
+  ): Promise<void> {
+    if (!window.confirm(message)) {
+      return;
+    }
+    await postJson(url, payload);
+  }
+
   return (
     <div className="stack">
       {error ? <p className="badge badge-red">{error}</p> : null}
@@ -387,7 +398,7 @@ export function AdminConsole({
 
       <section className="grid-2">
         <article className="panel stack">
-          <h2 className="panel-title">Hide Problem</h2>
+          <h2 className="panel-title">Problem Controls</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -420,6 +431,21 @@ export function AdminConsole({
                           Hide Problem
                         </button>
                         <button
+                          className="button button-danger"
+                          disabled={busyKey.includes(problem.id)}
+                          onClick={() =>
+                            void confirmAndPost(
+                              `Delete problem ${problem.title}? Related submissions and reports will also be removed.`,
+                              `/api/admin/problems/${problem.id}/delete`,
+                              {
+                                reason: "admin delete operation",
+                              },
+                            )
+                          }
+                        >
+                          Delete Problem
+                        </button>
+                        <button
                           className="button button-secondary"
                           disabled={busyKey.includes(problem.id)}
                           onClick={() =>
@@ -440,7 +466,7 @@ export function AdminConsole({
         </article>
 
         <article className="panel stack">
-          <h2 className="panel-title">Hide Contest</h2>
+          <h2 className="panel-title">Contest Controls</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -458,17 +484,34 @@ export function AdminConsole({
                     <td>{contest.title}</td>
                     <td>{contest.visibility}</td>
                     <td>
-                      <button
-                        className="button button-danger"
-                        disabled={busyKey.includes(contest.id)}
-                        onClick={() =>
-                          postJson(`/api/admin/contests/${contest.id}/hide`, {
-                            reason: "admin hide operation",
-                          })
-                        }
-                      >
-                        Hide
-                      </button>
+                      <div className="button-row">
+                        <button
+                          className="button button-danger"
+                          disabled={busyKey.includes(contest.id)}
+                          onClick={() =>
+                            postJson(`/api/admin/contests/${contest.id}/hide`, {
+                              reason: "admin hide operation",
+                            })
+                          }
+                        >
+                          Hide
+                        </button>
+                        <button
+                          className="button button-danger"
+                          disabled={busyKey.includes(contest.id)}
+                          onClick={() =>
+                            void confirmAndPost(
+                              `Delete contest ${contest.title}? Contest reports will be removed and contest submissions will be detached from the contest.`,
+                              `/api/admin/contests/${contest.id}/delete`,
+                              {
+                                reason: "admin delete operation",
+                              },
+                            )
+                          }
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -15,6 +15,7 @@ import {
 import { pickHighestPriorityVerdict } from "@/lib/submission-status";
 import {
   canRequestRejudgeByViewer,
+  findUser,
   getOptionalCurrentUser,
   getProblemById,
   getSubmissionWithAccess,
@@ -72,6 +73,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
 
   const { submission, canViewSource } = result;
   const problem = getProblemById(submission.problemId);
+  const user = findUser(submission.userId);
   const canRequestRejudge = me ? canRequestRejudgeByViewer(submission, me.id) : false;
   const testCaseVisibility = problem?.testCaseVisibility ?? "case_index_only";
   const groupedResults = groupTestResults(submission.testResults);
@@ -126,6 +128,9 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
               {difficultyLabel(problem.difficulty)}
             </StatusBadge>
           ) : null}
+        </p>
+        <p className="text-soft">
+          User: {user?.displayName ?? submission.userId} ({submission.userId})
         </p>
         <p className="text-soft">
           Language: {languageLabel(submission.language)} / Submitted: {formatDate(submission.submittedAt)}

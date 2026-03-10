@@ -2754,6 +2754,94 @@ export async function hideContestByAdmin(
   return contest;
 }
 
+function removeQueuedStateForSubmissionIds(submissionIds: ReadonlySet<string>): void {
+  store.judgeQueue = store.judgeQueue.filter((job) => !submissionIds.has(job.submissionId));
+  store.judgeInFlightSubmissionIds = store.judgeInFlightSubmissionIds.filter(
+    (submissionId) => !submissionIds.has(submissionId),
+  );
+}
+
+export async function deleteProblemByAdmin(
+  problemId: string,
+  reason: string,
+): Promise<Problem> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+  const problem = resolveProblemIfExists(problemId);
+
+  const deletedSubmissionIds = new Set(
+    store.submissions
+      .filter((submission) => submission.problemId === problemId)
+      .map((submission) => submission.id),
+  );
+
+  store.problems = store.problems.filter((item) => item.id !== problemId);
+  delete store.problemPackages[problemId];
+  store.contests = store.contests.map((contest) => ({
+    ...contest,
+    problems: contest.problems
+      .filter((contestProblem) => contestProblem.problemId !== problemId)
+      .map((contestProblem, index) => ({
+        ...contestProblem,
+        orderIndex: index,
+      })),
+  }));
+  store.submissions = store.submissions.filter((submission) => submission.problemId !== problemId);
+  store.rejudgeRequests = store.rejudgeRequests.filter(
+    (request) =>
+      request.problemId !== problemId && !deletedSubmissionIds.has(request.submissionId),
+  );
+  store.reports = store.reports.filter((report) => {
+    if (report.targetType === "problem" && report.targetId === problemId) {
+      return false;
+    }
+    if (report.targetType === "submission" && deletedSubmissionIds.has(report.targetId)) {
+      return false;
+    }
+    return true;
+  });
+  removeQueuedStateForSubmissionIds(deletedSubmissionIds);
+
+  appendAuditLog({
+    actorId: admin.id,
+    action: "admin.problem.delete",
+    targetType: "problem",
+    targetId: problem.id,
+    reason: reason || "problem deleted by admin",
+  });
+
+  return problem;
+}
+
+export async function deleteContestByAdmin(
+  contestId: string,
+  reason: string,
+): Promise<Contest> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+  const contest = resolveContestIfExists(contestId);
+
+  store.contests = store.contests.filter((item) => item.id !== contestId);
+  for (const submission of store.submissions) {
+    if (submission.contestId === contestId) {
+      submission.contestId = null;
+    }
+  }
+  store.reports = store.reports.filter(
+    (report) => !(report.targetType === "contest" && report.targetId === contestId),
+  );
+
+  appendAuditLog({
+    actorId: admin.id,
+    action: "admin.contest.delete",
+    targetType: "contest",
+    targetId: contest.id,
+    reason: reason || "contest deleted by admin",
+  });
+
+  return contest;
+}
+
 export async function getJudgeQueueStatsForAdmin(): Promise<{
   queuedJobs: number;
   waitingSubmissions: number;

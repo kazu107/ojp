@@ -6,31 +6,23 @@ import {
   badgeClassForDifficulty,
   badgeClassForVisibility,
   difficultyLabel,
-  explanationVisibilityLabel,
   formatDate,
   testCaseVisibilityLabel,
   visibilityLabel,
 } from "@/lib/presentation";
 import {
   canEditProblemByViewer,
-  canViewProblemExplanation,
   getProblemPackageData,
   getOptionalCurrentUser,
   getProblemForViewer,
 } from "@/lib/store";
 import { getJudgeEnvironmentVersion } from "@/lib/judge-config";
+import { SubmissionForm } from "@/components/submission-form";
 
 interface ProblemDetailPageProps {
   params: Promise<{
     problemId: string;
   }>;
-}
-
-function hiddenExplanationMessage(explanationVisibility: "always" | "contest_end" | "private"): string {
-  if (explanationVisibility === "contest_end") {
-    return "解説はコンテスト終了後に公開されます。";
-  }
-  return "解説は現在非公開です。";
 }
 
 export default async function ProblemDetailPage({ params }: ProblemDetailPageProps) {
@@ -44,15 +36,15 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
   }
 
   const canEditProblem = me ? canEditProblemByViewer(problem, me.id) : false;
-  const canViewExplanation = canViewProblemExplanation(problem, viewerId);
   const packageData = getProblemPackageData(problem.id);
+  const signInUrl = `/signin?callbackUrl=${encodeURIComponent(`/problems/${problem.id}`)}`;
 
   return (
     <div className="page">
       <section className="page-head">
         <div>
           <h1 className="page-title">{problem.title}</h1>
-          <p className="page-subtitle">問題詳細・制約・解説を確認し、そのまま提出できます。</p>
+          <p className="page-subtitle">問題詳細と制約を確認し、そのまま提出できます。</p>
         </div>
         <div className="button-row">
           <StatusBadge className={badgeClassForVisibility(problem.visibility)}>
@@ -60,6 +52,9 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
           </StatusBadge>
           <Link href={`/problems/${problem.id}/submit`} className="button">
             提出する
+          </Link>
+          <Link href={`/problems/${problem.id}/explanation`} className="button button-secondary">
+            解説
           </Link>
           {canEditProblem ? (
             <Link href={`/problems/${problem.id}/edit`} className="button button-secondary">
@@ -137,13 +132,13 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
       <section className="panel stack">
         <h2 className="panel-title">Explanation</h2>
         <p className="text-soft">
-          Explanation Visibility: {explanationVisibilityLabel(problem.explanationVisibility)}
+          解説は専用ページに分離されています。公開条件に応じて表示されます。
         </p>
-        {canViewExplanation ? (
-          <MarkdownBlock text={problem.explanationMarkdown || "解説はまだありません。"} />
-        ) : (
-          <p className="badge badge-slate">{hiddenExplanationMessage(problem.explanationVisibility)}</p>
-        )}
+        <div className="button-row">
+          <Link href={`/problems/${problem.id}/explanation`} className="button button-secondary">
+            解説ページを開く
+          </Link>
+        </div>
       </section>
 
       {problem.latestPackageSummary ? (
@@ -174,6 +169,29 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
           )}
         </section>
       ) : null}
+
+      <section className="panel stack">
+        <h2 className="panel-title">Submit</h2>
+        {me ? (
+          <>
+            <p className="text-soft">
+              このページの下から直接提出できます。提出後は非同期ジャッジされ、提出詳細で結果を確認できます。
+            </p>
+            <SubmissionForm problemId={problem.id} />
+          </>
+        ) : (
+          <>
+            <p className="text-soft">
+              提出するにはログインが必要です。ログイン後、この問題ページに戻ります。
+            </p>
+            <div className="button-row">
+              <Link href={signInUrl} className="button">
+                Sign In to Submit
+              </Link>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }

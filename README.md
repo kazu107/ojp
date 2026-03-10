@@ -136,6 +136,7 @@ npm run build
 - `/problems`
 - `/problems/new`
 - `/problems/[problemId]`
+- `/problems/[problemId]/explanation`
 - `/problems/[problemId]/edit`
 - `/problems/[problemId]/submit`
 - `/submissions`
@@ -191,8 +192,10 @@ npm run build
 - `POST /api/admin/announcements/:announcementId/hide`
 - `GET /api/admin/judge/queue`
 - `POST /api/admin/judge/queue`
+- `POST /api/admin/problems/:problemId/delete`
 - `POST /api/admin/problems/:problemId/hide`
 - `POST /api/admin/problems/:problemId/explanation/hide`
+- `POST /api/admin/contests/:contestId/delete`
 - `POST /api/admin/contests/:contestId/hide`
 
 荳隕ｧ邉ｻAPI (`/api/problems`, `/api/contests`, `/api/submissions`, `/api/admin/reports`) 縺ｯ

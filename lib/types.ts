@@ -171,8 +171,10 @@ export type AuditAction =
   | "admin.announcement.create"
   | "admin.announcement.hide"
   | "admin.problem.hide"
+  | "admin.problem.delete"
   | "admin.problem.explanation.hide"
   | "admin.contest.hide"
+  | "admin.contest.delete"
   | "submission.judge"
   | "submission.rejudge.request";
 
