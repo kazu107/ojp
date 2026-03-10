@@ -13,6 +13,7 @@ import {
   findUser,
   getOptionalCurrentUser,
   listProblemsForListView,
+  listSubmissionsForViewer,
 } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,14 @@ export default async function ProblemsPage() {
   const me = await getOptionalCurrentUser();
   const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
   const problems = listProblemsForListView(me?.id ?? "guest");
+  const acceptedProblemIds = me
+    ? new Set(
+        listSubmissionsForViewer(me.id, {
+          userId: me.id,
+          status: "accepted",
+        }).map((submission) => submission.problemId),
+      )
+    : new Set<string>();
 
   return (
     <div className="page">
@@ -59,7 +68,10 @@ export default async function ProblemsPage() {
               </thead>
               <tbody>
                 {problems.map((problem) => (
-                  <tr key={problem.id}>
+                  <tr
+                    key={problem.id}
+                    className={acceptedProblemIds.has(problem.id) ? "problem-row-solved" : undefined}
+                  >
                     <td>
                       <Link className="link" href={`/problems/${problem.id}`}>
                         {problem.title}

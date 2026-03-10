@@ -1,3 +1,10 @@
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 export function MarkdownBlock({ text }: { text: string }) {
-  return <pre className="markdown-block">{text}</pre>;
+  return (
+    <div className="markdown-block">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+    </div>
+  );
 }

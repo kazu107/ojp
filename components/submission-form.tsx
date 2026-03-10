@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CodeEditor } from "@/components/code-editor";
 import { Language } from "@/lib/types";
 
 interface SubmissionFormProps {
@@ -75,16 +76,15 @@ export function SubmissionForm({
         </select>
       </label>
 
-      <label className="field">
+      <div className="field">
         <span className="field-label">Source Code</span>
-        <textarea
-          className="textarea"
-          style={{ minHeight: 300, fontFamily: "var(--font-jp-mono)" }}
-          required
+        <CodeEditor
+          language={language}
+          minHeight={320}
           value={sourceCode}
-          onChange={(event) => setSourceCode(event.target.value)}
+          onChange={setSourceCode}
         />
-      </label>
+      </div>
 
       <p className="text-soft">
         提出は非同期ジャッジされます。対象問題に ZIP パッケージ（tests/config）が未設定の場合は

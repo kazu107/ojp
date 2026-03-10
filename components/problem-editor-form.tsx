@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CodeEditor } from "@/components/code-editor";
+import { MarkdownBlock } from "@/components/markdown-block";
 import { ProblemPackageDraftEditor } from "@/components/problem-package-draft-editor";
 import {
   ExplanationVisibility,
@@ -252,6 +254,10 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!form.statementMarkdown.trim()) {
+      setError("Statement is required.");
+      return;
+    }
     const parsedDifficulty = parseDifficultyInput(form.difficulty);
     if (!parsedDifficulty.ok) {
       setError(parsedDifficulty.message);
@@ -319,17 +325,21 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         </label>
       </div>
 
-      <label className="field">
+      <div className="field">
         <span className="field-label">Statement (Markdown)</span>
-        <textarea
-          className="textarea"
-          required
+        <CodeEditor
+          language="markdown"
+          minHeight={260}
           value={form.statementMarkdown}
-          onChange={(event) =>
-            setForm((prev) => ({ ...prev, statementMarkdown: event.target.value }))
-          }
+          onChange={(value) => setForm((prev) => ({ ...prev, statementMarkdown: value }))}
         />
-      </label>
+        <div className="markdown-preview">
+          <span className="field-label">Live Preview</span>
+          <div className="panel stack">
+            <MarkdownBlock text={form.statementMarkdown || "_No preview yet._"} />
+          </div>
+        </div>
+      </div>
 
       <div className="form-grid">
         <label className="field">
