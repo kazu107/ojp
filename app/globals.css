@@ -716,6 +716,10 @@ a {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.sample-description {
+  white-space: pre-wrap;
+}
+
 .package-editor-toolbar {
   display: flex;
   flex-wrap: wrap;

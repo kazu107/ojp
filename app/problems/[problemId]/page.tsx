@@ -113,9 +113,6 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
           {packageData.samples.map((sample) => (
             <article key={sample.name} className="package-case-editor stack">
               <p className="field-label">{sample.name}</p>
-              {sample.description ? (
-                <p className="text-soft">{sample.description}</p>
-              ) : null}
               <div className="form-grid">
                 <div className="field">
                   <span className="field-label">Input</span>
@@ -126,6 +123,9 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
                   <pre className="code-block">{sample.output}</pre>
                 </div>
               </div>
+              {sample.description ? (
+                <p className="sample-description text-soft">{sample.description}</p>
+              ) : null}
             </article>
           ))}
         </section>
