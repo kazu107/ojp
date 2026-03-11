@@ -6,7 +6,6 @@ import {
   badgeClassForDifficulty,
   badgeClassForVisibility,
   difficultyLabel,
-  formatDate,
   testCaseVisibilityLabel,
   visibilityLabel,
 } from "@/lib/presentation";
@@ -114,6 +113,9 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
           {packageData.samples.map((sample) => (
             <article key={sample.name} className="package-case-editor stack">
               <p className="field-label">{sample.name}</p>
+              {sample.description ? (
+                <p className="text-soft">{sample.description}</p>
+              ) : null}
               <div className="form-grid">
                 <div className="field">
                   <span className="field-label">Input</span>
@@ -126,47 +128,6 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
               </div>
             </article>
           ))}
-        </section>
-      ) : null}
-
-      <section className="panel stack">
-        <h2 className="panel-title">Explanation</h2>
-        <p className="text-soft">
-          解説は専用ページに分離されています。公開条件に応じて表示されます。
-        </p>
-        <div className="button-row">
-          <Link href={`/problems/${problem.id}/explanation`} className="button button-secondary">
-            解説ページを開く
-          </Link>
-        </div>
-      </section>
-
-      {problem.latestPackageSummary ? (
-        <section className="panel stack">
-          <h2 className="panel-title">Latest Package Validation</h2>
-          <p className="text-soft">File: {problem.latestPackageSummary.fileName}</p>
-          <p className="text-soft">
-            Size: {problem.latestPackageSummary.zipSizeBytes} bytes / Files:{" "}
-            {problem.latestPackageSummary.fileCount}
-          </p>
-          <p className="text-soft">
-            Samples: {problem.latestPackageSummary.samplePairs} pairs / Tests:{" "}
-            {problem.latestPackageSummary.testGroupCount} groups,{" "}
-            {problem.latestPackageSummary.totalTestPairs} pairs
-          </p>
-          <p className="text-soft">Validated: {formatDate(problem.latestPackageSummary.validatedAt)}</p>
-          {problem.latestPackageSummary.warnings.length > 0 ? (
-            <div className="stack">
-              <p className="field-label">Warnings</p>
-              {problem.latestPackageSummary.warnings.map((warning) => (
-                <p key={warning} className="text-soft">
-                  - {warning}
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="badge">No warnings.</p>
-          )}
         </section>
       ) : null}
 

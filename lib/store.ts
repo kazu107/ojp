@@ -423,6 +423,10 @@ function createInitialStore(): Store {
           checkerType: "exact",
           checkerLanguage: null,
           compareMode: "exact",
+          samples: [
+            { name: "sample1", description: "" },
+            { name: "sample2", description: "" },
+          ],
           groups: [{ name: "group1", score: 100, tests: 2 }],
         },
         warnings: ["seed package (embedded)"],
@@ -435,11 +439,13 @@ function createInitialStore(): Store {
       samples: [
         {
           name: "sample1",
+          description: "",
           input: "1\n",
           output: "1\n",
         },
         {
           name: "sample2",
+          description: "",
           input: "42\n",
           output: "42\n",
         },
@@ -479,6 +485,10 @@ function createInitialStore(): Store {
           checkerType: "exact",
           checkerLanguage: null,
           compareMode: "exact",
+          samples: [
+            { name: "sample1", description: "" },
+            { name: "sample2", description: "" },
+          ],
           groups: [{ name: "group1", score: 100, tests: 2 }],
         },
         warnings: ["seed package (embedded)"],
@@ -491,11 +501,13 @@ function createInitialStore(): Store {
       samples: [
         {
           name: "sample1",
+          description: "",
           input: "1 2 3\n",
           output: "6\n",
         },
         {
           name: "sample2",
+          description: "",
           input: "-5 6 7\n",
           output: "8\n",
         },
@@ -616,6 +628,10 @@ function normalizeStoreInPlace(target: Store): void {
     if (legacyPackage.validation.config.checkerLanguage === undefined) {
       legacyPackage.validation.config.checkerLanguage = legacyPackage.checkerLanguage;
     }
+    legacyPackage.samples = legacyPackage.samples.map((sample) => ({
+      ...sample,
+      description: typeof sample.description === "string" ? sample.description : "",
+    }));
   }
   if (!Array.isArray(target.announcements)) {
     target.announcements = [];

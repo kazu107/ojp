@@ -682,6 +682,33 @@ a {
   background: rgba(0, 0, 0, 0.14);
 }
 
+.package-group-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.package-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.package-group-summary::before {
+  content: ">";
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.package-group-editor[open] .package-group-summary::before {
+  content: "v";
+}
+
+.package-group-body {
+  margin-top: 0.75rem;
+}
+
 .package-case-editor {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;

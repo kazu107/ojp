@@ -113,6 +113,7 @@ function createBlankPackageDraft(): ProblemPackageEditorDraft {
       {
         id: createId("sample"),
         name: "sample1",
+        description: "",
         input: "",
         output: "",
       },
@@ -253,6 +254,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         fileCount: packageDraft.fileCount,
         samples: packageDraft.samples.map((sample) => ({
           name: sample.name,
+          description: sample.description,
           input: sample.input,
           output: sample.output,
         })),
@@ -317,6 +319,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
             fileCount: packageDraft.fileCount,
             samples: packageDraft.samples.map((sample) => ({
               name: sample.name,
+              description: sample.description,
               input: sample.input,
               output: sample.output,
             })),

@@ -11,6 +11,11 @@ export interface ProblemPackageEditorTestCase {
   output: string;
 }
 
+export interface ProblemPackageEditorSampleCase
+  extends ProblemPackageEditorTestCase {
+  description: string;
+}
+
 export interface ProblemPackageEditorGroup {
   id: string;
   name: string;
@@ -26,7 +31,7 @@ export interface ProblemPackageEditorDraft {
   compareMode: ProblemPackageCompareMode;
   zipSizeBytes: number;
   fileCount: number;
-  samples: ProblemPackageEditorTestCase[];
+  samples: ProblemPackageEditorSampleCase[];
   warnings: string[];
   groups: ProblemPackageEditorGroup[];
 }

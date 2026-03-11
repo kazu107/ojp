@@ -5,6 +5,7 @@ import {
   ProblemPackageCheckerType,
   ProblemPackageEditorDraft,
   ProblemPackageEditorGroup,
+  ProblemPackageEditorSampleCase,
   ProblemPackageEditorTestCase,
   ProblemPackageInspectResult,
   ProblemPackagePrefill,
@@ -32,6 +33,11 @@ interface ConfigGroupSummary {
   tests: number;
 }
 
+interface ConfigSampleSummary {
+  name: string;
+  description: string;
+}
+
 interface ConfigSummary {
   timeLimitMs: number;
   memoryLimitMb: number;
@@ -39,6 +45,7 @@ interface ConfigSummary {
   checkerType: ProblemPackageCheckerType;
   checkerLanguage: Language | null;
   compareMode: ProblemPackageCompareMode;
+  samples: ConfigSampleSummary[];
   groups: ConfigGroupSummary[];
 }
 
@@ -59,6 +66,10 @@ export interface ProblemPackageTestCase {
   output: string;
 }
 
+export interface ProblemPackageSampleCase extends ProblemPackageTestCase {
+  description: string;
+}
+
 export interface ProblemPackageTestGroup {
   name: string;
   score: number;
@@ -73,8 +84,13 @@ export interface ProblemPackageExtracted {
   checkerLanguage: Language | null;
   checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
-  samples: ProblemPackageTestCase[];
+  samples: ProblemPackageSampleCase[];
   groups: ProblemPackageTestGroup[];
+}
+
+interface ParsedConfigSample {
+  name: string;
+  description: string;
 }
 
 interface ParsedConfigGroup {
@@ -91,6 +107,7 @@ interface ParsedConfig {
   checkerLanguage: Language | null;
   checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
+  samples: ParsedConfigSample[];
   groups: ParsedConfigGroup[];
   warnings: string[];
 }
@@ -275,6 +292,34 @@ function parseConfigGroup(value: unknown, index: number): ParsedConfigGroup {
   };
 }
 
+function parseConfigSample(value: unknown, index: number): ParsedConfigSample {
+  if (typeof value === "string") {
+    const name = value.trim();
+    if (!name) {
+      throw new Error(`config.samples[${index}] must not be empty`);
+    }
+    return {
+      name,
+      description: "",
+    };
+  }
+
+  if (!value || typeof value !== "object") {
+    throw new Error(`config.samples[${index}] must be a string or object`);
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.name !== "string" || !record.name.trim()) {
+    throw new Error(`config.samples[${index}].name must be a non-empty string`);
+  }
+
+  return {
+    name: record.name.trim(),
+    description:
+      typeof record.description === "string" ? record.description : "",
+  };
+}
+
 function parseConfig(configJson: unknown): ParsedConfig {
   if (!configJson || typeof configJson !== "object") {
     throw new Error("config.json must be a JSON object");
@@ -292,6 +337,9 @@ function parseConfig(configJson: unknown): ParsedConfig {
     throw new Error("config.groups must be a non-empty array");
   }
 
+  const samples = Array.isArray(config.samples)
+    ? config.samples.map((sample, index) => parseConfigSample(sample, index))
+    : [];
   const groups = config.groups.map((group, index) => parseConfigGroup(group, index));
   const requestedScoringType = parseScoringType(config.scoringType);
   const warnings: string[] = [];
@@ -334,6 +382,7 @@ function parseConfig(configJson: unknown): ParsedConfig {
     checkerLanguage,
     checkerSourceCode: null,
     compareMode: resolveCompareMode(config),
+    samples,
     groups,
     warnings,
   };
@@ -381,12 +430,23 @@ function samplePath(caseName: string, ext: "in" | "out"): string {
 }
 
 function buildSampleCases(
+  configSamples: ParsedConfigSample[],
   entryByPath: ReadonlyMap<string, AdmZip.IZipEntry>,
   sampleIn: ReadonlySet<string>,
-): ProblemPackageTestCase[] {
-  return [...sampleIn]
-    .sort((a, b) => a.localeCompare(b))
+): ProblemPackageSampleCase[] {
+  const configuredByName = new Map(configSamples.map((sample) => [sample.name, sample]));
+  const orderedNames = [
+    ...configSamples.map((sample) => sample.name),
+    ...[...sampleIn]
+      .filter((name) => !configuredByName.has(name))
+      .sort((a, b) => a.localeCompare(b)),
+  ];
+
+  return orderedNames
     .map((caseName) => {
+      if (!sampleIn.has(caseName)) {
+        throw new Error(`samples/${caseName}.in/.out is required by config.samples`);
+      }
       const inEntry = entryByPath.get(samplePath(caseName, "in"));
       const outEntry = entryByPath.get(samplePath(caseName, "out"));
       if (!inEntry || !outEntry) {
@@ -394,6 +454,7 @@ function buildSampleCases(
       }
       return {
         name: caseName,
+        description: configuredByName.get(caseName)?.description ?? "",
         input: inEntry.getData().toString("utf8"),
         output: outEntry.getData().toString("utf8"),
       };
@@ -555,7 +616,6 @@ export function validateProblemPackage(
   }
 
   validatePairs(sampleIn, sampleOut, "samples");
-  const samples = buildSampleCases(entryByPath, sampleIn);
 
   const groupNames = new Set<string>([...testIn.keys(), ...testOut.keys()]);
   if (groupNames.size === 0) {
@@ -563,6 +623,7 @@ export function validateProblemPackage(
   }
 
   const config = parseConfigFromEntry(entryByPath);
+  const samples = buildSampleCases(config.samples, entryByPath, sampleIn);
   const { groups, warnings: groupWarnings } = buildTestGroups(config, entryByPath, testIn, testOut);
   const warnings = [...config.warnings, ...groupWarnings];
   const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
@@ -582,6 +643,10 @@ export function validateProblemPackage(
       checkerType: config.checkerType,
       checkerLanguage: config.checkerLanguage,
       compareMode: config.compareMode,
+      samples: samples.map((sample) => ({
+        name: sample.name,
+        description: sample.description,
+      })),
       groups: config.groups.map((group) => ({
         name: group.name,
         score: group.score,
@@ -755,9 +820,10 @@ export function buildEditorDraftFromExtracted(
     compareMode: extracted.compareMode,
     zipSizeBytes: extracted.validation.zipSizeBytes,
     fileCount: extracted.validation.fileCount,
-    samples: extracted.samples.map((sample, sampleIndex): ProblemPackageEditorTestCase => ({
+    samples: extracted.samples.map((sample, sampleIndex): ProblemPackageEditorSampleCase => ({
       id: `sample-${sampleIndex + 1}`,
       name: sample.name,
+      description: sample.description,
       input: sample.input,
       output: sample.output,
     })),
@@ -786,7 +852,7 @@ export function buildProblemPackageFromEditorDraft(input: {
   compareMode?: ProblemPackageCompareMode;
   zipSizeBytes?: number;
   fileCount?: number;
-  samples?: ProblemPackageEditorTestCase[];
+  samples?: ProblemPackageEditorSampleCase[];
   warnings?: string[];
   groups: ProblemPackageEditorGroup[];
 }): ProblemPackageExtracted {
@@ -865,6 +931,7 @@ export function buildProblemPackageFromEditorDraft(input: {
         }
         return {
           name: caseName,
+          description: typeof sample.description === "string" ? sample.description : "",
           input: sample.input,
           output: sample.output,
         };
@@ -901,6 +968,10 @@ export function buildProblemPackageFromEditorDraft(input: {
         checkerType,
         checkerLanguage,
         compareMode,
+        samples: samples.map((sample) => ({
+          name: sample.name,
+          description: sample.description,
+        })),
         groups: groups.map((group) => ({
           name: group.name,
           score: scoringType === "sum_of_groups" ? group.score : null,
