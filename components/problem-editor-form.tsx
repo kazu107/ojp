@@ -6,9 +6,16 @@ import { useRouter } from "next/navigation";
 import { CodeEditor } from "@/components/code-editor";
 import { MarkdownBlock } from "@/components/markdown-block";
 import { ProblemPackageDraftEditor } from "@/components/problem-package-draft-editor";
+import { CHECKER_SOURCE_TEMPLATES } from "@/lib/checker-source-templates";
+import { StatusBadge } from "@/components/status-badge";
+import { badgeClassForSubmission, submissionStatusLabel } from "@/lib/presentation";
+import { SOURCE_CODE_TEMPLATES } from "@/lib/source-code-templates";
 import {
   ExplanationVisibility,
+  Language,
   Problem,
+  Submission,
+  SubmissionStatus,
   TestCaseVisibility,
   Visibility,
 } from "@/lib/types";
@@ -43,6 +50,14 @@ interface FormState {
   timeLimitMs: number;
   memoryLimitMb: number;
   testCaseVisibility: TestCaseVisibility;
+}
+
+interface PackageTestPreviewResult {
+  status: SubmissionStatus;
+  score: number;
+  totalTimeMs: number;
+  peakMemoryKb: number;
+  testResults: Submission["testResults"];
 }
 
 function emptyState(): FormState {
@@ -90,7 +105,7 @@ function createBlankPackageDraft(): ProblemPackageEditorDraft {
     sourceLabel: "manual-package",
     checkerType: "exact",
     checkerLanguage: "python",
-    checkerSourceCode: "",
+    checkerSourceCode: CHECKER_SOURCE_TEMPLATES.python,
     compareMode: "exact",
     zipSizeBytes: 0,
     fileCount: 0,
@@ -147,6 +162,13 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const [packageDraft, setPackageDraft] = useState<ProblemPackageEditorDraft | null>(
     props.initialPackageDraft ?? null,
   );
+  const [previewLanguage, setPreviewLanguage] = useState<Language>("python");
+  const [previewDraftsByLanguage, setPreviewDraftsByLanguage] = useState<Record<Language, string>>(
+    SOURCE_CODE_TEMPLATES,
+  );
+  const [isRunningPreview, setIsRunningPreview] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [previewResult, setPreviewResult] = useState<PackageTestPreviewResult | null>(null);
   const [createdProblemId, setCreatedProblemId] = useState<string | null>(null);
 
   const endpoint = useMemo(() => {
@@ -255,6 +277,77 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         "failed to save problem package",
       );
       throw new Error(packageMessage);
+    }
+  }
+
+  async function runPackagePreview() {
+    if (!packageDraft) {
+      setPreviewError("Judge package is required before running a local test.");
+      return;
+    }
+
+    const sourceCode = previewDraftsByLanguage[previewLanguage] ?? "";
+    if (!sourceCode.trim()) {
+      setPreviewError("Source code is required.");
+      return;
+    }
+
+    setIsRunningPreview(true);
+    setPreviewError("");
+    setPreviewResult(null);
+
+    try {
+      const response = await fetch("/api/problem-packages/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          language: previewLanguage,
+          sourceCode,
+          timeLimitMs: form.timeLimitMs,
+          memoryLimitMb: form.memoryLimitMb,
+          draft: {
+            sourceLabel: packageDraft.sourceLabel,
+            checkerType: packageDraft.checkerType,
+            checkerLanguage: packageDraft.checkerLanguage,
+            checkerSourceCode: packageDraft.checkerSourceCode,
+            compareMode: packageDraft.compareMode,
+            zipSizeBytes: packageDraft.zipSizeBytes,
+            fileCount: packageDraft.fileCount,
+            samples: packageDraft.samples.map((sample) => ({
+              name: sample.name,
+              input: sample.input,
+              output: sample.output,
+            })),
+            warnings: packageDraft.warnings,
+            groups: packageDraft.groups.map((group) => ({
+              name: group.name,
+              score: group.score,
+              tests: group.tests.map((testCase) => ({
+                name: testCase.name,
+                input: testCase.input,
+                output: testCase.output,
+              })),
+            })),
+          },
+        }),
+      });
+      if (!response.ok) {
+        const message = await parseErrorMessage(response, "failed to run package test");
+        throw new Error(message);
+      }
+
+      const body = (await response.json()) as { result: PackageTestPreviewResult };
+      setPreviewResult(body.result);
+    } catch (previewRunError) {
+      setPreviewError(
+        previewRunError instanceof Error
+          ? previewRunError.message
+          : "failed to run package test",
+      );
+    } finally {
+      setIsRunningPreview(false);
     }
   }
 
@@ -569,6 +662,100 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
             No package is attached yet. Start from a blank manual package or import a ZIP.
           </p>
         )}
+      </section>
+
+      <section className="panel stack">
+        <div>
+          <h2 className="panel-title">Package Test Run</h2>
+          <p className="panel-subtitle">
+            現在のテストケースと special judge 設定を使って、保存前にコードを試せます。
+          </p>
+        </div>
+
+        <label className="field">
+          <span className="field-label">Language</span>
+          <select
+            className="select"
+            value={previewLanguage}
+            onChange={(event) => setPreviewLanguage(event.target.value as Language)}
+          >
+            <option value="cpp">cpp</option>
+            <option value="python">python</option>
+            <option value="java">java</option>
+            <option value="javascript">javascript</option>
+          </select>
+        </label>
+
+        <div className="field">
+          <span className="field-label">Source Code</span>
+          <CodeEditor
+            language={previewLanguage}
+            minHeight={300}
+            value={previewDraftsByLanguage[previewLanguage] ?? ""}
+            onChange={(value) =>
+              setPreviewDraftsByLanguage((current) => ({
+                ...current,
+                [previewLanguage]: value,
+              }))
+            }
+          />
+        </div>
+
+        <div className="button-row">
+          <button
+            type="button"
+            className="button"
+            onClick={() => void runPackagePreview()}
+            disabled={isRunningPreview || !packageDraft}
+          >
+            {isRunningPreview ? "Running..." : "Run Test"}
+          </button>
+        </div>
+
+        {previewError ? <p className="badge badge-red">{previewError}</p> : null}
+
+        {previewResult ? (
+          <div className="stack">
+            <div className="meta-inline">
+              <StatusBadge className={badgeClassForSubmission(previewResult.status)}>
+                {submissionStatusLabel(previewResult.status)}
+              </StatusBadge>
+              <span className="text-soft">Score: {previewResult.score}</span>
+              <span className="text-soft">Time: {previewResult.totalTimeMs} ms</span>
+              <span className="text-soft">Memory: {previewResult.peakMemoryKb} KB</span>
+            </div>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th>Case</th>
+                    <th>Verdict</th>
+                    <th>Time</th>
+                    <th>Memory</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewResult.testResults.map((result) => (
+                    <tr key={result.id}>
+                      <td>{result.groupName}</td>
+                      <td>{result.testCaseName}</td>
+                      <td>
+                        <StatusBadge className={badgeClassForSubmission(result.verdict)}>
+                          {submissionStatusLabel(result.verdict)}
+                        </StatusBadge>
+                      </td>
+                      <td>{result.timeMs} ms</td>
+                      <td>{result.memoryKb} KB</td>
+                      <td>{result.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {error ? <p className="badge badge-red">{error}</p> : null}

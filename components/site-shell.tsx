@@ -30,22 +30,6 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
                 {link.label}
               </Link>
             ))}
-            <a
-              className="site-nav-link"
-              href={SITE_SOCIAL_LINKS.twitter}
-              target="_blank"
-              rel="noreferrer"
-            >
-              X / Twitter
-            </a>
-            <a
-              className="site-nav-link"
-              href={SITE_SOCIAL_LINKS.github}
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>
             {canCreateProblem ? (
               <Link href="/problems/new" className="site-nav-cta">
                 New Problem
@@ -57,6 +41,32 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
       </header>
       <div className="site-backdrop" />
       <main className="site-main">{children}</main>
+      <footer className="site-footer">
+        <div className="site-footer-inner">
+          <div className="site-footer-copy">
+            <p className="site-footer-title">OJP</p>
+            <p className="site-footer-text">AtCoder-like Platform MVP</p>
+          </div>
+          <div className="site-footer-links">
+            <a
+              className="site-footer-link"
+              href={SITE_SOCIAL_LINKS.twitter}
+              target="_blank"
+              rel="noreferrer"
+            >
+              X / Twitter
+            </a>
+            <a
+              className="site-footer-link"
+              href={SITE_SOCIAL_LINKS.github}
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

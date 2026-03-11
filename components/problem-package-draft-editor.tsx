@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  CHECKER_SOURCE_TEMPLATES,
+  isDefaultCheckerSourceTemplate,
+} from "@/lib/checker-source-templates";
 import { CodeEditor } from "@/components/code-editor";
 import {
   ProblemPackageCompareMode,
@@ -63,6 +67,10 @@ function scoreSummary(draft: ProblemPackageEditorDraft): {
     label: "Partial scoring total=100",
     badgeClass: "badge badge-green",
   };
+}
+
+function shouldReplaceCheckerSource(code: string): boolean {
+  return code.trim().length === 0 || isDefaultCheckerSourceTemplate(code);
 }
 
 export function ProblemPackageDraftEditor({
@@ -228,6 +236,11 @@ export function ProblemPackageDraftEditor({
               patchDraft((current) => ({
                 ...current,
                 checkerType: event.target.value as ProblemPackageCheckerType,
+                checkerSourceCode:
+                  event.target.value === "special_judge" &&
+                  shouldReplaceCheckerSource(current.checkerSourceCode)
+                    ? CHECKER_SOURCE_TEMPLATES[current.checkerLanguage]
+                    : current.checkerSourceCode,
               }))
             }
           >
@@ -242,10 +255,16 @@ export function ProblemPackageDraftEditor({
               className="select"
               value={draft.checkerLanguage}
               onChange={(event) =>
-                patchDraft((current) => ({
-                  ...current,
-                  checkerLanguage: event.target.value as Language,
-                }))
+                patchDraft((current) => {
+                  const nextLanguage = event.target.value as Language;
+                  return {
+                    ...current,
+                    checkerLanguage: nextLanguage,
+                    checkerSourceCode: shouldReplaceCheckerSource(current.checkerSourceCode)
+                      ? CHECKER_SOURCE_TEMPLATES[nextLanguage]
+                      : current.checkerSourceCode,
+                  };
+                })
               }
             >
               <option value="cpp">cpp</option>

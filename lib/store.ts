@@ -588,6 +588,35 @@ function normalizeStoreInPlace(target: Store): void {
   if (!target.problemPackages || typeof target.problemPackages !== "object") {
     target.problemPackages = {};
   }
+  for (const packageData of Object.values(target.problemPackages)) {
+    const legacyPackage = packageData as ProblemPackageExtracted & {
+      checkerType?: "exact" | "special_judge";
+      checkerLanguage?: Language | null;
+      checkerSourceCode?: string | null;
+      validation: ProblemPackageExtracted["validation"] & {
+        config: ProblemPackageExtracted["validation"]["config"] & {
+          checkerType?: "exact" | "special_judge";
+          checkerLanguage?: Language | null;
+        };
+      };
+    };
+
+    if (!legacyPackage.checkerType) {
+      legacyPackage.checkerType = "exact";
+    }
+    if (legacyPackage.checkerLanguage === undefined) {
+      legacyPackage.checkerLanguage = null;
+    }
+    if (legacyPackage.checkerSourceCode === undefined) {
+      legacyPackage.checkerSourceCode = null;
+    }
+    if (!legacyPackage.validation.config.checkerType) {
+      legacyPackage.validation.config.checkerType = legacyPackage.checkerType;
+    }
+    if (legacyPackage.validation.config.checkerLanguage === undefined) {
+      legacyPackage.validation.config.checkerLanguage = legacyPackage.checkerLanguage;
+    }
+  }
   if (!Array.isArray(target.announcements)) {
     target.announcements = [];
   }

@@ -1,100 +1,170 @@
-﻿# OJP (AtCoder-like Platform MVP)
+# OJP (AtCoder-like Platform MVP)
 
-`atcoder_like_platform_spec_draft.md` 繧偵ｂ縺ｨ縺ｫ縲¨ext.js App Router 縺ｧ螳溯｣・＠縺・AtCoder鬚ｨ繝励Λ繝・ヨ繝輔か繝ｼ繝縺ｮMVP繝励Ο繝医ち繧､繝励〒縺吶・
-## 螳溯｣・ｸ医∩讖溯・
+`atcoder_like_platform_spec_draft.md` をもとに、Next.js App Router で実装した
+AtCoder 風プラットフォームの MVP プロトタイプです。
 
-- 蝠城｡御ｸ隕ｧ / 蝠城｡瑚ｩｳ邏ｰ
-- 蝠城｡御ｽ懈・ / 蝠城｡檎ｷｨ髮・- 謠仙・繝輔か繝ｼ繝 / 謠仙・荳隕ｧ / 謠仙・隧ｳ邏ｰ
-- 繧ｳ繝ｳ繝・せ繝井ｸ隕ｧ / 繧ｳ繝ｳ繝・せ繝郁ｩｳ邏ｰ / 鬆・ｽ崎｡ｨ
-- 繧ｳ繝ｳ繝・せ繝井ｽ懈・ / 繧ｳ繝ｳ繝・せ繝育ｷｨ髮・/ 蜿ょ刈
-- 繝励Ο繝輔ぅ繝ｼ繝ｫ邱ｨ髮・ｼ郁｡ｨ遉ｺ蜷阪・閾ｪ蟾ｱ邏ｹ莉具ｼ・- 騾壼ｱ菴懈・
-- 邂｡逅・・判髱｢・磯壼ｱ邂｡逅・√Θ繝ｼ繧ｶ繝ｼ蜃咲ｵ舌∝撫鬘・繧ｳ繝ｳ繝・せ繝磯撼蜈ｬ髢句喧・・- 邂｡逅・・判髱｢・磯壼ｱ邂｡逅・√Θ繝ｼ繧ｶ繝ｼ蜃咲ｵ・隗｣髯､縲∽ｽ懈・繝ｭ繝ｼ繝ｫ螟画峩縲∝撫鬘・繧ｳ繝ｳ繝・せ繝磯撼蜈ｬ髢句喧・・- 蜀阪ず繝｣繝・ず隕∵ｱ・
-## 莉墓ｧ倥→縺ｮ蟇ｾ蠢・
-- 蜈ｬ髢狗ｯ・峇: `public / unlisted / private`
-- 謠仙・迥ｶ諷・ `pending / queued / compiling / running / judging / accepted / wrong_answer / time_limit_exceeded / memory_limit_exceeded / runtime_error / compilation_error / internal_error / cancelled`
-- 蛻晄悄險隱・ `C++ / Python / Java / JavaScript`
-- 鬆・ｽ崎｡ｨ: 蝠城｡後＃縺ｨ縺ｮ譛鬮倡せ + 繝壹リ繝ｫ繝・ぅ縺ｧ髮・ｨ・- 鬆・ｽ崎｡ｨ蜈ｬ髢・ `hidden / partial / full` 繧貞渚譏
-- 謠仙・隧ｳ邏ｰ縺ｮ蜈ｬ髢狗ｲ貞ｺｦ: `group_only / case_index_only / case_name_visible`
-- 莉紋ｺｺ謠仙・繧ｳ繝ｼ繝峨・髱槫・髢・ 譛ｬ莠ｺ縺ｾ縺溘・邂｡逅・・・縺ｿ蜈ｨ譁・夢隕ｧ蜿ｯ
-- 菴懈・讓ｩ髯・
-  - 蝠城｡御ｽ懈・縺ｯ `problem_author` 縺ｾ縺溘・ `admin`
-  - 繧ｳ繝ｳ繝・せ繝井ｽ懈・縺ｯ `contest_organizer` 縺ｾ縺溘・ `admin`
-- 謠仙・繝ｬ繝ｼ繝亥宛髯・
-  - 蜷御ｸ繝ｦ繝ｼ繧ｶ繝ｼ繝ｻ蜷御ｸ蝠城｡後・騾壼ｸｸ謠仙・繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ: 10遘・  - 蜷御ｸ繝ｦ繝ｼ繧ｶ繝ｼ縺ｮ騾壼ｸｸ謠仙・荳企剞: 1蛻・≠縺溘ｊ20莉ｶ
-- 蜀阪ず繝｣繝・ず蛻ｶ髯・
-  - 蜷御ｸ繝ｦ繝ｼ繧ｶ繝ｼ: 1蛻・≠縺溘ｊ3莉ｶ
-  - 蜷御ｸ繝ｦ繝ｼ繧ｶ繝ｼ繝ｻ蜷御ｸ蝠城｡・ 60遘偵け繝ｼ繝ｫ繝繧ｦ繝ｳ
-- 繧ｳ繝ｳ繝・せ繝域署蜃ｺ蛻ｶ邏・
-  - 蜿ょ刈貂医∩繝ｦ繝ｼ繧ｶ繝ｼ縺ｮ縺ｿ謠仙・蜿ｯ
-  - 髢句ぎ荳ｭ (`running`) 縺ｮ縺ｿ謠仙・蜿ｯ
-  - 蝠城｡後′繧ｳ繝ｳ繝・せ繝医そ繝・ヨ縺ｫ蜷ｫ縺ｾ繧後ｋ蝣ｴ蜷医・縺ｿ謠仙・蜿ｯ
-- 陦ｨ遉ｺ蜷榊､画峩:
-  - 30譌･繧ｯ繝ｼ繝ｫ繝繧ｦ繝ｳ
-  - 陦ｨ遉ｺ蜷堺ｸ諢丞宛邏・  - 逶｣譟ｻ繝ｭ繧ｰ險倬鹸
-- 蝠城｡兄IP讀懆ｨｼAPI:
+## 実装済み機能
+
+- 問題一覧 / 問題詳細 / 解説ページ
+- 問題作成 / 問題編集
+- ZIP 取り込みによる問題文・制約・ジャッジ設定の自動入力
+- 問題作成ページ上での手動テストケース編集
+  - サンプルケース編集
+  - グループ編集
+  - ケース追加・編集・並び替え
+  - special judge 設定
+  - 保存前テスト実行
+- 提出フォーム / 提出一覧 / 提出詳細
+- 問題ページ下部からの直接提出
+- コンテスト一覧 / コンテスト詳細 / 順位表
+- コンテスト作成 / コンテスト編集 / 参加
+- プロフィール編集
+- プロフィール統計表示
+- 通報作成
+- 管理者画面
+  - 通報管理
+  - ユーザー凍結 / 解除
+  - 作成ロール変更
+  - 問題 / コンテスト非公開化
+  - 問題 / コンテスト削除
+  - 再ジャッジ要求確認
+  - ジャッジキュー修復
+- GitHub / Google OAuth ログイン
+
+## 仕様との対応
+
+- 公開範囲: `public / unlisted / private`
+- 提出状態:
+  `pending / queued / compiling / running / judging / accepted / wrong_answer / time_limit_exceeded / memory_limit_exceeded / runtime_error / compilation_error / internal_error / cancelled`
+- 初期対応言語: `C++ / Python / Java / JavaScript`
+- 順位表: 問題ごとの最高点 + ペナルティで集計
+- 順位表公開: `hidden / partial / full`
+- 提出詳細の公開粒度:
+  `group_only / case_index_only / case_name_visible`
+- 他人提出コードの非公開:
+  本人または管理者のみ全文閲覧可
+- 作成権限:
+  - 問題作成: `problem_author` または `admin`
+  - コンテスト作成: `contest_organizer` または `admin`
+- 提出レート制限:
+  - 同一ユーザー・同一問題の通常提出クールダウン: 10 秒
+  - 同一ユーザーの通常提出上限: 1 分あたり 20 件
+- 再ジャッジ制限:
+  - 同一ユーザー: 1 分あたり 3 件
+  - 同一ユーザー・同一問題: 60 秒クールダウン
+- コンテスト提出制約:
+  - 参加済みユーザーのみ提出可
+  - 開催中 (`running`) のみ提出可
+  - 問題がコンテストセットに含まれる場合のみ提出可
+- 表示名変更:
+  - 30 日クールダウン
+  - 表示名一意制約
+  - 監査ログ記録
+- 問題 ZIP 検証 API:
   - `POST /api/problems/:problemId/package`
-  - 蠢・医ヵ繧｡繧､繝ｫ繝ｻ`.in/.out` 繝壹い繝ｻpath traversal繝ｻ螳ｹ驥丈ｸ企剞繧呈､懆ｨｼ
-  - 讀懆ｨｼ謌仙粥譎ゅ↓ `timeLimitMs / memoryLimitMb / scoringType` 繧貞撫鬘瑚ｨｭ螳壹∈蜿肴丐
+  - 必須ファイル・`.in/.out` ペア・path traversal・容量上限を検証
+  - 検証成功時に `timeLimitMs / memoryLimitMb / scoringType` を問題設定へ反映
 
-## 螳溯｣・ｸ翫・蛻ｶ邏・
-- 豌ｸ邯壼喧縺ｯ譛ｪ螳溯｣・〒縲∝渕譛ｬ縺ｯ繧､繝ｳ繝｡繝｢繝ｪ繧ｹ繝医い縺ｧ縺吶・- 隱崎ｨｼ縺ｯ GitHub OAuth 繝ｭ繧ｰ繧､繝ｳ縺ｧ縺呻ｼ・next-auth`・峨・- 蛻晏屓繝ｭ繧ｰ繧､繝ｳ譎ゅ・縲；itHub繧｢繧ｫ繧ｦ繝ｳ繝域ュ蝣ｱ縺九ｉ繧｢繝励Μ蜀・Θ繝ｼ繧ｶ繝ｼ繧定・蜍穂ｽ懈・縺励∪縺吶・- 繧ｸ繝｣繝・ず縺ｯ髱槫酔譛溘〒縺呻ｼ・pending -> queued -> compiling -> running -> judging -> final`・峨・- 蝠城｡兄IP縺檎匳骭ｲ縺輔ｌ縺ｦ縺・ｋ蝠城｡後・縲～config.json` 縺ｨ `tests/*` 繧剃ｽｿ縺｣縺ｦ螳溯｡後ず繝｣繝・ず縺励∪縺吶・  - 蟇ｾ蠢懆ｨ隱・ `C++ / Python / Java / JavaScript`
-  - 豈碑ｼ・婿蠑・ `exact / ignore_trailing_spaces`
-  - 謗｡轤ｹ譁ｹ蠑・ `binary / sum_of_groups`
-- 蛻､螳壼━蜈磯・・莉墓ｧ倬壹ｊ `CE > IE > RE > MLE > TLE > WA > AC` 縺ｧ縺吶・- 蝠城｡兄IP縺梧悴逋ｻ骭ｲ縺ｮ蝠城｡後・ `internal_error` 縺ｫ縺ｪ繧翫∪縺呻ｼ・eed縺ｮ `p1000 / p1001` 縺ｯ蝓九ａ霎ｼ縺ｿ繝代ャ繧ｱ繝ｼ繧ｸ縺ゅｊ・峨・- 謗｡轤ｹ譎ゅ・ `judgeEnvironmentVersion` 繧呈署蜃ｺ縺ｫ菫晏ｭ倥＠縺ｾ縺呻ｼ域里螳・ `v1`・峨・- Prisma / PostgreSQL 繧堤畑諢上＠縺ｦ縲√せ繝翫ャ繝励す繝ｧ繝・ヨ縺ｮ seed 縺ｧ蛻晄悄繝・・繧ｿ謚募・縺ｧ縺阪∪縺吶・
-## 襍ｷ蜍・
+## 実装上の制約
+
+- アプリ状態は PostgreSQL の `AppState` テーブルへ JSON スナップショットとして保存します。
+- 問題パッケージと提出コードは DB 管理状態に保持されます。
+- judge は非同期です:
+  `pending -> queued -> compiling -> running -> judging -> final`
+- 問題 ZIP が登録されている問題は `config.json` と `tests/*` を使って実行ジャッジします。
+  - 提出言語: `C++ / Python / Java / JavaScript`
+  - 比較方式: `exact / ignore_trailing_spaces`
+  - 採点方式: `binary / sum_of_groups`
+  - special judge:
+    `cpp / python / java / javascript` で checker を実装可能
+- 判定優先順:
+  `CE > IE > RE > MLE > TLE > WA > AC`
+- 問題 ZIP / 手動 package 未設定の問題は `internal_error` になります。
+- `judgeEnvironmentVersion` を提出に保存します。
+
+## 起動
+
 ```bash
 npm install
 npm run dev
 ```
 
-繝悶Λ繧ｦ繧ｶ縺ｧ `http://localhost:3000` 繧帝幕縺・※縺上□縺輔＞縲・
-## GitHub OAuth 險ｭ螳・
-`.env.local` 縺ｫ莉･荳九ｒ險ｭ螳壹＠縺ｦ縺上□縺輔＞縲・
+ブラウザで `http://localhost:3000` を開いてください。
+
+## GitHub / Google OAuth 設定
+
+`.env.local` に以下を設定してください。
+
 ```bash
 AUTH_SECRET="replace-with-long-random-string"
 AUTH_GITHUB_ID="github-oauth-client-id"
 AUTH_GITHUB_SECRET="github-oauth-client-secret"
+AUTH_GOOGLE_ID="google-oauth-client-id"
+AUTH_GOOGLE_SECRET="google-oauth-client-secret"
 JUDGE_ENVIRONMENT_VERSION="v1"
 ```
 
-GitHub OAuth App 蛛ｴ縺ｫ縺ｯ縲∝茜逕ｨ迺ｰ蠅・↓蜷医ｏ縺帙※ Callback URL 繧定ｨｭ螳壹＠縺ｦ縺上□縺輔＞縲・
-- 繝ｭ繝ｼ繧ｫ繝ｫ髢狗匱: `http://localhost:3000/api/auth/callback/github`
-- Heroku萓・ `https://<your-app-name>.herokuapp.com/api/auth/callback/github`
+OAuth callback URL:
 
-`AUTH_SECRET` 縺ｯ `openssl rand -base64 32` 縺ｪ縺ｩ縺ｧ逕滓・縺励◆蜊∝・縺ｫ髟ｷ縺・Λ繝ｳ繝繝譁・ｭ怜・繧呈耳螂ｨ縺励∪縺吶・
-## Heroku Container 繝・・繝ｭ繧､
+- GitHub local:
+  `http://localhost:3000/api/auth/callback/github`
+- GitHub Heroku:
+  `https://<your-app-name>.herokuapp.com/api/auth/callback/github`
+- Google local:
+  `http://localhost:3000/api/auth/callback/google`
+- Google Heroku:
+  `https://<your-app-name>.herokuapp.com/api/auth/callback/google`
 
-縺薙・繝ｪ繝昴ず繝医Μ縺ｫ縺ｯ `Dockerfile` 縺ｨ `heroku.yml` 縺悟性縺ｾ繧後※縺翫ｊ縲・judge 縺ｫ蠢・ｦ√↑螳溯｡檎腸蠅・ｼ・g++ / python3 / javac / java / node`・峨ｒ蜷梧｢ｱ縺ｧ縺阪∪縺吶・
-謇矩・
+`AUTH_SECRET` は `openssl rand -base64 32` などで生成した十分に長いランダム文字列を推奨します。
+
+### PKCE エラーについて
+
+OAuth サインインで
+`InvalidCheck: pkceCodeVerifier value could not be parsed`
+が出る場合は、まず secret の整合性を確認してください。
+
+- 固定の `AUTH_SECRET` を Config Vars に設定する
+- 旧名の `NEXTAUTH_SECRET` も使用可能
+- サインイン開始から callback までの間に secret を変えない
+- secret を変えた後はブラウザ cookie を一度削除する
+
+## Heroku Container デプロイ
+
+このリポジトリには `Dockerfile` と `heroku.yml` が含まれており、
+judge に必要な実行環境
+`g++ / python3 / javac / java / node`
+を同梱できます。
 
 ```bash
 heroku stack:set container -a <your-app-name>
 git push heroku main
 ```
 
-蛻晏屓縺ｾ縺溘・繧ｹ繧ｭ繝ｼ繝槫､画峩譎・
+初回またはスキーマ変更時:
 
 ```bash
 heroku run npm run db:push -a <your-app-name>
 ```
 
-繝・・繝ｫ繝√ぉ繝ｼ繝ｳ遒ｺ隱・
+ツールチェーン確認:
 
 ```bash
 heroku run "node -v && python3 --version && g++ --version && javac -version && java -version" -a <your-app-name>
 ```
 
-豕ｨ諢・
-- 迴ｾ蝨ｨ縺ｯ繧､繝ｳ繝｡繝｢繝ｪ繧ｹ繝医い縺ｮ縺溘ａ縲？eroku 縺ｧ縺ｯ `web=1` 繧呈耳螂ｨ縺励∪縺呻ｼ郁､・焚dyno縺ｧ迥ｶ諷句・譛峨＆繧後∪縺帙ｓ・峨・- 蝠城｡兄IP譛ｪ險ｭ螳壹・蝠城｡後・ `internal_error` 縺ｫ縺ｪ繧翫∪縺吶・- `JUDGE_ENVIRONMENT_VERSION` 繧・Config Vars 縺ｫ險ｭ螳壹☆繧九→謠仙・縺ｸ險倬鹸縺輔ｌ縺ｾ縺呻ｼ域悴險ｭ螳壽凾縺ｯ `v1`・峨・
-## DB 繧ｻ繝・ヨ繧｢繝・・・・risma / PostgreSQL・・
-1繧ｳ繝槭Φ繝峨〒襍ｷ蜍輔・繧ｹ繧ｭ繝ｼ繝槫渚譏繝ｻseed 縺ｾ縺ｧ螳溯｡後〒縺阪∪縺吶・
+注意:
+
+- 現在は単一アプリ状態のため、Heroku では `web=1` を推奨します
+- package 未設定問題は `internal_error` になります
+- `JUDGE_ENVIRONMENT_VERSION` を Config Vars に設定すると提出へ記録されます
+
+## DB セットアップ (Prisma / PostgreSQL)
+
 ```bash
 npm run db:prepare
 ```
 
-豕ｨ諢・
-- 譌｢蟄倥ョ繝ｼ繧ｿ縺後≠繧句､夜ΚDB縺ｫ `DATABASE_URL` 繧貞髄縺代◆蝣ｴ蜷医～npm run db:push` 縺ｯ繝・・繧ｿ謳榊､ｱ隴ｦ蜻翫〒蛛懈ｭ｢縺励∪縺吶・- 髢狗匱逕ｨ縺ｫ縺ｯ繝ｭ繝ｼ繧ｫ繝ｫDB・・ocker・峨ｒ菴ｿ縺・°縲∝､夜ΚDB繧剃ｽｿ縺・ｴ蜷医・蟇ｾ雎｡繧ｹ繧ｭ繝ｼ繝槭ｒ莠句燕縺ｫ遒ｺ隱阪＠縺ｦ縺上□縺輔＞縲・- `.env.example` 縺ｯ繝・Φ繝励Ξ繝ｼ繝医〒縺吶ょｮ溷､縺ｯ `.env.local` 縺ｧ邂｡逅・＠縺ｦ縺上□縺輔＞・・.env.local` 縺ｯ Git 霑ｽ霍｡蟇ｾ雎｡螟厄ｼ峨・
-蛟句挨縺ｫ螳溯｡後☆繧句ｴ蜷・
+個別実行:
 
 ```bash
 npm run db:up
@@ -103,13 +173,13 @@ npm run db:push
 npm run db:seed
 ```
 
-蛛懈ｭ｢:
+停止:
 
 ```bash
 npm run db:down
 ```
 
-繝・・繧ｿ繧ょ炎髯､縺励※蛛懈ｭ｢:
+データも削除して停止:
 
 ```bash
 npm run db:down:volumes
@@ -121,16 +191,20 @@ Prisma Studio:
 npm run db:studio
 ```
 
-`DATABASE_URL` 繧呈悴險ｭ螳壹・蝣ｴ蜷医√Ο繝ｼ繧ｫ繝ｫ髢狗匱逕ｨ縺ｮ譌｢螳壼､
-`postgresql://postgres:postgres@localhost:15432/ojp?schema=public`
-繧貞茜逕ｨ縺励∪縺吶・
-## 讀懆ｨｼ繧ｳ繝槭Φ繝・
+`DATABASE_URL` 未設定時は次を既定値として使います。
+
+```bash
+postgresql://postgres:postgres@localhost:15432/ojp?schema=public
+```
+
+## 検証コマンド
+
 ```bash
 npm run lint
 npm run build
 ```
 
-## 荳ｻ縺ｪ繝壹・繧ｸ
+## 主なページ
 
 - `/`
 - `/problems`
@@ -149,8 +223,9 @@ npm run build
 - `/reports/new`
 - `/admin`
 
-## API 繧ｨ繝ｳ繝峨・繧､繝ｳ繝・
-- `GET/POST /api/auth/*` (next-auth)
+## API エンドポイント
+
+- `GET/POST /api/auth/*`
 - `GET /api/me`
 - `PATCH /api/me/profile`
 - `GET /api/problems`
@@ -160,6 +235,7 @@ npm run build
 - `POST /api/problems/:problemId/publish`
 - `POST /api/problems/:problemId/unpublish`
 - `POST /api/problem-packages/inspect`
+- `POST /api/problem-packages/test`
 - `POST /api/problems/:problemId/package`
 - `POST /api/problems/:problemId/package/manual`
 - `GET /api/problems/:problemId/explanation`
@@ -198,68 +274,44 @@ npm run build
 - `POST /api/admin/contests/:contestId/delete`
 - `POST /api/admin/contests/:contestId/hide`
 
-荳隕ｧ邉ｻAPI (`/api/problems`, `/api/contests`, `/api/submissions`, `/api/admin/reports`) 縺ｯ
-`page`, `limit`, `cursor` 繧ｯ繧ｨ繝ｪ繧偵し繝昴・繝医＠縺ｾ縺吶・
-## Google OAuth Setup
-
-To enable Google login, add these env vars (`.env.local` or Heroku Config Vars):
-
-```bash
-AUTH_GOOGLE_ID="google-oauth-client-id"
-AUTH_GOOGLE_SECRET="google-oauth-client-secret"
-```
-
-Google OAuth callback URL:
-- Local: `http://localhost:3000/api/auth/callback/google`
-- Heroku: `https://<your-app-name>.herokuapp.com/api/auth/callback/google`
-
-You can keep GitHub and Google enabled at the same time.
-
-## Auth Secret Note (PKCE)
-
-If OAuth sign-in fails with `InvalidCheck: pkceCodeVerifier value could not be parsed`,
-check secret consistency first.
-
-- Set a fixed `AUTH_SECRET` in Config Vars.
-- If you already use legacy naming, `NEXTAUTH_SECRET` is also accepted by this app.
-- Do not rotate secret between the sign-in request and callback.
-- After changing secret, clear browser cookies once and retry login.
+一覧系 API (`/api/problems`, `/api/contests`, `/api/submissions`, `/api/admin/reports`) は
+`page`, `limit`, `cursor` をサポートします。
 
 ## DB-only Persistence Mode
 
-This app can run without object storage for MVP/small scale operation.
+このアプリは object storage なしでも小規模運用できます。
 
-- App state is persisted to Postgres (`AppState` table) as JSON snapshot.
-- Submission source and package-derived data remain in DB-managed state.
-- Set `STORE_DB_SYNC=1` (default) to enable snapshot sync.
+- アプリ状態は Postgres (`AppState`) に JSON スナップショットで保存
+- 提出コードと package 派生データも DB 管理状態に保持
+- `STORE_DB_SYNC=1` (既定) で同期を有効化
 
-Operational notes:
-- Keep `web=1` to avoid multi-process state conflicts.
-- This mode is suitable for small deployments; large test assets should still move to object storage later.
+注意:
+
+- 複数プロセスでの状態競合を避けるため `web=1` を推奨
+- 大きなテスト資産は将来的に object storage へ分離した方が安全
 
 ## Legacy DB Enum Migration
 
-If `npm run db:push` fails with an enum error like
-`invalid input value for enum "SubmissionStatus_new": "AC"`,
-run this one-time migration first:
+`npm run db:push` が
+`invalid input value for enum "SubmissionStatus_new": "AC"`
+のような enum エラーで止まる場合は、先に次を一度だけ実行してください。
 
 ```bash
 npm run db:migrate:legacy-status
 npm run db:push -- --accept-data-loss
 ```
 
-This converts old verdict/status values (`AC`, `WA`, etc.) to the current
-values (`accepted`, `wrong_answer`, etc.) before Prisma drops legacy enum variants.
-
 ## Problem ZIP Format
 
-You can register problem test cases by uploading one ZIP package.
+問題作成 / 編集ページでは、次の 2 つの方法で judge package を扱えます。
 
-Problem create/edit page also supports:
-- ZIP import with automatic form prefill from `statement.md` and `config.json`
-- Manual judge package editing on the page (samples, groups, cases, scores, compare mode)
+- ZIP import:
+  `statement.md` と `config.json` からフォームを自動入力
+- Manual editor:
+  samples / groups / cases / score / checker をページ上で直接編集
+  - special judge の checker フィールドには言語別テンプレートを自動入力
 
-Expected structure:
+### 期待される構成
 
 ```text
 problem-package.zip
@@ -270,37 +322,66 @@ problem-package.zip
 |  |- sample1.out
 |  |- sample2.in
 |  `- sample2.out
+|- checker/
+|  `- Main.py
 `- tests/
    |- group1/
    |  |- 01.in
    |  |- 01.out
-   |  |- 02.in
-   |  `- 02.out
+   |  `- 02.in
    `- group2/
       |- 01.in
       `- 01.out
 ```
 
-`config.json` fields:
-- `timeLimitMs` (number)
-- `memoryLimitMb` (number)
-- `scoringType` (optional: `binary` or `sum_of_groups`)
-- `checkerType` (optional: `exact` or `special_judge`)
-- `checkerLanguage` (required when `checkerType` is `special_judge`)
-- `groups` (each item is either group name string or `{ name, score? }`)
+### `config.json` fields
 
-Scoring rules:
-- If every group has integer `score`, the sum must be exactly `100` (partial scoring mode).
-- If `score` is omitted for all groups, binary mode is used (`all groups passed => 100`, otherwise `0`).
-- Mixing scored and non-scored groups in the same package is invalid.
+- `timeLimitMs`
+- `memoryLimitMb`
+- `scoringType`:
+  `binary` or `sum_of_groups`
+- `checkerType`:
+  `exact` or `special_judge`
+- `checkerLanguage`:
+  `checkerType` が `special_judge` のとき必須
+- `compareMode`:
+  `exact` or `ignore_trailing_spaces`
+- `groups`:
+  `"group1"` または `{ "name": "group1", "score": 50 }`
 
-Validation rules:
-- `.in/.out` pairs are required for `samples/` and `tests/<group>/`.
-- Group test case names are auto-detected from `tests/<group>/` (no `tests[]` list required).
-- For special judge, add checker source at `checker/Main.cpp`, `checker/Main.py`, `checker/Main.java`, or `checker/Main.js`.
-- Path traversal and oversized ZIP/file payloads are rejected.
+### 採点ルール
 
-Template generator:
+- 全 group に `score` がある場合:
+  合計 100 点で部分点採点
+- 全 group で `score` 省略時:
+  binary 採点
+- `score` あり / なし の混在は不可
+
+### special judge
+
+- `checkerType: "special_judge"` を指定
+- `checkerLanguage` を `cpp / python / java / javascript` から選ぶ
+- checker ソースは次のいずれかに置く
+  - `checker/Main.cpp`
+  - `checker/Main.py`
+  - `checker/Main.java`
+  - `checker/Main.js`
+- checker には次の 3 引数が渡されます
+  - 入力ファイルパス
+  - reference output ファイルパス
+  - contestant output ファイルパス
+- exit code:
+  - `0` = AC
+  - `1` = WA
+  - その他 = judge error (`internal_error`)
+
+### 検証ルール
+
+- `samples/` と `tests/<group>/` の `.in/.out` ペアが必須
+- `tests[]` は省略可能で、未指定時はディレクトリから自動検出
+- path traversal と oversized ZIP/file payload は拒否
+
+### テンプレート生成
 
 ```bash
 npm run template:problem-zip
@@ -308,10 +389,21 @@ npm run template:problem-zip -- --mode partial --output ./my-problem.zip
 npm run template:problem-zip -- --mode binary --groups 3 --tests-per-group 4
 ```
 
-
 ## Problem Difficulty
 
-- Each problem has an optional integer difficulty value (difficulty).
-- You can set/update it from the create/edit problem form.
-- This value is intended to be compatible with AtCoder-style rating numbers (for example 400, 800, 1200).
+- 各問題に整数 difficulty を設定可能
+- AtCoder 風のレーティング値を想定
+  - 例: `400 / 800 / 1200`
 
+## Site Header Links
+
+ヘッダーの外部リンク URL は次で設定します。
+
+- `lib/site-links.ts`
+
+```ts
+export const SITE_SOCIAL_LINKS = {
+  github: "https://github.com/replace-this",
+  twitter: "https://x.com/replace-this",
+} as const;
+```
