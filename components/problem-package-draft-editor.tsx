@@ -78,9 +78,13 @@ export function ProblemPackageDraftEditor({
   draft,
   onChange,
 }: ProblemPackageDraftEditorProps) {
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
+    draft.groups[0]?.id ?? null,
+  );
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(
     draft.groups[0]?.tests[0]?.id ?? null,
   );
+
   const summary = scoreSummary(draft);
   const totalCases = draft.groups.reduce((acc, group) => acc + group.tests.length, 0);
   const totalSamples = draft.samples.length;
@@ -88,7 +92,8 @@ export function ProblemPackageDraftEditor({
     draft.fileCount > 0
       ? draft.fileCount
       : 2 + (totalSamples + totalCases) * 2 + (draft.checkerType === "special_judge" ? 1 : 0);
-  const outputLabel = draft.checkerType === "special_judge" ? "Reference Output" : "Expected Output";
+  const outputLabel =
+    draft.checkerType === "special_judge" ? "Reference Output" : "Expected Output";
 
   function patchDraft(
     updater: (current: ProblemPackageEditorDraft) => ProblemPackageEditorDraft,
@@ -96,32 +101,45 @@ export function ProblemPackageDraftEditor({
     onChange(updater(draft));
   }
 
-  const activeCaseId = draft.groups.some((group) =>
-    group.tests.some((testCase) => testCase.id === selectedCaseId),
-  )
-    ? selectedCaseId
-    : draft.groups[0]?.tests[0]?.id ?? null;
+  const activeGroup =
+    draft.groups.find((group) => group.id === selectedGroupId) ?? draft.groups[0] ?? null;
+  const activeCase =
+    activeGroup?.tests.find((testCase) => testCase.id === selectedCaseId) ??
+    activeGroup?.tests[0] ??
+    null;
+  const activeCaseIndex = activeGroup
+    ? activeGroup.tests.findIndex((testCase) => testCase.id === activeCase?.id)
+    : -1;
+  const activeGroupIndex = activeGroup
+    ? draft.groups.findIndex((group) => group.id === activeGroup.id)
+    : -1;
+
+  function selectGroup(groupId: string) {
+    const nextGroup = draft.groups.find((group) => group.id === groupId);
+    setSelectedGroupId(groupId);
+    setSelectedCaseId(nextGroup?.tests[0]?.id ?? null);
+  }
 
   function addGroup() {
-    patchDraft((current) => ({
-      ...current,
-      groups: [
-        ...current.groups,
+    const nextGroup = {
+      id: createId("group"),
+      name: nextGroupName(draft.groups.length),
+      score: null,
+      tests: [
         {
-          id: createId("group"),
-          name: nextGroupName(current.groups.length),
-          score: null,
-          tests: [
-            {
-              id: createId("case"),
-              name: "01",
-              input: "",
-              output: "",
-            },
-          ],
+          id: createId("case"),
+          name: "01",
+          input: "",
+          output: "",
         },
       ],
+    };
+    patchDraft((current) => ({
+      ...current,
+      groups: [...current.groups, nextGroup],
     }));
+    setSelectedGroupId(nextGroup.id);
+    setSelectedCaseId(nextGroup.tests[0].id);
   }
 
   function addSample() {
@@ -181,6 +199,12 @@ export function ProblemPackageDraftEditor({
   }
 
   function addCase(groupIndex: number) {
+    const nextCase = {
+      id: createId("case"),
+      name: nextCaseName(draft.groups[groupIndex]?.tests.length ?? 0),
+      input: "",
+      output: "",
+    };
     patchDraft((current) => ({
       ...current,
       groups: current.groups.map((group, index) =>
@@ -188,18 +212,12 @@ export function ProblemPackageDraftEditor({
           ? group
           : {
               ...group,
-              tests: [
-                ...group.tests,
-                {
-                  id: createId("case"),
-                  name: nextCaseName(group.tests.length),
-                  input: "",
-                  output: "",
-                },
-              ],
+              tests: [...group.tests, nextCase],
             },
       ),
     }));
+    setSelectedGroupId(draft.groups[groupIndex]?.id ?? null);
+    setSelectedCaseId(nextCase.id);
   }
 
   function moveCase(groupIndex: number, caseIndex: number, direction: -1 | 1) {
@@ -491,260 +509,266 @@ export function ProblemPackageDraftEditor({
         )}
       </section>
 
-      {draft.groups.map((group, groupIndex) => (
-        <details key={group.id} className="package-group-editor stack" open>
-          <summary className="package-group-summary">
-            <span className="panel-title">Group {groupIndex + 1}</span>
-            <span className="result-group-meta">{group.name || "(unnamed group)"}</span>
-            <span className="result-group-meta">Cases: {group.tests.length}</span>
-            <span className="result-group-meta">
-              Score: {group.score === null ? "binary" : group.score}
-            </span>
-          </summary>
+      <section className="package-group-editor stack">
+        <div className="package-editor-toolbar">
+          <h3 className="panel-title">Groups</h3>
+          <div className="button-row">
+            <button type="button" className="button" onClick={addGroup}>
+              Add Group
+            </button>
+          </div>
+        </div>
 
-          <div className="package-group-body stack">
-            <div className="package-editor-toolbar">
-              <div className="button-row">
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => moveGroup(groupIndex, -1)}
-                  disabled={groupIndex === 0}
-                >
-                  Up
-                </button>
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => moveGroup(groupIndex, 1)}
-                  disabled={groupIndex === draft.groups.length - 1}
-                >
-                  Down
-                </button>
-                <button
-                  type="button"
-                  className="button button-danger"
-                  onClick={() => removeGroup(groupIndex)}
-                  disabled={draft.groups.length === 1}
-                >
-                  Remove Group
-                </button>
-              </div>
-            </div>
-
-            <div className="form-grid">
-              <label className="field">
-                <span className="field-label">Group Name</span>
-                <input
-                  className="input"
-                  value={group.name}
-                  onChange={(event) =>
-                    patchDraft((current) => ({
-                      ...current,
-                      groups: current.groups.map((item, index) =>
-                        index !== groupIndex
-                          ? item
-                          : {
-                              ...item,
-                              name: event.target.value,
-                            },
-                      ),
-                    }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span className="field-label">Partial Score</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={group.score ?? ""}
-                  onChange={(event) => {
-                    const value = event.target.value.trim();
-                    patchDraft((current) => ({
-                      ...current,
-                      groups: current.groups.map((item, index) =>
-                        index !== groupIndex
-                          ? item
-                          : {
-                              ...item,
-                              score: value.length === 0 ? null : Number.parseInt(value, 10),
-                            },
-                      ),
-                    }));
-                  }}
-                  placeholder="blank = binary"
-                />
-              </label>
-            </div>
-
+        {draft.groups.length === 0 ? (
+          <p className="empty">No groups yet.</p>
+        ) : (
+          <>
             <div className="field">
-              <span className="field-label">Cases</span>
+              <span className="field-label">Group List</span>
               <div className="button-row">
-                {group.tests.map((testCase) => (
+                {draft.groups.map((group) => (
                   <button
-                    key={testCase.id}
+                    key={group.id}
                     type="button"
                     className={
-                      activeCaseId === testCase.id ? "button" : "button button-secondary"
+                      activeGroup?.id === group.id ? "button" : "button button-secondary"
                     }
-                    onClick={() => setSelectedCaseId(testCase.id)}
+                    onClick={() => selectGroup(group.id)}
                   >
-                    {testCase.name}
+                    {group.name} ({group.tests.length})
                   </button>
                 ))}
               </div>
             </div>
 
-            {(() => {
-              const selectedCaseIndex = group.tests.findIndex(
-                (testCase) => testCase.id === activeCaseId,
-              );
-              if (selectedCaseIndex < 0) {
-                return null;
-              }
-              const testCase = group.tests[selectedCaseIndex];
-
-              return (
-                <article key={testCase.id} className="package-case-editor stack">
-                  <div className="package-editor-toolbar">
-                    <h4 className="field-label">Case {selectedCaseIndex + 1}</h4>
-                    <div className="button-row">
-                      <button
-                        type="button"
-                        className="button button-secondary"
-                        onClick={() => moveCase(groupIndex, selectedCaseIndex, -1)}
-                        disabled={selectedCaseIndex === 0}
-                      >
-                        Up
-                      </button>
-                      <button
-                        type="button"
-                        className="button button-secondary"
-                        onClick={() => moveCase(groupIndex, selectedCaseIndex, 1)}
-                        disabled={selectedCaseIndex === group.tests.length - 1}
-                      >
-                        Down
-                      </button>
-                      <button
-                        type="button"
-                        className="button button-danger"
-                        onClick={() => removeCase(groupIndex, selectedCaseIndex)}
-                        disabled={group.tests.length === 1}
-                      >
-                        Remove Case
-                      </button>
-                    </div>
+            {activeGroup && activeGroupIndex >= 0 ? (
+              <>
+                <div className="package-editor-toolbar">
+                  <h4 className="field-label">Selected Group</h4>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => moveGroup(activeGroupIndex, -1)}
+                      disabled={activeGroupIndex === 0}
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => moveGroup(activeGroupIndex, 1)}
+                      disabled={activeGroupIndex === draft.groups.length - 1}
+                    >
+                      Down
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-danger"
+                      onClick={() => removeGroup(activeGroupIndex)}
+                      disabled={draft.groups.length === 1}
+                    >
+                      Remove Group
+                    </button>
                   </div>
+                </div>
 
+                <div className="form-grid">
                   <label className="field">
-                    <span className="field-label">Case Name</span>
+                    <span className="field-label">Group Name</span>
                     <input
                       className="input"
-                      value={testCase.name}
+                      value={activeGroup.name}
                       onChange={(event) =>
                         patchDraft((current) => ({
                           ...current,
-                          groups: current.groups.map((groupItem, currentGroupIndex) =>
-                            currentGroupIndex !== groupIndex
-                              ? groupItem
+                          groups: current.groups.map((item, index) =>
+                            index !== activeGroupIndex
+                              ? item
                               : {
-                                  ...groupItem,
-                                  tests: groupItem.tests.map((caseItem, currentCaseIndex) =>
-                                    currentCaseIndex !== selectedCaseIndex
-                                      ? caseItem
-                                      : {
-                                          ...caseItem,
-                                          name: event.target.value,
-                                        },
-                                  ),
+                                  ...item,
+                                  name: event.target.value,
                                 },
                           ),
                         }))
                       }
                     />
                   </label>
+                  <label className="field">
+                    <span className="field-label">Partial Score</span>
+                    <input
+                      className="input"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={activeGroup.score ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value.trim();
+                        patchDraft((current) => ({
+                          ...current,
+                          groups: current.groups.map((item, index) =>
+                            index !== activeGroupIndex
+                              ? item
+                              : {
+                                  ...item,
+                                  score: value.length === 0 ? null : Number.parseInt(value, 10),
+                                },
+                          ),
+                        }));
+                      }}
+                      placeholder="blank = binary"
+                    />
+                  </label>
+                </div>
 
-                  <div className="form-grid">
-                    <label className="field">
-                      <span className="field-label">Input</span>
-                      <textarea
-                        className="textarea"
-                        value={testCase.input}
-                        onChange={(event) =>
-                          patchDraft((current) => ({
-                            ...current,
-                            groups: current.groups.map((groupItem, currentGroupIndex) =>
-                              currentGroupIndex !== groupIndex
-                                ? groupItem
-                                : {
-                                    ...groupItem,
-                                    tests: groupItem.tests.map((caseItem, currentCaseIndex) =>
-                                      currentCaseIndex !== selectedCaseIndex
-                                        ? caseItem
-                                        : {
-                                            ...caseItem,
-                                            input: event.target.value,
-                                          },
-                                    ),
-                                  },
-                            ),
-                          }))
+                <div className="field">
+                  <span className="field-label">Case List</span>
+                  <div className="button-row">
+                    {activeGroup.tests.map((testCase) => (
+                      <button
+                        key={testCase.id}
+                        type="button"
+                        className={
+                          activeCase?.id === testCase.id ? "button" : "button button-secondary"
                         }
-                      />
-                    </label>
-                    <label className="field">
-                      <span className="field-label">{outputLabel}</span>
-                      <textarea
-                        className="textarea"
-                        value={testCase.output}
-                        onChange={(event) =>
-                          patchDraft((current) => ({
-                            ...current,
-                            groups: current.groups.map((groupItem, currentGroupIndex) =>
-                              currentGroupIndex !== groupIndex
-                                ? groupItem
-                                : {
-                                    ...groupItem,
-                                    tests: groupItem.tests.map((caseItem, currentCaseIndex) =>
-                                      currentCaseIndex !== selectedCaseIndex
-                                        ? caseItem
-                                        : {
-                                            ...caseItem,
-                                            output: event.target.value,
-                                          },
-                                    ),
-                                  },
-                            ),
-                          }))
-                        }
-                      />
-                    </label>
+                        onClick={() => setSelectedCaseId(testCase.id)}
+                      >
+                        {testCase.name}
+                      </button>
+                    ))}
                   </div>
-                </article>
-              );
-            })()}
+                </div>
 
-            <div className="button-row">
-              <button
-                type="button"
-                className="button"
-                onClick={() => addCase(groupIndex)}
-              >
-                Add Case
-              </button>
-            </div>
-          </div>
-        </details>
-      ))}
+                {activeCase && activeCaseIndex >= 0 ? (
+                  <article key={activeCase.id} className="package-case-editor stack">
+                    <div className="package-editor-toolbar">
+                      <h4 className="field-label">Selected Case</h4>
+                      <div className="button-row">
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          onClick={() => moveCase(activeGroupIndex, activeCaseIndex, -1)}
+                          disabled={activeCaseIndex === 0}
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          onClick={() => moveCase(activeGroupIndex, activeCaseIndex, 1)}
+                          disabled={activeCaseIndex === activeGroup.tests.length - 1}
+                        >
+                          Down
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-danger"
+                          onClick={() => removeCase(activeGroupIndex, activeCaseIndex)}
+                          disabled={activeGroup.tests.length === 1}
+                        >
+                          Remove Case
+                        </button>
+                        <button
+                          type="button"
+                          className="button"
+                          onClick={() => addCase(activeGroupIndex)}
+                        >
+                          Add Case
+                        </button>
+                      </div>
+                    </div>
 
-      <div className="button-row">
-        <button type="button" className="button" onClick={addGroup}>
-          Add Group
-        </button>
-      </div>
+                    <label className="field">
+                      <span className="field-label">Case Name</span>
+                      <input
+                        className="input"
+                        value={activeCase.name}
+                        onChange={(event) =>
+                          patchDraft((current) => ({
+                            ...current,
+                            groups: current.groups.map((groupItem, currentGroupIndex) =>
+                              currentGroupIndex !== activeGroupIndex
+                                ? groupItem
+                                : {
+                                    ...groupItem,
+                                    tests: groupItem.tests.map((caseItem, currentCaseIndex) =>
+                                      currentCaseIndex !== activeCaseIndex
+                                        ? caseItem
+                                        : {
+                                            ...caseItem,
+                                            name: event.target.value,
+                                          },
+                                    ),
+                                  },
+                            ),
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <div className="form-grid">
+                      <label className="field">
+                        <span className="field-label">Input</span>
+                        <textarea
+                          className="textarea"
+                          value={activeCase.input}
+                          onChange={(event) =>
+                            patchDraft((current) => ({
+                              ...current,
+                              groups: current.groups.map((groupItem, currentGroupIndex) =>
+                                currentGroupIndex !== activeGroupIndex
+                                  ? groupItem
+                                  : {
+                                      ...groupItem,
+                                      tests: groupItem.tests.map((caseItem, currentCaseIndex) =>
+                                        currentCaseIndex !== activeCaseIndex
+                                          ? caseItem
+                                          : {
+                                              ...caseItem,
+                                              input: event.target.value,
+                                            },
+                                      ),
+                                    },
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="field">
+                        <span className="field-label">{outputLabel}</span>
+                        <textarea
+                          className="textarea"
+                          value={activeCase.output}
+                          onChange={(event) =>
+                            patchDraft((current) => ({
+                              ...current,
+                              groups: current.groups.map((groupItem, currentGroupIndex) =>
+                                currentGroupIndex !== activeGroupIndex
+                                  ? groupItem
+                                  : {
+                                      ...groupItem,
+                                      tests: groupItem.tests.map((caseItem, currentCaseIndex) =>
+                                        currentCaseIndex !== activeCaseIndex
+                                          ? caseItem
+                                          : {
+                                              ...caseItem,
+                                              output: event.target.value,
+                                            },
+                                      ),
+                                    },
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  </article>
+                ) : null}
+              </>
+            ) : null}
+          </>
+        )}
+      </section>
     </div>
   );
 }

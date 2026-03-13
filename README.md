@@ -407,3 +407,31 @@ export const SITE_SOCIAL_LINKS = {
   twitter: "https://x.com/replace-this",
 } as const;
 ```
+
+## Cloudflare R2
+
+問題 package ZIP を DB スナップショットへ埋め込まず、Cloudflare R2 に保存できます。
+
+必要な環境変数:
+
+```bash
+R2_BUCKET="your-bucket-name"
+R2_ACCOUNT_ID="your-cloudflare-account-id"
+R2_ACCESS_KEY_ID="your-r2-access-key-id"
+R2_SECRET_ACCESS_KEY="your-r2-secret-access-key"
+# 代わりに明示 endpoint を使う場合
+# R2_ENDPOINT="https://<account-id>.r2.cloudflarestorage.com"
+```
+
+移行手順:
+
+1. R2 bucket を作成する
+2. R2 用の Access Key / Secret を作成する
+3. 上の環境変数を設定してデプロイする
+4. 管理画面の `Object Storage Migration` から `Migrate Problem ZIPs to R2` を実行する
+
+補足:
+
+- 新しく登録・更新した問題 package は自動で R2 に保存されます
+- package の展開結果はメモリ cache に保持され、DB スナップショットには object ref のみ保存されます
+- 既存の埋め込み package は migration 実行で zip 再構築して R2 へ移行できます

@@ -25,11 +25,9 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
   }
 
   const canEdit = canEditProblemByViewer(problem, me.id);
-  const packageDraft = canEdit
-    ? (() => {
-        const packageData = getProblemPackageData(problem.id);
-        return packageData ? buildEditorDraftFromExtracted(packageData) : null;
-      })()
+  const loadedPackageData = canEdit ? await getProblemPackageData(problem.id) : null;
+  const resolvedPackageDraft = loadedPackageData
+    ? buildEditorDraftFromExtracted(loadedPackageData)
     : null;
 
   return (
@@ -50,7 +48,7 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
             <ProblemEditorForm
               mode="edit"
               initialProblem={problem}
-              initialPackageDraft={packageDraft}
+              initialPackageDraft={resolvedPackageDraft}
             />
           </section>
           <section className="panel stack">

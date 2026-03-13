@@ -26,9 +26,21 @@ import {
   Visibility,
 } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
-import type { ProblemPackageExtracted } from "@/lib/problem-package";
+import {
+  buildEditorDraftFromExtracted,
+  buildProblemPackageZip,
+  validateProblemPackage,
+  type ProblemPackageExtracted,
+} from "@/lib/problem-package";
 import { executePackageJudge } from "@/lib/judge-runtime";
 import { getJudgeEnvironmentVersion } from "@/lib/judge-config";
+import {
+  deleteProblemPackageZip,
+  getProblemPackageZip,
+  isProblemPackageObjectStorageEnabled,
+  putProblemPackageZip,
+  type ProblemPackageStorageRef,
+} from "@/lib/problem-package-storage";
 import {
   isAcceptedSubmissionStatus,
   isFinalSubmissionStatus,
@@ -93,6 +105,7 @@ interface Store {
   users: User[];
   problems: Problem[];
   problemPackages: Record<string, ProblemPackageExtracted>;
+  problemPackageRefs: Record<string, ProblemPackageStorageRef>;
   contests: Contest[];
   submissions: Submission[];
   announcements: Announcement[];
@@ -128,6 +141,7 @@ interface StoreSnapshot {
   users: User[];
   problems: Problem[];
   problemPackages: Record<string, ProblemPackageExtracted>;
+  problemPackageRefs: Record<string, ProblemPackageStorageRef>;
   contests: Contest[];
   submissions: Submission[];
   announcements: Announcement[];
@@ -552,6 +566,7 @@ function createInitialStore(): Store {
     users,
     problems,
     problemPackages,
+    problemPackageRefs: {},
     contests,
     submissions,
     announcements,
@@ -613,6 +628,9 @@ function normalizeStoreInPlace(target: Store): void {
   }
   if (!target.problemPackages || typeof target.problemPackages !== "object") {
     target.problemPackages = {};
+  }
+  if (!target.problemPackageRefs || typeof target.problemPackageRefs !== "object") {
+    target.problemPackageRefs = {};
   }
   for (const packageData of Object.values(target.problemPackages)) {
     const legacyPackage = packageData as ProblemPackageExtracted & {
@@ -713,7 +731,8 @@ function captureStoreSnapshot(target: Store): StoreSnapshot {
     JSON.stringify({
       users: target.users,
       problems: target.problems,
-      problemPackages: target.problemPackages,
+      problemPackages: isProblemPackageObjectStorageEnabled() ? {} : target.problemPackages,
+      problemPackageRefs: target.problemPackageRefs,
       contests: target.contests,
       submissions: target.submissions,
       announcements: target.announcements,
@@ -734,6 +753,10 @@ function applyStoreSnapshotInPlace(target: Store, snapshot: StoreSnapshot): void
   target.problemPackages =
     snapshot.problemPackages && typeof snapshot.problemPackages === "object"
       ? snapshot.problemPackages
+      : {};
+  target.problemPackageRefs =
+    snapshot.problemPackageRefs && typeof snapshot.problemPackageRefs === "object"
+      ? snapshot.problemPackageRefs
       : {};
   target.contests = Array.isArray(snapshot.contests) ? snapshot.contests : [];
   target.submissions = Array.isArray(snapshot.submissions) ? snapshot.submissions : [];
@@ -1122,7 +1145,7 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
     return;
   }
 
-  const packageData = store.problemPackages[problem.id];
+  const packageData = await loadProblemPackageData(problem.id);
   if (!packageData || packageData.groups.length === 0) {
     markSubmissionAsInternalError(
       submission,
@@ -1692,6 +1715,24 @@ export function getProblemById(problemId: string): Problem | undefined {
   return store.problems.find((problem) => problem.id === problemId);
 }
 
+async function loadProblemPackageData(problemId: string): Promise<ProblemPackageExtracted | undefined> {
+  const cached = store.problemPackages[problemId];
+  if (cached) {
+    return cached;
+  }
+
+  const ref = store.problemPackageRefs[problemId];
+  if (!ref) {
+    return undefined;
+  }
+
+  const zipBuffer = await getProblemPackageZip(ref);
+  const fileName = ref.key.split("/").pop() ?? `${problemId}.zip`;
+  const extracted = validateProblemPackage(fileName, zipBuffer);
+  store.problemPackages[problemId] = extracted;
+  return extracted;
+}
+
 function findContestsIncludingProblem(problemId: string): Contest[] {
   return store.contests.filter((contest) =>
     contest.problems.some((contestProblem) => contestProblem.problemId === problemId),
@@ -1770,8 +1811,10 @@ export function getProblemForViewer(problemId: string, viewerId: string): Proble
   return allowed ? maskProblemExplanationByViewer(problem, viewerId) : undefined;
 }
 
-export function getProblemPackageData(problemId: string): ProblemPackageExtracted | undefined {
-  return store.problemPackages[problemId];
+export async function getProblemPackageData(
+  problemId: string,
+): Promise<ProblemPackageExtracted | undefined> {
+  return loadProblemPackageData(problemId);
 }
 
 export async function createProblem(input: CreateProblemInput): Promise<Problem> {
@@ -1869,6 +1912,7 @@ export async function updateProblem(
 export async function applyProblemPackageValidation(
   problemId: string,
   packageData: ProblemPackageExtracted,
+  storageRef?: ProblemPackageStorageRef | null,
 ): Promise<Problem> {
   const actor = await getCurrentUser();
   const problem = resolveProblemIfExists(problemId);
@@ -1890,7 +1934,14 @@ export async function applyProblemPackageValidation(
     warnings: packageData.validation.warnings,
     validatedAt: nowIso(),
   };
+  const previousRef = store.problemPackageRefs[problem.id];
   store.problemPackages[problem.id] = packageData;
+  if (storageRef) {
+    store.problemPackageRefs[problem.id] = storageRef;
+    if (previousRef && previousRef.key !== storageRef.key) {
+      await deleteProblemPackageZip(previousRef);
+    }
+  }
   problem.updatedAt = nowIso();
 
   return problem;
@@ -2387,6 +2438,7 @@ export function dumpStoreSnapshot(): {
   users: User[];
   problems: Problem[];
   problemPackages: Record<string, ProblemPackageExtracted>;
+  problemPackageRefs: Record<string, ProblemPackageStorageRef>;
   contests: Contest[];
   submissions: Submission[];
   announcements: Announcement[];
@@ -2843,7 +2895,9 @@ export async function deleteProblemByAdmin(
   );
 
   store.problems = store.problems.filter((item) => item.id !== problemId);
+  const packageRef = store.problemPackageRefs[problemId];
   delete store.problemPackages[problemId];
+  delete store.problemPackageRefs[problemId];
   store.contests = store.contests.map((contest) => ({
     ...contest,
     problems: contest.problems
@@ -2868,6 +2922,9 @@ export async function deleteProblemByAdmin(
     return true;
   });
   removeQueuedStateForSubmissionIds(deletedSubmissionIds);
+  if (packageRef) {
+    await deleteProblemPackageZip(packageRef);
+  }
 
   appendAuditLog({
     actorId: admin.id,
@@ -2907,6 +2964,61 @@ export async function deleteContestByAdmin(
   });
 
   return contest;
+}
+
+export async function migrateProblemPackagesToObjectStorageByAdmin(): Promise<{
+  migrated: number;
+  skipped: number;
+}> {
+  const admin = await getCurrentUser();
+  assertAdmin(admin);
+  if (!isProblemPackageObjectStorageEnabled()) {
+    throw new HttpError("R2 is not configured", 400);
+  }
+
+  let migrated = 0;
+  let skipped = 0;
+
+  for (const problem of store.problems) {
+    if (store.problemPackageRefs[problem.id]) {
+      skipped += 1;
+      continue;
+    }
+    const packageData = store.problemPackages[problem.id];
+    if (!packageData) {
+      skipped += 1;
+      continue;
+    }
+
+    const zipBuffer = buildProblemPackageZip({
+      title: problem.title,
+      slug: problem.slug,
+      visibility: problem.visibility,
+      explanationVisibility: problem.explanationVisibility,
+      difficulty: problem.difficulty,
+      testCaseVisibility: problem.testCaseVisibility,
+      statementMarkdown: problem.statementMarkdown,
+      inputDescription: problem.inputDescription,
+      outputDescription: problem.outputDescription,
+      constraintsMarkdown: problem.constraintsMarkdown,
+      explanationMarkdown: problem.explanationMarkdown,
+      timeLimitMs: problem.timeLimitMs,
+      memoryLimitMb: problem.memoryLimitMb,
+      draft: buildEditorDraftFromExtracted(packageData),
+    });
+
+    const storageRef = await putProblemPackageZip({
+      problemId: problem.id,
+      fileName: packageData.validation.fileName,
+      zipBuffer,
+    });
+
+    store.problemPackageRefs[problem.id] = storageRef;
+    migrated += 1;
+  }
+
+  await persistStoreSnapshotNow();
+  return { migrated, skipped };
 }
 
 export async function getJudgeQueueStatsForAdmin(): Promise<{

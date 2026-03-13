@@ -250,6 +250,26 @@ export function AdminConsole({
       </section>
 
       <section className="panel stack">
+        <h2 className="panel-title">Object Storage Migration</h2>
+        <p className="text-soft">
+          Embedded problem packages can be reconstructed as ZIP and uploaded to R2.
+        </p>
+        <div className="button-row">
+          <button
+            className="button"
+            disabled={busyKey === "/api/admin/storage/problem-packages/migrate"}
+            onClick={() =>
+              postJson("/api/admin/storage/problem-packages/migrate", {
+                reason: "admin package migration",
+              })
+            }
+          >
+            Migrate Problem ZIPs to R2
+          </button>
+        </div>
+      </section>
+
+      <section className="panel stack">
         <h2 className="panel-title">Reports</h2>
         <div className="table-wrap">
           <table className="table">

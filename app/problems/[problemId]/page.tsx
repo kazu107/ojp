@@ -35,7 +35,7 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
   }
 
   const canEditProblem = me ? canEditProblemByViewer(problem, me.id) : false;
-  const packageData = getProblemPackageData(problem.id);
+  const packageData = await getProblemPackageData(problem.id);
   const signInUrl = `/signin?callbackUrl=${encodeURIComponent(`/problems/${problem.id}`)}`;
 
   return (

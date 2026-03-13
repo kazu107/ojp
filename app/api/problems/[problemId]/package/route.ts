@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
 import { validateProblemPackage } from "@/lib/problem-package";
-import { applyProblemPackageValidation } from "@/lib/store";
+import { isProblemPackageObjectStorageEnabled, putProblemPackageZip } from "@/lib/problem-package-storage";
+import { applyProblemPackageValidation, getCurrentUser, getProblemById, HttpError } from "@/lib/store";
 
 interface ProblemPackageRouteContext {
   params: Promise<{
@@ -14,6 +15,14 @@ export const runtime = "nodejs";
 export async function POST(request: Request, { params }: ProblemPackageRouteContext) {
   try {
     const { problemId } = await params;
+    const actor = await getCurrentUser();
+    const problemRecord = getProblemById(problemId);
+    if (!problemRecord) {
+      throw new HttpError("problem not found", 404);
+    }
+    if (actor.role !== "admin" && problemRecord.authorId !== actor.id) {
+      throw new HttpError("you cannot upload package for this problem", 403);
+    }
 
     const formData = await request.formData();
     const file = formData.get("file");
@@ -26,7 +35,14 @@ export async function POST(request: Request, { params }: ProblemPackageRouteCont
 
     const zipBuffer = Buffer.from(await file.arrayBuffer());
     const extracted = validateProblemPackage(file.name, zipBuffer);
-    const problem = await applyProblemPackageValidation(problemId, extracted);
+    const storageRef = isProblemPackageObjectStorageEnabled()
+      ? await putProblemPackageZip({
+          problemId,
+          fileName: file.name,
+          zipBuffer,
+        })
+      : null;
+    const problem = await applyProblemPackageValidation(problemId, extracted, storageRef);
     return NextResponse.json({ package: extracted.validation, problem }, { status: 201 });
   } catch (error) {
     return errorResponse(error, "failed to validate problem package");

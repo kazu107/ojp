@@ -19,6 +19,7 @@
     "template:problem-zip": "node scripts/create-problem-package-template.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1008.0",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-java": "^6.0.2",
     "@codemirror/lang-javascript": "^6.2.5",
