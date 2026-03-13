@@ -17,10 +17,12 @@ import {
   canRequestRejudgeByViewer,
   findUser,
   getOptionalCurrentUser,
+  getProblemPackageData,
   getProblemById,
   getSubmissionWithAccess,
 } from "@/lib/store";
 import { Submission, SubmissionStatus } from "@/lib/types";
+import { isWaitingSubmissionStatus } from "@/lib/submission-status";
 
 interface SubmissionDetailPageProps {
   params: Promise<{
@@ -32,9 +34,26 @@ interface GroupedTestResults {
   groupName: string;
   verdict: SubmissionStatus;
   caseCount: number;
-  averageTimeMs: number;
+  maxTimeMs: number;
   peakMemoryKb: number;
   cases: Submission["testResults"];
+}
+
+function pickGroupedVerdict(results: Submission["testResults"]): SubmissionStatus {
+  const finalVerdicts = results
+    .map((entry) => entry.verdict)
+    .filter((status) => !isWaitingSubmissionStatus(status));
+
+  if (finalVerdicts.length === 0) {
+    return "queued";
+  }
+  if (finalVerdicts.some((status) => status !== "accepted")) {
+    return pickHighestPriorityVerdict(finalVerdicts);
+  }
+  if (results.some((entry) => isWaitingSubmissionStatus(entry.verdict))) {
+    return "queued";
+  }
+  return "accepted";
 }
 
 function groupTestResults(results: Submission["testResults"]): GroupedTestResults[] {
@@ -47,19 +66,96 @@ function groupTestResults(results: Submission["testResults"]): GroupedTestResult
 
   return [...grouped.entries()].map(([groupName, cases]) => ({
     groupName,
-    verdict: pickHighestPriorityVerdict(cases.map((entry) => entry.verdict)),
+    verdict: pickGroupedVerdict(cases),
     caseCount: cases.length,
-    averageTimeMs: cases.reduce((acc, entry) => acc + entry.timeMs, 0) / cases.length,
+    maxTimeMs: cases.reduce((max, entry) => Math.max(max, entry.timeMs), 0),
     peakMemoryKb: cases.reduce((max, entry) => Math.max(max, entry.memoryKb), 0),
     cases,
   }));
 }
 
-function formatAverageTimeMs(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
+function waitingResult(groupName: string, testCaseName: string): Submission["testResults"][number] {
+  return {
+    id: `waiting-${groupName}-${testCaseName}`,
+    groupName,
+    testCaseName,
+    verdict: "queued",
+    timeMs: 0,
+    memoryKb: 0,
+    message: "Waiting Judge",
+  };
+}
+
+function detailVerdictLabel(status: SubmissionStatus): string {
+  return isWaitingSubmissionStatus(status) ? "WJ" : submissionStatusLabel(status);
+}
+
+function buildDisplayResults(input: {
+  submission: Submission;
+  testCaseVisibility: "group_only" | "case_index_only" | "case_name_visible";
+  canViewSource: boolean;
+  packageData:
+    | Awaited<ReturnType<typeof getProblemPackageData>>
+    | null
+    | undefined;
+}): Submission["testResults"] {
+  const actualByKey = new Map(
+    input.submission.testResults.map((result) => [
+      `${result.groupName}::${result.testCaseName}`,
+      result,
+    ]),
+  );
+
+  if (!input.packageData) {
+    return input.submission.testResults;
   }
-  return value.toFixed(1);
+
+  const waiting = isWaitingSubmissionStatus(input.submission.status);
+  if (!waiting) {
+    return input.submission.testResults;
+  }
+
+  if (!input.canViewSource && input.testCaseVisibility === "group_only") {
+    return input.packageData.groups.map((group) => {
+      const groupActualResults = group.tests
+        .map((testCase) => actualByKey.get(`${group.name}::${testCase.name}`))
+        .filter((result): result is Submission["testResults"][number] => Boolean(result));
+      if (groupActualResults.length === 0) {
+        return waitingResult(group.name, "-");
+      }
+      const summaryVerdict = groupActualResults.some((result) => result.verdict !== "accepted")
+        ? pickHighestPriorityVerdict(groupActualResults.map((result) => result.verdict))
+        : "queued";
+      return {
+        id: `waiting-group-${group.name}`,
+        groupName: group.name,
+        testCaseName: "-",
+        verdict: summaryVerdict,
+        timeMs: groupActualResults.reduce((max, result) => Math.max(max, result.timeMs), 0),
+        memoryKb: groupActualResults.reduce((max, result) => Math.max(max, result.memoryKb), 0),
+        message:
+          groupActualResults.length === group.tests.length
+            ? "Judged"
+            : "Waiting Judge",
+      };
+    });
+  }
+
+  let caseIndex = 0;
+  return input.packageData.groups.flatMap((group) =>
+    group.tests.map((testCase) => {
+      caseIndex += 1;
+      const actual = actualByKey.get(`${group.name}::${testCase.name}`);
+      if (actual) {
+        return actual;
+      }
+      const visibleCaseName =
+        !input.canViewSource && input.testCaseVisibility === "case_index_only"
+          ? `#${caseIndex}`
+          : testCase.name;
+      return waitingResult(group.name, visibleCaseName);
+    }),
+  );
 }
 
 export default async function SubmissionDetailPage({ params }: SubmissionDetailPageProps) {
@@ -76,7 +172,14 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
   const user = findUser(submission.userId);
   const canRequestRejudge = me ? canRequestRejudgeByViewer(submission, me.id) : false;
   const testCaseVisibility = problem?.testCaseVisibility ?? "case_index_only";
-  const groupedResults = groupTestResults(submission.testResults);
+  const packageData = problem ? await getProblemPackageData(problem.id) : null;
+  const displayResults = buildDisplayResults({
+    submission,
+    testCaseVisibility,
+    canViewSource,
+    packageData,
+  });
+  const groupedResults = groupTestResults(displayResults);
   const canExpandCaseDetails = canViewSource || testCaseVisibility !== "group_only";
 
   return (
@@ -107,7 +210,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
         <SubmissionLiveRefresh status={submission.status} />
         <div className="meta-inline">
           <StatusBadge className={badgeClassForSubmission(submission.status)}>
-            {submissionStatusLabel(submission.status)}
+            {detailVerdictLabel(submission.status)}
           </StatusBadge>
           <span className="text-soft">
             Score: {submission.score} / Time: {submission.totalTimeMs} ms / Memory:{" "}
@@ -148,8 +251,8 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
           Visibility mode: {testCaseVisibilityLabel(testCaseVisibility)}
           {!canViewSource ? " (applied for non-owner viewers)" : ""}
         </p>
-        {submission.testResults.length === 0 ? (
-          <p className="empty">No per-test result yet. The submission is still being judged.</p>
+        {displayResults.length === 0 ? (
+          <p className="empty">No test result data is available.</p>
         ) : (
           <div className="stack">
             {groupedResults.map((group) => (
@@ -157,11 +260,11 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                 <summary className="result-group-summary">
                   <span className="kpi">{group.groupName}</span>
                   <StatusBadge className={badgeClassForSubmission(group.verdict)}>
-                    {submissionStatusLabel(group.verdict)}
+                    {detailVerdictLabel(group.verdict)}
                   </StatusBadge>
                   <span className="result-group-meta">Cases: {group.caseCount}</span>
                   <span className="result-group-meta">
-                    Time(avg): {formatAverageTimeMs(group.averageTimeMs)} ms
+                    Time(max): {group.maxTimeMs} ms
                   </span>
                   <span className="result-group-meta">Memory: {group.peakMemoryKb} KB</span>
                 </summary>
@@ -184,7 +287,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                               <td>{result.testCaseName}</td>
                               <td>
                                 <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                                  {submissionStatusLabel(result.verdict)}
+                                  {detailVerdictLabel(result.verdict)}
                                 </StatusBadge>
                               </td>
                               <td>{result.timeMs} ms</td>

@@ -417,6 +417,11 @@ export async function executePackageJudge(input: {
   packageData: ProblemPackageExtracted;
   nextTestResultId: () => string;
   onPhaseChange?: (status: "compiling" | "running" | "judging") => void;
+  onTestResult?: (params: {
+    result: Submission["testResults"][number];
+    totalTimeMs: number;
+    peakMemoryKb: number;
+  }) => void;
 }): Promise<JudgeResult> {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "ojp-judge-"));
   try {
@@ -526,7 +531,7 @@ export async function executePackageJudge(input: {
         });
         const runResult = executed.result;
 
-        totalTimeMs += runResult.durationMs;
+        totalTimeMs = Math.max(totalTimeMs, runResult.durationMs);
         peakMemoryKb = Math.max(peakMemoryKb, runResult.memoryKb);
 
         let verdict: SubmissionStatus = "accepted";
@@ -571,7 +576,7 @@ export async function executePackageJudge(input: {
           groupAccepted = false;
         }
 
-        results.push({
+        const nextResult = {
           id: input.nextTestResultId(),
           groupName: group.name,
           testCaseName: testCase.name,
@@ -579,6 +584,12 @@ export async function executePackageJudge(input: {
           timeMs: runResult.durationMs,
           memoryKb: runResult.memoryKb,
           message,
+        };
+        results.push(nextResult);
+        input.onTestResult?.({
+          result: nextResult,
+          totalTimeMs,
+          peakMemoryKb,
         });
       }
 

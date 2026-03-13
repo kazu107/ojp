@@ -1178,6 +1178,11 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       onPhaseChange: (phase) => {
         submission.status = phase;
       },
+      onTestResult: ({ result, totalTimeMs, peakMemoryKb }) => {
+        submission.testResults = [...submission.testResults, result];
+        submission.totalTimeMs = totalTimeMs;
+        submission.peakMemoryKb = peakMemoryKb;
+      },
     });
     submission.status = judged.status;
     submission.score = judged.score;
