@@ -81,7 +81,10 @@ function getR2Client(): S3Client {
 function sanitizeFileName(fileName: string): string {
   const trimmed = fileName.trim().toLowerCase();
   const normalized = trimmed.replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  return normalized || "problem-package.zip";
+  if (!normalized) {
+    return "problem-package.zip";
+  }
+  return normalized.endsWith(".zip") ? normalized : `${normalized}.zip`;
 }
 
 function buildObjectKey(problemId: string, fileName: string): string {

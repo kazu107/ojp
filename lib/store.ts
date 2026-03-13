@@ -1732,7 +1732,10 @@ async function loadProblemPackageData(problemId: string): Promise<ProblemPackage
   }
 
   const zipBuffer = await getProblemPackageZip(ref);
-  const fileName = ref.key.split("/").pop() ?? `${problemId}.zip`;
+  const storedFileName = ref.key.split("/").pop() ?? `${problemId}.zip`;
+  const fileName = storedFileName.toLowerCase().endsWith(".zip")
+    ? storedFileName
+    : `${storedFileName}.zip`;
   const extracted = validateProblemPackage(fileName, zipBuffer);
   store.problemPackages[problemId] = extracted;
   return extracted;
