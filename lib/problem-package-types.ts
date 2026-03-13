@@ -1,4 +1,9 @@
-import { Language } from "@/lib/types";
+import {
+  ExplanationVisibility,
+  Language,
+  TestCaseVisibility,
+  Visibility,
+} from "@/lib/types";
 
 export type ProblemPackageScoringType = "binary" | "sum_of_groups";
 export type ProblemPackageCompareMode = "exact" | "ignore_trailing_spaces";
@@ -46,6 +51,10 @@ export interface ProblemPackagePrefill {
   explanationMarkdown: string;
   timeLimitMs: number;
   memoryLimitMb: number;
+  visibility?: Visibility;
+  explanationVisibility?: ExplanationVisibility;
+  difficulty?: number | null;
+  testCaseVisibility?: TestCaseVisibility;
 }
 
 export interface ProblemPackageInspectResult {

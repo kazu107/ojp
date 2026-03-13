@@ -11,7 +11,12 @@ import {
   ProblemPackagePrefill,
   ProblemPackageScoringType,
 } from "@/lib/problem-package-types";
-import { Language } from "@/lib/types";
+import {
+  ExplanationVisibility,
+  Language,
+  TestCaseVisibility,
+  Visibility,
+} from "@/lib/types";
 
 const MAX_ZIP_BYTES = 64 * 1024 * 1024;
 const MAX_SINGLE_FILE_BYTES = 8 * 1024 * 1024;
@@ -45,6 +50,13 @@ interface ConfigSummary {
   checkerType: ProblemPackageCheckerType;
   checkerLanguage: Language | null;
   compareMode: ProblemPackageCompareMode;
+  problem: {
+    slug: string | null;
+    visibility: Visibility | null;
+    explanationVisibility: ExplanationVisibility | null;
+    difficulty: number | null;
+    testCaseVisibility: TestCaseVisibility | null;
+  };
   samples: ConfigSampleSummary[];
   groups: ConfigGroupSummary[];
 }
@@ -107,6 +119,13 @@ interface ParsedConfig {
   checkerLanguage: Language | null;
   checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
+  problemSettings: {
+    slug?: string;
+    visibility?: Visibility;
+    explanationVisibility?: ExplanationVisibility;
+    difficulty?: number | null;
+    testCaseVisibility?: TestCaseVisibility;
+  };
   samples: ParsedConfigSample[];
   groups: ParsedConfigGroup[];
   warnings: string[];
@@ -199,6 +218,31 @@ function parseCheckerLanguage(raw: unknown): Language {
     return raw;
   }
   throw new Error("config.checkerLanguage must be one of: cpp, python, java, javascript");
+}
+
+function parseVisibility(raw: unknown): Visibility {
+  if (raw === "public" || raw === "unlisted" || raw === "private") {
+    return raw;
+  }
+  throw new Error("config.problem.visibility must be one of: public, unlisted, private");
+}
+
+function parseExplanationVisibility(raw: unknown): ExplanationVisibility {
+  if (raw === "always" || raw === "contest_end" || raw === "private") {
+    return raw;
+  }
+  throw new Error(
+    "config.problem.explanationVisibility must be one of: always, contest_end, private",
+  );
+}
+
+function parseTestCaseVisibility(raw: unknown): TestCaseVisibility {
+  if (raw === "group_only" || raw === "case_index_only" || raw === "case_name_visible") {
+    return raw;
+  }
+  throw new Error(
+    "config.problem.testCaseVisibility must be one of: group_only, case_index_only, case_name_visible",
+  );
 }
 
 function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
@@ -333,6 +377,41 @@ function parseConfig(configJson: unknown): ParsedConfig {
     checkerLanguage = parseCheckerLanguage(config.checkerLanguage);
   }
 
+  const problemSettings: ParsedConfig["problemSettings"] = {};
+  if (config.problem !== undefined) {
+    if (!config.problem || typeof config.problem !== "object") {
+      throw new Error("config.problem must be an object when provided");
+    }
+    const problem = config.problem as Record<string, unknown>;
+    if (problem.slug !== undefined) {
+      if (typeof problem.slug !== "string" || !problem.slug.trim()) {
+        throw new Error("config.problem.slug must be a non-empty string");
+      }
+      problemSettings.slug = problem.slug.trim();
+    }
+    if (problem.visibility !== undefined) {
+      problemSettings.visibility = parseVisibility(problem.visibility);
+    }
+    if (problem.explanationVisibility !== undefined) {
+      problemSettings.explanationVisibility = parseExplanationVisibility(
+        problem.explanationVisibility,
+      );
+    }
+    if (problem.difficulty !== undefined) {
+      if (problem.difficulty === null || problem.difficulty === "") {
+        problemSettings.difficulty = null;
+      } else {
+        problemSettings.difficulty = parseNonNegativeInteger(
+          problem.difficulty,
+          "config.problem.difficulty",
+        );
+      }
+    }
+    if (problem.testCaseVisibility !== undefined) {
+      problemSettings.testCaseVisibility = parseTestCaseVisibility(problem.testCaseVisibility);
+    }
+  }
+
   if (!Array.isArray(config.groups) || config.groups.length === 0) {
     throw new Error("config.groups must be a non-empty array");
   }
@@ -382,6 +461,7 @@ function parseConfig(configJson: unknown): ParsedConfig {
     checkerLanguage,
     checkerSourceCode: null,
     compareMode: resolveCompareMode(config),
+    problemSettings,
     samples,
     groups,
     warnings,
@@ -643,6 +723,16 @@ export function validateProblemPackage(
       checkerType: config.checkerType,
       checkerLanguage: config.checkerLanguage,
       compareMode: config.compareMode,
+      problem: {
+        slug: config.problemSettings.slug ?? null,
+        visibility: config.problemSettings.visibility ?? null,
+        explanationVisibility: config.problemSettings.explanationVisibility ?? null,
+        difficulty:
+          config.problemSettings.difficulty === undefined
+            ? null
+            : config.problemSettings.difficulty,
+        testCaseVisibility: config.problemSettings.testCaseVisibility ?? null,
+      },
       samples: samples.map((sample) => ({
         name: sample.name,
         description: sample.description,
@@ -702,6 +792,11 @@ function buildPrefillFromStatement(
   options: {
     timeLimitMs: number;
     memoryLimitMb: number;
+    visibility?: Visibility;
+    explanationVisibility?: ExplanationVisibility;
+    difficulty?: number | null;
+    testCaseVisibility?: TestCaseVisibility;
+    slug?: string;
   },
 ): ProblemPackagePrefill {
   const normalized = statementMarkdown.replace(/\r\n/g, "\n");
@@ -753,7 +848,7 @@ function buildPrefillFromStatement(
 
   return {
     title,
-    slugSuggestion: title ? toSlugSuggestion(title) : "",
+    slugSuggestion: options.slug || (title ? toSlugSuggestion(title) : ""),
     statementMarkdown: statementBody || fallbackStatement,
     inputDescription,
     outputDescription,
@@ -761,6 +856,10 @@ function buildPrefillFromStatement(
     explanationMarkdown,
     timeLimitMs: options.timeLimitMs,
     memoryLimitMb: options.memoryLimitMb,
+    visibility: options.visibility,
+    explanationVisibility: options.explanationVisibility,
+    difficulty: options.difficulty,
+    testCaseVisibility: options.testCaseVisibility,
   };
 }
 
@@ -968,6 +1067,13 @@ export function buildProblemPackageFromEditorDraft(input: {
         checkerType,
         checkerLanguage,
         compareMode,
+        problem: {
+          slug: null,
+          visibility: null,
+          explanationVisibility: null,
+          difficulty: null,
+          testCaseVisibility: null,
+        },
         samples: samples.map((sample) => ({
           name: sample.name,
           description: sample.description,
@@ -1007,7 +1113,146 @@ export function inspectProblemPackage(
     prefill: buildPrefillFromStatement(statementMarkdown, {
       timeLimitMs: extracted.validation.config.timeLimitMs,
       memoryLimitMb: extracted.validation.config.memoryLimitMb,
+      visibility: extracted.validation.config.problem.visibility ?? undefined,
+      explanationVisibility:
+        extracted.validation.config.problem.explanationVisibility ?? undefined,
+      difficulty: extracted.validation.config.problem.difficulty,
+      testCaseVisibility:
+        extracted.validation.config.problem.testCaseVisibility ?? undefined,
+      slug: extracted.validation.config.problem.slug ?? undefined,
     }),
     draft: buildEditorDraftFromExtracted(extracted),
   };
+}
+
+export function buildProblemStatementMarkdown(input: {
+  title: string;
+  statementMarkdown: string;
+  inputDescription: string;
+  outputDescription: string;
+  constraintsMarkdown: string;
+  explanationMarkdown: string;
+}): string {
+  const parts = [
+    `# ${input.title.trim() || "Untitled Problem"}`,
+    "",
+    input.statementMarkdown.trim(),
+    "",
+    "## Input",
+    input.inputDescription.trim(),
+    "",
+    "## Output",
+    input.outputDescription.trim(),
+    "",
+    "## Constraints",
+    input.constraintsMarkdown.trim(),
+  ];
+
+  if (input.explanationMarkdown.trim()) {
+    parts.push("", "## Explanation", input.explanationMarkdown.trim());
+  }
+
+  return `${parts.join("\n")}\n`;
+}
+
+export function buildProblemPackageZip(input: {
+  title: string;
+  slug: string;
+  visibility: Visibility;
+  explanationVisibility: ExplanationVisibility;
+  difficulty: number | null;
+  testCaseVisibility: TestCaseVisibility;
+  statementMarkdown: string;
+  inputDescription: string;
+  outputDescription: string;
+  constraintsMarkdown: string;
+  explanationMarkdown: string;
+  timeLimitMs: number;
+  memoryLimitMb: number;
+  draft: ProblemPackageEditorDraft;
+}): Buffer {
+  const extracted = buildProblemPackageFromEditorDraft({
+    sourceLabel: input.draft.sourceLabel,
+    checkerType: input.draft.checkerType,
+    checkerLanguage: input.draft.checkerLanguage,
+    checkerSourceCode: input.draft.checkerSourceCode,
+    compareMode: input.draft.compareMode,
+    zipSizeBytes: input.draft.zipSizeBytes,
+    fileCount: input.draft.fileCount,
+    samples: input.draft.samples,
+    warnings: input.draft.warnings,
+    timeLimitMs: input.timeLimitMs,
+    memoryLimitMb: input.memoryLimitMb,
+    groups: input.draft.groups,
+  });
+
+  const config = {
+    timeLimitMs: input.timeLimitMs,
+    memoryLimitMb: input.memoryLimitMb,
+    scoringType: extracted.scoringType,
+    checkerType: extracted.checkerType,
+    checkerLanguage: extracted.checkerLanguage,
+    compareMode: extracted.compareMode,
+    problem: {
+      slug: input.slug,
+      visibility: input.visibility,
+      explanationVisibility: input.explanationVisibility,
+      difficulty: input.difficulty,
+      testCaseVisibility: input.testCaseVisibility,
+    },
+    samples: extracted.samples.map((sample) => ({
+      name: sample.name,
+      description: sample.description,
+    })),
+    groups: extracted.groups.map((group) =>
+      extracted.scoringType === "sum_of_groups"
+        ? {
+            name: group.name,
+            score: group.score,
+          }
+        : group.name,
+    ),
+  };
+
+  const zip = new AdmZip();
+  zip.addFile(
+    "statement.md",
+    Buffer.from(
+      buildProblemStatementMarkdown({
+        title: input.title,
+        statementMarkdown: input.statementMarkdown,
+        inputDescription: input.inputDescription,
+        outputDescription: input.outputDescription,
+        constraintsMarkdown: input.constraintsMarkdown,
+        explanationMarkdown: input.explanationMarkdown,
+      }),
+      "utf8",
+    ),
+  );
+  zip.addFile("config.json", Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8"));
+
+  for (const sample of extracted.samples) {
+    zip.addFile(`samples/${sample.name}.in`, Buffer.from(sample.input, "utf8"));
+    zip.addFile(`samples/${sample.name}.out`, Buffer.from(sample.output, "utf8"));
+  }
+
+  for (const group of extracted.groups) {
+    for (const testCase of group.tests) {
+      zip.addFile(`tests/${group.name}/${testCase.name}.in`, Buffer.from(testCase.input, "utf8"));
+      zip.addFile(`tests/${group.name}/${testCase.name}.out`, Buffer.from(testCase.output, "utf8"));
+    }
+  }
+
+  if (
+    extracted.checkerType === "special_judge" &&
+    extracted.checkerLanguage &&
+    extracted.checkerSourceCode
+  ) {
+    zip.addFile(
+      checkerSourceFileName(extracted.checkerLanguage),
+      Buffer.from(extracted.checkerSourceCode, "utf8"),
+    );
+  }
+
+  return zip.toBuffer();
 }

@@ -423,6 +423,13 @@ function createInitialStore(): Store {
           checkerType: "exact",
           checkerLanguage: null,
           compareMode: "exact",
+          problem: {
+            slug: null,
+            visibility: null,
+            explanationVisibility: null,
+            difficulty: null,
+            testCaseVisibility: null,
+          },
           samples: [
             { name: "sample1", description: "" },
             { name: "sample2", description: "" },
@@ -485,6 +492,13 @@ function createInitialStore(): Store {
           checkerType: "exact",
           checkerLanguage: null,
           compareMode: "exact",
+          problem: {
+            slug: null,
+            visibility: null,
+            explanationVisibility: null,
+            difficulty: null,
+            testCaseVisibility: null,
+          },
           samples: [
             { name: "sample1", description: "" },
             { name: "sample2", description: "" },
