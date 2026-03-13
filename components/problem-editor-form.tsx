@@ -36,6 +36,8 @@ type ProblemEditorFormProps =
       initialPackageDraft?: ProblemPackageEditorDraft | null;
     };
 
+type EditorTab = "content" | "settings" | "tests" | "testrun";
+
 interface FormState {
   title: string;
   slug: string;
@@ -155,11 +157,15 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const [form, setForm] = useState<FormState>(
     props.mode === "edit" ? stateFromProblem(props.initialProblem) : emptyState(),
   );
+  const [activeTab, setActiveTab] = useState<EditorTab>("content");
   const [isSaving, setIsSaving] = useState(false);
   const [isInspectingPackage, setIsInspectingPackage] = useState(false);
+  const [isExportingPackage, setIsExportingPackage] = useState(false);
+  const [isRunningPreview, setIsRunningPreview] = useState(false);
   const [error, setError] = useState<string>("");
   const [packageError, setPackageError] = useState<string>("");
   const [packageNotice, setPackageNotice] = useState<string>("");
+  const [previewError, setPreviewError] = useState("");
   const [packageDraft, setPackageDraft] = useState<ProblemPackageEditorDraft | null>(
     props.initialPackageDraft ?? null,
   );
@@ -167,8 +173,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const [previewDraftsByLanguage, setPreviewDraftsByLanguage] = useState<Record<Language, string>>(
     SOURCE_CODE_TEMPLATES,
   );
-  const [isRunningPreview, setIsRunningPreview] = useState(false);
-  const [previewError, setPreviewError] = useState("");
   const [previewResult, setPreviewResult] = useState<PackageTestPreviewResult | null>(null);
   const [createdProblemId, setCreatedProblemId] = useState<string | null>(null);
 
@@ -222,6 +226,17 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         explanationMarkdown: inspected.prefill.explanationMarkdown,
         timeLimitMs: inspected.prefill.timeLimitMs,
         memoryLimitMb: inspected.prefill.memoryLimitMb,
+        visibility: inspected.prefill.visibility ?? prev.visibility,
+        explanationVisibility:
+          inspected.prefill.explanationVisibility ?? prev.explanationVisibility,
+        difficulty:
+          inspected.prefill.difficulty === undefined
+            ? prev.difficulty
+            : inspected.prefill.difficulty === null
+              ? ""
+              : String(inspected.prefill.difficulty),
+        testCaseVisibility:
+          inspected.prefill.testCaseVisibility ?? prev.testCaseVisibility,
       }));
       setPackageDraft(inspected.draft);
       setPackageNotice(`Imported ${inspected.package.fileName} and filled the form fields.`);
@@ -354,12 +369,69 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     }
   }
 
+  async function downloadPackageZip() {
+    if (!packageDraft) {
+      setPackageError("Judge package is required before downloading ZIP.");
+      return;
+    }
+
+    setIsExportingPackage(true);
+    setPackageError("");
+
+    try {
+      const response = await fetch("/api/problem-packages/export", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: form.title,
+          slug: form.slug,
+          statementMarkdown: form.statementMarkdown,
+          inputDescription: form.inputDescription,
+          outputDescription: form.outputDescription,
+          constraintsMarkdown: form.constraintsMarkdown,
+          explanationMarkdown: form.explanationMarkdown,
+          visibility: form.visibility,
+          explanationVisibility: form.explanationVisibility,
+          difficulty:
+            form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
+          testCaseVisibility: form.testCaseVisibility,
+          timeLimitMs: form.timeLimitMs,
+          memoryLimitMb: form.memoryLimitMb,
+          draft: packageDraft,
+        }),
+      });
+      if (!response.ok) {
+        const message = await parseErrorMessage(response, "failed to export problem package");
+        throw new Error(message);
+      }
+
+      const zipBlob = await response.blob();
+      const url = URL.createObjectURL(zipBlob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${form.slug.trim() || "problem-package"}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      setPackageError(
+        exportError instanceof Error ? exportError.message : "failed to export problem package",
+      );
+    } finally {
+      setIsExportingPackage(false);
+    }
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.statementMarkdown.trim()) {
       setError("Statement is required.");
       return;
     }
+
     const parsedDifficulty = parseDifficultyInput(form.difficulty);
     if (!parsedDifficulty.ok) {
       setError(parsedDifficulty.message);
@@ -404,362 +476,417 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
   return (
     <form className="form" onSubmit={onSubmit}>
-      <div className="form-grid">
-        <label className="field">
-          <span className="field-label">Title</span>
-          <input
-            className="input"
-            required
-            value={form.title}
-            onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-            placeholder="A - Sample Problem"
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">Slug</span>
-          <input
-            className="input"
-            required
-            value={form.slug}
-            onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
-            placeholder="a-sample-problem"
-          />
-        </label>
-      </div>
-
-      <div className="field">
-        <span className="field-label">Statement (Markdown)</span>
-        <CodeEditor
-          language="markdown"
-          minHeight={260}
-          value={form.statementMarkdown}
-          onChange={(value) => setForm((prev) => ({ ...prev, statementMarkdown: value }))}
-        />
-        <div className="markdown-preview">
-          <span className="field-label">Live Preview</span>
-          <div className="panel stack">
-            <MarkdownBlock text={form.statementMarkdown || "_No preview yet._"} />
-          </div>
-        </div>
-      </div>
-
-      <div className="form-grid">
-        <label className="field">
-          <span className="field-label">Input Description</span>
-          <textarea
-            className="textarea"
-            required
-            value={form.inputDescription}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, inputDescription: event.target.value }))
-            }
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">Output Description</span>
-          <textarea
-            className="textarea"
-            required
-            value={form.outputDescription}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, outputDescription: event.target.value }))
-            }
-          />
-        </label>
-      </div>
-
-      <div className="form-grid">
-        <label className="field">
-          <span className="field-label">Constraints</span>
-          <textarea
-            className="textarea"
-            required
-            value={form.constraintsMarkdown}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, constraintsMarkdown: event.target.value }))
-            }
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">Explanation</span>
-          <textarea
-            className="textarea"
-            value={form.explanationMarkdown}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, explanationMarkdown: event.target.value }))
-            }
-          />
-        </label>
-      </div>
-
-      <div className="form-grid">
-        <label className="field">
-          <span className="field-label">Visibility</span>
-          <select
-            className="select"
-            value={form.visibility}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, visibility: event.target.value as Visibility }))
-            }
-          >
-            <option value="public">Public</option>
-            <option value="unlisted">Unlisted</option>
-            <option value="private">Private</option>
-          </select>
-        </label>
-        <label className="field">
-          <span className="field-label">Explanation Visibility</span>
-          <select
-            className="select"
-            value={form.explanationVisibility}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                explanationVisibility: event.target.value as ExplanationVisibility,
-              }))
-            }
-          >
-            <option value="always">always</option>
-            <option value="contest_end">contest_end</option>
-            <option value="private">private (default)</option>
-          </select>
-        </label>
-        <label className="field">
-          <span className="field-label">Difficulty (AtCoder rating)</span>
-          <input
-            className="input"
-            type="number"
-            step={1}
-            value={form.difficulty}
-            onChange={(event) => setForm((prev) => ({ ...prev, difficulty: event.target.value }))}
-            placeholder="800"
-          />
-          <p className="text-soft">Optional integer value (for example: 400, 800, 1200).</p>
-        </label>
-        <label className="field">
-          <span className="field-label">Time Limit (ms)</span>
-          <input
-            className="input"
-            type="number"
-            min={1}
-            value={form.timeLimitMs}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, timeLimitMs: Number(event.target.value) }))
-            }
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">Memory Limit (MB)</span>
-          <input
-            className="input"
-            type="number"
-            min={1}
-            value={form.memoryLimitMb}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, memoryLimitMb: Number(event.target.value) }))
-            }
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">Test Case Visibility</span>
-          <select
-            className="select"
-            value={form.testCaseVisibility}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                testCaseVisibility: event.target.value as TestCaseVisibility,
-              }))
-            }
-          >
-            <option value="group_only">group_only</option>
-            <option value="case_index_only">case_index_only (default)</option>
-            <option value="case_name_visible">case_name_visible</option>
-          </select>
-          <p className="text-soft">
-            Use `case_name_visible` only when needed to avoid leaking hidden test intent.
-          </p>
-        </label>
-      </div>
-
       <section className="panel stack">
-        <div>
-          <h2 className="panel-title">Judge Package</h2>
-          <p className="panel-subtitle">
-            Import ZIP to auto-fill the form, or build groups and test cases manually on this page.
-          </p>
-        </div>
-
-        <label className="field">
-          <span className="field-label">Import ZIP</span>
-          <input
-            className="input"
-            type="file"
-            accept=".zip,application/zip"
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              if (file) {
-                void inspectPackage(file);
-              }
-            }}
-          />
-          <p className="text-soft">
-            Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields,
-            and converts its tests into the editor below.
-          </p>
-        </label>
-
-        <div className="button-row">
-          {!packageDraft ? (
-            <button
-              type="button"
-              className="button"
-              onClick={() => {
-                setPackageDraft(createBlankPackageDraft());
-                setPackageNotice("Started a blank manual package.");
-                setPackageError("");
-              }}
-            >
-              Start Manual Package
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="button button-secondary"
-                onClick={() => {
-                  setPackageDraft(createBlankPackageDraft());
-                  setPackageNotice("Reset the package editor to a blank template.");
-                  setPackageError("");
-                }}
-              >
-                Reset to Blank
-              </button>
-              <button
-                type="button"
-                className="button button-secondary"
-                onClick={() => {
-                  setPackageDraft(null);
-                  setPackageNotice(
-                    props.mode === "edit"
-                      ? "Package editor disabled. Existing package stays unchanged on save."
-                      : "Package editor cleared. This problem will be created without a package.",
-                  );
-                  setPackageError("");
-                }}
-              >
-                Clear Package
-              </button>
-            </>
-          )}
-        </div>
-
-        {isInspectingPackage ? <p className="badge badge-blue">Inspecting ZIP...</p> : null}
-        {packageNotice ? <p className="badge badge-blue">{packageNotice}</p> : null}
-        {packageError ? <p className="badge badge-red">{packageError}</p> : null}
-
-        {packageDraft ? (
-          <ProblemPackageDraftEditor draft={packageDraft} onChange={setPackageDraft} />
-        ) : (
-          <p className="empty">
-            No package is attached yet. Start from a blank manual package or import a ZIP.
-          </p>
-        )}
-      </section>
-
-      <section className="panel stack">
-        <div>
-          <h2 className="panel-title">Package Test Run</h2>
-          <p className="panel-subtitle">
-            現在のテストケースと special judge 設定を使って、保存前にコードを試せます。
-          </p>
-        </div>
-
-        <label className="field">
-          <span className="field-label">Language</span>
-          <select
-            className="select"
-            value={previewLanguage}
-            onChange={(event) => setPreviewLanguage(event.target.value as Language)}
-          >
-            <option value="cpp">cpp</option>
-            <option value="python">python</option>
-            <option value="java">java</option>
-            <option value="javascript">javascript</option>
-          </select>
-        </label>
-
-        <div className="field">
-          <span className="field-label">Source Code</span>
-          <CodeEditor
-            language={previewLanguage}
-            minHeight={300}
-            value={previewDraftsByLanguage[previewLanguage] ?? ""}
-            onChange={(value) =>
-              setPreviewDraftsByLanguage((current) => ({
-                ...current,
-                [previewLanguage]: value,
-              }))
-            }
-          />
-        </div>
-
         <div className="button-row">
           <button
             type="button"
-            className="button"
-            onClick={() => void runPackagePreview()}
-            disabled={isRunningPreview || !packageDraft}
+            className={activeTab === "content" ? "button" : "button button-secondary"}
+            onClick={() => setActiveTab("content")}
           >
-            {isRunningPreview ? "Running..." : "Run Test"}
+            問題文など
+          </button>
+          <button
+            type="button"
+            className={activeTab === "settings" ? "button" : "button button-secondary"}
+            onClick={() => setActiveTab("settings")}
+          >
+            問題の設定など
+          </button>
+          <button
+            type="button"
+            className={activeTab === "tests" ? "button" : "button button-secondary"}
+            onClick={() => setActiveTab("tests")}
+          >
+            テストケース
+          </button>
+          <button
+            type="button"
+            className={activeTab === "testrun" ? "button" : "button button-secondary"}
+            onClick={() => setActiveTab("testrun")}
+          >
+            テスト run
           </button>
         </div>
+      </section>
 
-        {previewError ? <p className="badge badge-red">{previewError}</p> : null}
+      {activeTab === "content" ? (
+        <section className="stack">
+          <div className="form-grid">
+            <label className="field">
+              <span className="field-label">Title</span>
+              <input
+                className="input"
+                required
+                value={form.title}
+                onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="A - Sample Problem"
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Slug</span>
+              <input
+                className="input"
+                required
+                value={form.slug}
+                onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
+                placeholder="a-sample-problem"
+              />
+            </label>
+          </div>
 
-        {previewResult ? (
-          <div className="stack">
-            <div className="meta-inline">
-              <StatusBadge className={badgeClassForSubmission(previewResult.status)}>
-                {submissionStatusLabel(previewResult.status)}
-              </StatusBadge>
-              <span className="text-soft">Score: {previewResult.score}</span>
-              <span className="text-soft">Time: {previewResult.totalTimeMs} ms</span>
-              <span className="text-soft">Memory: {previewResult.peakMemoryKb} KB</span>
-            </div>
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Group</th>
-                    <th>Case</th>
-                    <th>Verdict</th>
-                    <th>Time</th>
-                    <th>Memory</th>
-                    <th>Message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewResult.testResults.map((result) => (
-                    <tr key={result.id}>
-                      <td>{result.groupName}</td>
-                      <td>{result.testCaseName}</td>
-                      <td>
-                        <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                          {submissionStatusLabel(result.verdict)}
-                        </StatusBadge>
-                      </td>
-                      <td>{result.timeMs} ms</td>
-                      <td>{result.memoryKb} KB</td>
-                      <td>{result.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="field">
+            <span className="field-label">Statement (Markdown)</span>
+            <CodeEditor
+              language="markdown"
+              minHeight={260}
+              value={form.statementMarkdown}
+              onChange={(value) => setForm((prev) => ({ ...prev, statementMarkdown: value }))}
+            />
+            <div className="markdown-preview">
+              <span className="field-label">Live Preview</span>
+              <div className="panel stack">
+                <MarkdownBlock text={form.statementMarkdown || "_No preview yet._"} />
+              </div>
             </div>
           </div>
-        ) : null}
-      </section>
+
+          <div className="form-grid">
+            <label className="field">
+              <span className="field-label">Input Description</span>
+              <textarea
+                className="textarea"
+                required
+                value={form.inputDescription}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, inputDescription: event.target.value }))
+                }
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Output Description</span>
+              <textarea
+                className="textarea"
+                required
+                value={form.outputDescription}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, outputDescription: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+
+          <div className="form-grid">
+            <label className="field">
+              <span className="field-label">Constraints</span>
+              <textarea
+                className="textarea"
+                required
+                value={form.constraintsMarkdown}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, constraintsMarkdown: event.target.value }))
+                }
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Explanation</span>
+              <textarea
+                className="textarea"
+                value={form.explanationMarkdown}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, explanationMarkdown: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "settings" ? (
+        <section className="stack">
+          <div className="form-grid">
+            <label className="field">
+              <span className="field-label">Visibility</span>
+              <select
+                className="select"
+                value={form.visibility}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, visibility: event.target.value as Visibility }))
+                }
+              >
+                <option value="public">Public</option>
+                <option value="unlisted">Unlisted</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">Explanation Visibility</span>
+              <select
+                className="select"
+                value={form.explanationVisibility}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    explanationVisibility: event.target.value as ExplanationVisibility,
+                  }))
+                }
+              >
+                <option value="always">always</option>
+                <option value="contest_end">contest_end</option>
+                <option value="private">private (default)</option>
+              </select>
+            </label>
+            <label className="field">
+              <span className="field-label">Difficulty (AtCoder rating)</span>
+              <input
+                className="input"
+                type="number"
+                step={1}
+                value={form.difficulty}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, difficulty: event.target.value }))
+                }
+                placeholder="800"
+              />
+              <p className="text-soft">Optional integer value (for example: 400, 800, 1200).</p>
+            </label>
+            <label className="field">
+              <span className="field-label">Time Limit (ms)</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={form.timeLimitMs}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, timeLimitMs: Number(event.target.value) }))
+                }
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Memory Limit (MB)</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={form.memoryLimitMb}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, memoryLimitMb: Number(event.target.value) }))
+                }
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Test Case Visibility</span>
+              <select
+                className="select"
+                value={form.testCaseVisibility}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    testCaseVisibility: event.target.value as TestCaseVisibility,
+                  }))
+                }
+              >
+                <option value="group_only">group_only</option>
+                <option value="case_index_only">case_index_only (default)</option>
+                <option value="case_name_visible">case_name_visible</option>
+              </select>
+              <p className="text-soft">
+                Use `case_name_visible` only when needed to avoid leaking hidden test intent.
+              </p>
+            </label>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "tests" ? (
+        <section className="panel stack">
+          <div>
+            <h2 className="panel-title">Judge Package</h2>
+            <p className="panel-subtitle">
+              ZIP import / export と、サンプル・グループ・ケース・checker 設定をここで管理します。
+            </p>
+          </div>
+
+          <label className="field">
+            <span className="field-label">Import ZIP</span>
+            <input
+              className="input"
+              type="file"
+              accept=".zip,application/zip"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (file) {
+                  void inspectPackage(file);
+                }
+              }}
+            />
+            <p className="text-soft">
+              Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields,
+              and converts its tests into the editor below.
+            </p>
+          </label>
+
+          <div className="button-row">
+            {!packageDraft ? (
+              <button
+                type="button"
+                className="button"
+                onClick={() => {
+                  setPackageDraft(createBlankPackageDraft());
+                  setPackageNotice("Started a blank manual package.");
+                  setPackageError("");
+                }}
+              >
+                Start Manual Package
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => {
+                    setPackageDraft(createBlankPackageDraft());
+                    setPackageNotice("Reset the package editor to a blank template.");
+                    setPackageError("");
+                  }}
+                >
+                  Reset to Blank
+                </button>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => {
+                    setPackageDraft(null);
+                    setPackageNotice(
+                      props.mode === "edit"
+                        ? "Package editor disabled. Existing package stays unchanged on save."
+                        : "Package editor cleared. This problem will be created without a package.",
+                    );
+                    setPackageError("");
+                  }}
+                >
+                  Clear Package
+                </button>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => void downloadPackageZip()}
+                  disabled={isExportingPackage}
+                >
+                  {isExportingPackage ? "Exporting..." : "Download ZIP"}
+                </button>
+              </>
+            )}
+          </div>
+
+          {isInspectingPackage ? <p className="badge badge-blue">Inspecting ZIP...</p> : null}
+          {packageNotice ? <p className="badge badge-blue">{packageNotice}</p> : null}
+          {packageError ? <p className="badge badge-red">{packageError}</p> : null}
+
+          {packageDraft ? (
+            <ProblemPackageDraftEditor draft={packageDraft} onChange={setPackageDraft} />
+          ) : (
+            <p className="empty">
+              No package is attached yet. Start from a blank manual package or import a ZIP.
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      {activeTab === "testrun" ? (
+        <section className="panel stack">
+          <div>
+            <h2 className="panel-title">Package Test Run</h2>
+            <p className="panel-subtitle">
+              現在のテストケースと special judge 設定を使って、保存前にコードを試せます。
+            </p>
+          </div>
+
+          <label className="field">
+            <span className="field-label">Language</span>
+            <select
+              className="select"
+              value={previewLanguage}
+              onChange={(event) => setPreviewLanguage(event.target.value as Language)}
+            >
+              <option value="cpp">cpp</option>
+              <option value="python">python</option>
+              <option value="java">java</option>
+              <option value="javascript">javascript</option>
+            </select>
+          </label>
+
+          <div className="field">
+            <span className="field-label">Source Code</span>
+            <CodeEditor
+              language={previewLanguage}
+              minHeight={300}
+              value={previewDraftsByLanguage[previewLanguage] ?? ""}
+              onChange={(value) =>
+                setPreviewDraftsByLanguage((current) => ({
+                  ...current,
+                  [previewLanguage]: value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="button-row">
+            <button
+              type="button"
+              className="button"
+              onClick={() => void runPackagePreview()}
+              disabled={isRunningPreview || !packageDraft}
+            >
+              {isRunningPreview ? "Running..." : "Run Test"}
+            </button>
+          </div>
+
+          {previewError ? <p className="badge badge-red">{previewError}</p> : null}
+
+          {previewResult ? (
+            <div className="stack">
+              <div className="meta-inline">
+                <StatusBadge className={badgeClassForSubmission(previewResult.status)}>
+                  {submissionStatusLabel(previewResult.status)}
+                </StatusBadge>
+                <span className="text-soft">Score: {previewResult.score}</span>
+                <span className="text-soft">Time: {previewResult.totalTimeMs} ms</span>
+                <span className="text-soft">Memory: {previewResult.peakMemoryKb} KB</span>
+              </div>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Group</th>
+                      <th>Case</th>
+                      <th>Verdict</th>
+                      <th>Time</th>
+                      <th>Memory</th>
+                      <th>Message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewResult.testResults.map((result) => (
+                      <tr key={result.id}>
+                        <td>{result.groupName}</td>
+                        <td>{result.testCaseName}</td>
+                        <td>
+                          <StatusBadge className={badgeClassForSubmission(result.verdict)}>
+                            {submissionStatusLabel(result.verdict)}
+                          </StatusBadge>
+                        </td>
+                        <td>{result.timeMs} ms</td>
+                        <td>{result.memoryKb} KB</td>
+                        <td>{result.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {error ? <p className="badge badge-red">{error}</p> : null}
       {props.mode === "create" && createdProblemId ? (
