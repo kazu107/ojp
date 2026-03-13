@@ -7,6 +7,7 @@ import { CodeEditor } from "@/components/code-editor";
 import { MarkdownBlock } from "@/components/markdown-block";
 import { ProblemPackageDraftEditor } from "@/components/problem-package-draft-editor";
 import { CHECKER_SOURCE_TEMPLATES } from "@/lib/checker-source-templates";
+import { buildProblemPackageZipBlob } from "@/lib/problem-package-client-zip";
 import { StatusBadge } from "@/components/status-badge";
 import { badgeClassForSubmission, submissionStatusLabel } from "@/lib/presentation";
 import { SOURCE_CODE_TEMPLATES } from "@/lib/source-code-templates";
@@ -254,38 +255,23 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       return;
     }
 
-    const exportResponse = await fetch("/api/problem-packages/export", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        title: form.title,
-        slug: form.slug,
-        statementMarkdown: form.statementMarkdown,
-        inputDescription: form.inputDescription,
-        outputDescription: form.outputDescription,
-        constraintsMarkdown: form.constraintsMarkdown,
-        explanationMarkdown: form.explanationMarkdown,
-        visibility: form.visibility,
-        explanationVisibility: form.explanationVisibility,
-        difficulty:
-          form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
-        testCaseVisibility: form.testCaseVisibility,
-        timeLimitMs: form.timeLimitMs,
-        memoryLimitMb: form.memoryLimitMb,
-        draft: packageDraft,
-      }),
+    const zipBlob = await buildProblemPackageZipBlob({
+      title: form.title,
+      slug: form.slug,
+      statementMarkdown: form.statementMarkdown,
+      inputDescription: form.inputDescription,
+      outputDescription: form.outputDescription,
+      constraintsMarkdown: form.constraintsMarkdown,
+      explanationMarkdown: form.explanationMarkdown,
+      visibility: form.visibility,
+      explanationVisibility: form.explanationVisibility,
+      difficulty:
+        form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
+      testCaseVisibility: form.testCaseVisibility,
+      timeLimitMs: form.timeLimitMs,
+      memoryLimitMb: form.memoryLimitMb,
+      draft: packageDraft,
     });
-    if (!exportResponse.ok) {
-      const exportMessage = await parseErrorMessage(
-        exportResponse,
-        "failed to export problem package",
-      );
-      throw new Error(exportMessage);
-    }
-
-    const zipBlob = await exportResponse.blob();
     const formData = new FormData();
     formData.set(
       "file",
@@ -326,42 +312,38 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     setPreviewResult(null);
 
     try {
+      const zipBlob = await buildProblemPackageZipBlob({
+        title: form.title,
+        slug: form.slug,
+        statementMarkdown: form.statementMarkdown,
+        inputDescription: form.inputDescription,
+        outputDescription: form.outputDescription,
+        constraintsMarkdown: form.constraintsMarkdown,
+        explanationMarkdown: form.explanationMarkdown,
+        visibility: form.visibility,
+        explanationVisibility: form.explanationVisibility,
+        difficulty:
+          form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
+        testCaseVisibility: form.testCaseVisibility,
+        timeLimitMs: form.timeLimitMs,
+        memoryLimitMb: form.memoryLimitMb,
+        draft: packageDraft,
+      });
+      const formData = new FormData();
+      formData.set(
+        "file",
+        new File([zipBlob], `${form.slug.trim() || "problem-package"}.zip`, {
+          type: "application/zip",
+        }),
+      );
+      formData.set("language", previewLanguage);
+      formData.set("sourceCode", sourceCode);
+      formData.set("timeLimitMs", String(form.timeLimitMs));
+      formData.set("memoryLimitMb", String(form.memoryLimitMb));
+
       const response = await fetch("/api/problem-packages/test", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          language: previewLanguage,
-          sourceCode,
-          timeLimitMs: form.timeLimitMs,
-          memoryLimitMb: form.memoryLimitMb,
-          draft: {
-            sourceLabel: packageDraft.sourceLabel,
-            checkerType: packageDraft.checkerType,
-            checkerLanguage: packageDraft.checkerLanguage,
-            checkerSourceCode: packageDraft.checkerSourceCode,
-            compareMode: packageDraft.compareMode,
-            zipSizeBytes: packageDraft.zipSizeBytes,
-            fileCount: packageDraft.fileCount,
-            samples: packageDraft.samples.map((sample) => ({
-              name: sample.name,
-              description: sample.description,
-              input: sample.input,
-              output: sample.output,
-            })),
-            warnings: packageDraft.warnings,
-            groups: packageDraft.groups.map((group) => ({
-              name: group.name,
-              score: group.score,
-              tests: group.tests.map((testCase) => ({
-                name: testCase.name,
-                input: testCase.input,
-                output: testCase.output,
-              })),
-            })),
-          },
-        }),
+        body: formData,
       });
       if (!response.ok) {
         const message = await parseErrorMessage(response, "failed to run package test");
@@ -391,35 +373,23 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     setPackageError("");
 
     try {
-      const response = await fetch("/api/problem-packages/export", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: form.title,
-          slug: form.slug,
-          statementMarkdown: form.statementMarkdown,
-          inputDescription: form.inputDescription,
-          outputDescription: form.outputDescription,
-          constraintsMarkdown: form.constraintsMarkdown,
-          explanationMarkdown: form.explanationMarkdown,
-          visibility: form.visibility,
-          explanationVisibility: form.explanationVisibility,
-          difficulty:
-            form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
-          testCaseVisibility: form.testCaseVisibility,
-          timeLimitMs: form.timeLimitMs,
-          memoryLimitMb: form.memoryLimitMb,
-          draft: packageDraft,
-        }),
+      const zipBlob = await buildProblemPackageZipBlob({
+        title: form.title,
+        slug: form.slug,
+        statementMarkdown: form.statementMarkdown,
+        inputDescription: form.inputDescription,
+        outputDescription: form.outputDescription,
+        constraintsMarkdown: form.constraintsMarkdown,
+        explanationMarkdown: form.explanationMarkdown,
+        visibility: form.visibility,
+        explanationVisibility: form.explanationVisibility,
+        difficulty:
+          form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
+        testCaseVisibility: form.testCaseVisibility,
+        timeLimitMs: form.timeLimitMs,
+        memoryLimitMb: form.memoryLimitMb,
+        draft: packageDraft,
       });
-      if (!response.ok) {
-        const message = await parseErrorMessage(response, "failed to export problem package");
-        throw new Error(message);
-      }
-
-      const zipBlob = await response.blob();
       const url = URL.createObjectURL(zipBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
