@@ -254,43 +254,55 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       return;
     }
 
-    const response = await fetch(`/api/problems/${problemId}/package/manual`, {
+    const exportResponse = await fetch("/api/problem-packages/export", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        sourceLabel: packageDraft.sourceLabel,
-        checkerType: packageDraft.checkerType,
-        checkerLanguage: packageDraft.checkerLanguage,
-        checkerSourceCode: packageDraft.checkerSourceCode,
-        compareMode: packageDraft.compareMode,
-        zipSizeBytes: packageDraft.zipSizeBytes,
-        fileCount: packageDraft.fileCount,
-        samples: packageDraft.samples.map((sample) => ({
-          name: sample.name,
-          description: sample.description,
-          input: sample.input,
-          output: sample.output,
-        })),
-        warnings: packageDraft.warnings,
+        title: form.title,
+        slug: form.slug,
+        statementMarkdown: form.statementMarkdown,
+        inputDescription: form.inputDescription,
+        outputDescription: form.outputDescription,
+        constraintsMarkdown: form.constraintsMarkdown,
+        explanationMarkdown: form.explanationMarkdown,
+        visibility: form.visibility,
+        explanationVisibility: form.explanationVisibility,
+        difficulty:
+          form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
+        testCaseVisibility: form.testCaseVisibility,
         timeLimitMs: form.timeLimitMs,
         memoryLimitMb: form.memoryLimitMb,
-        groups: packageDraft.groups.map((group) => ({
-          name: group.name,
-          score: group.score,
-          tests: group.tests.map((testCase) => ({
-            name: testCase.name,
-            input: testCase.input,
-            output: testCase.output,
-          })),
-        })),
+        draft: packageDraft,
       }),
     });
+    if (!exportResponse.ok) {
+      const exportMessage = await parseErrorMessage(
+        exportResponse,
+        "failed to export problem package",
+      );
+      throw new Error(exportMessage);
+    }
 
-    if (!response.ok) {
+    const zipBlob = await exportResponse.blob();
+    const formData = new FormData();
+    formData.set(
+      "file",
+      new File(
+        [zipBlob],
+        `${form.slug.trim() || packageDraft.sourceLabel || "problem-package"}.zip`,
+        { type: "application/zip" },
+      ),
+    );
+
+    const uploadResponse = await fetch(`/api/problems/${problemId}/package`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!uploadResponse.ok) {
       const packageMessage = await parseErrorMessage(
-        response,
+        uploadResponse,
         "failed to save problem package",
       );
       throw new Error(packageMessage);
