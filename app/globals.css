@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 :root {
   --bg: #081320;
@@ -571,6 +572,14 @@ a {
   padding-left: 1.4rem;
 }
 
+.markdown-block ul {
+  list-style: disc;
+}
+
+.markdown-block ol {
+  list-style: decimal;
+}
+
 .markdown-block a {
   color: #a3d0ff;
   text-decoration: underline;
@@ -602,6 +611,36 @@ a {
   border-left: 3px solid rgba(127, 188, 255, 0.4);
   padding-left: 0.9rem;
   color: var(--text-soft);
+}
+
+.markdown-block hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  margin: 1rem 0;
+}
+
+.markdown-block table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8rem 0;
+}
+
+.markdown-block th,
+.markdown-block td {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-block th {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.markdown-block .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35rem 0;
 }
 
 .code-block {
