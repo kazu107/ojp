@@ -29,9 +29,9 @@ import type { Prisma } from "@prisma/client";
 import {
   buildEditorDraftFromExtracted,
   buildProblemPackageZip,
-  validateProblemPackage,
   type ProblemPackageExtracted,
 } from "@/lib/problem-package";
+import { validateProblemPackageCached } from "@/lib/problem-package-cache";
 import { executePackageJudge } from "@/lib/judge-runtime";
 import { getJudgeEnvironmentVersion } from "@/lib/judge-config";
 import {
@@ -1736,7 +1736,7 @@ async function loadProblemPackageData(problemId: string): Promise<ProblemPackage
   const fileName = storedFileName.toLowerCase().endsWith(".zip")
     ? storedFileName
     : `${storedFileName}.zip`;
-  const extracted = validateProblemPackage(fileName, zipBuffer);
+  const extracted = validateProblemPackageCached(fileName, zipBuffer);
   store.problemPackages[problemId] = extracted;
   return extracted;
 }

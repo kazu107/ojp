@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CodeEditor } from "@/components/code-editor";
 import { MarkdownBlock } from "@/components/markdown-block";
@@ -12,6 +12,7 @@ import { buildProblemPackageZipBlob } from "@/lib/problem-package-client-zip";
 import { StatusBadge } from "@/components/status-badge";
 import { badgeClassForSubmission, submissionStatusLabel } from "@/lib/presentation";
 import { SOURCE_CODE_TEMPLATES } from "@/lib/source-code-templates";
+import { pickHighestPriorityVerdict } from "@/lib/submission-status";
 import {
   ExplanationVisibility,
   Language,
@@ -61,6 +62,62 @@ interface PackageTestPreviewResult {
   totalTimeMs: number;
   peakMemoryKb: number;
   testResults: Submission["testResults"];
+}
+
+interface PreviewGroupedTestResults {
+  groupName: string;
+  verdict: SubmissionStatus;
+  caseCount: number;
+  maxTimeMs: number;
+  peakMemoryKb: number;
+  cases: Submission["testResults"];
+}
+
+function groupPreviewResults(
+  results: Submission["testResults"],
+): PreviewGroupedTestResults[] {
+  const grouped = new Map<string, Submission["testResults"]>();
+  for (const result of results) {
+    const entries = grouped.get(result.groupName) ?? [];
+    entries.push(result);
+    grouped.set(result.groupName, entries);
+  }
+
+  return [...grouped.entries()].map(([groupName, cases]) => ({
+    groupName,
+    verdict: pickHighestPriorityVerdict(cases.map((entry) => entry.verdict)),
+    caseCount: cases.length,
+    maxTimeMs: cases.reduce((max, entry) => Math.max(max, entry.timeMs), 0),
+    peakMemoryKb: cases.reduce((max, entry) => Math.max(max, entry.memoryKb), 0),
+    cases,
+  }));
+}
+
+interface PreviewGroupedResults {
+  groupName: string;
+  verdict: SubmissionStatus;
+  caseCount: number;
+  maxTimeMs: number;
+  peakMemoryKb: number;
+  cases: Submission["testResults"];
+}
+
+function groupPreviewResults(results: Submission["testResults"]): PreviewGroupedResults[] {
+  const grouped = new Map<string, Submission["testResults"]>();
+  for (const result of results) {
+    const entries = grouped.get(result.groupName) ?? [];
+    entries.push(result);
+    grouped.set(result.groupName, entries);
+  }
+
+  return [...grouped.entries()].map(([groupName, cases]) => ({
+    groupName,
+    verdict: pickHighestPriorityVerdict(cases.map((entry) => entry.verdict)),
+    caseCount: cases.length,
+    maxTimeMs: cases.reduce((max, entry) => Math.max(max, entry.timeMs), 0),
+    peakMemoryKb: cases.reduce((max, entry) => Math.max(max, entry.memoryKb), 0),
+    cases,
+  }));
 }
 
 function emptyState(): FormState {
@@ -177,6 +234,12 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   );
   const [previewResult, setPreviewResult] = useState<PackageTestPreviewResult | null>(null);
   const [createdProblemId, setCreatedProblemId] = useState<string | null>(null);
+  const importedPackageFileRef = useRef<File | null>(null);
+  const importedPackageSignatureRef = useRef<string | null>(null);
+  const generatedPackageFileCacheRef = useRef<{
+    signature: string;
+    file: File;
+  } | null>(null);
 
   const endpoint = useMemo(() => {
     if (props.mode === "edit") {
@@ -233,6 +296,34 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
           inspected.prefill.testCaseVisibility ?? prev.testCaseVisibility,
       }));
       setPackageDraft(inspected.draft);
+      importedPackageFileRef.current = file;
+      importedPackageSignatureRef.current = JSON.stringify({
+        form: {
+          ...form,
+          title: inspected.prefill.title || form.title,
+          slug: inspected.prefill.slugSuggestion || form.slug,
+          statementMarkdown: inspected.prefill.statementMarkdown,
+          inputDescription: inspected.prefill.inputDescription,
+          outputDescription: inspected.prefill.outputDescription,
+          constraintsMarkdown: inspected.prefill.constraintsMarkdown,
+          explanationMarkdown: inspected.prefill.explanationMarkdown,
+          timeLimitMs: inspected.prefill.timeLimitMs,
+          memoryLimitMb: inspected.prefill.memoryLimitMb,
+          visibility: inspected.prefill.visibility ?? form.visibility,
+          explanationVisibility:
+            inspected.prefill.explanationVisibility ?? form.explanationVisibility,
+          difficulty:
+            inspected.prefill.difficulty === undefined
+              ? form.difficulty
+              : inspected.prefill.difficulty === null
+                ? ""
+                : String(inspected.prefill.difficulty),
+          testCaseVisibility:
+            inspected.prefill.testCaseVisibility ?? form.testCaseVisibility,
+        },
+        draft: inspected.draft,
+      });
+      generatedPackageFileCacheRef.current = null;
       setPackageNotice(`Imported ${inspected.package.fileName} and filled the form fields.`);
     } catch (inspectError) {
       setPackageError(
@@ -244,9 +335,23 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     }
   }
 
-  async function saveProblemPackage(problemId: string) {
+  async function buildCurrentPackageFile(): Promise<File> {
     if (!packageDraft) {
-      return;
+      throw new Error("Judge package is required.");
+    }
+
+    const signature = JSON.stringify({
+      form,
+      draft: packageDraft,
+    });
+    if (
+      importedPackageFileRef.current &&
+      importedPackageSignatureRef.current === signature
+    ) {
+      return importedPackageFileRef.current;
+    }
+    if (generatedPackageFileCacheRef.current?.signature === signature) {
+      return generatedPackageFileCacheRef.current.file;
     }
 
     const zipBlob = await buildProblemPackageZipBlob({
@@ -266,15 +371,25 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       memoryLimitMb: form.memoryLimitMb,
       draft: packageDraft,
     });
-    const formData = new FormData();
-    formData.set(
-      "file",
-      new File(
-        [zipBlob],
-        `${form.slug.trim() || packageDraft.sourceLabel || "problem-package"}.zip`,
-        { type: "application/zip" },
-      ),
+    const file = new File(
+      [zipBlob],
+      `${form.slug.trim() || packageDraft.sourceLabel || "problem-package"}.zip`,
+      { type: "application/zip" },
     );
+    generatedPackageFileCacheRef.current = {
+      signature,
+      file,
+    };
+    return file;
+  }
+
+  async function saveProblemPackage(problemId: string) {
+    if (!packageDraft) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("file", await buildCurrentPackageFile());
 
     const uploadResponse = await fetch(`/api/problems/${problemId}/package`, {
       method: "POST",
@@ -306,30 +421,8 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     setPreviewResult(null);
 
     try {
-      const zipBlob = await buildProblemPackageZipBlob({
-        title: form.title,
-        slug: form.slug,
-        statementMarkdown: form.statementMarkdown,
-        inputDescription: form.inputDescription,
-        outputDescription: form.outputDescription,
-        constraintsMarkdown: form.constraintsMarkdown,
-        explanationMarkdown: form.explanationMarkdown,
-        visibility: form.visibility,
-        explanationVisibility: form.explanationVisibility,
-        difficulty:
-          form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
-        testCaseVisibility: form.testCaseVisibility,
-        timeLimitMs: form.timeLimitMs,
-        memoryLimitMb: form.memoryLimitMb,
-        draft: packageDraft,
-      });
       const formData = new FormData();
-      formData.set(
-        "file",
-        new File([zipBlob], `${form.slug.trim() || "problem-package"}.zip`, {
-          type: "application/zip",
-        }),
-      );
+      formData.set("file", await buildCurrentPackageFile());
       formData.set("language", previewLanguage);
       formData.set("sourceCode", sourceCode);
       formData.set("timeLimitMs", String(form.timeLimitMs));
@@ -367,27 +460,11 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     setPackageError("");
 
     try {
-      const zipBlob = await buildProblemPackageZipBlob({
-        title: form.title,
-        slug: form.slug,
-        statementMarkdown: form.statementMarkdown,
-        inputDescription: form.inputDescription,
-        outputDescription: form.outputDescription,
-        constraintsMarkdown: form.constraintsMarkdown,
-        explanationMarkdown: form.explanationMarkdown,
-        visibility: form.visibility,
-        explanationVisibility: form.explanationVisibility,
-        difficulty:
-          form.difficulty.trim().length > 0 ? Number.parseInt(form.difficulty, 10) : null,
-        testCaseVisibility: form.testCaseVisibility,
-        timeLimitMs: form.timeLimitMs,
-        memoryLimitMb: form.memoryLimitMb,
-        draft: packageDraft,
-      });
-      const url = URL.createObjectURL(zipBlob);
+      const packageFile = await buildCurrentPackageFile();
+      const url = URL.createObjectURL(packageFile);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${form.slug.trim() || "problem-package"}.zip`;
+      anchor.download = packageFile.name;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -833,35 +910,50 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                 <span className="text-soft">Time: {previewResult.totalTimeMs} ms</span>
                 <span className="text-soft">Memory: {previewResult.peakMemoryKb} KB</span>
               </div>
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Group</th>
-                      <th>Case</th>
-                      <th>Verdict</th>
-                      <th>Time</th>
-                      <th>Memory</th>
-                      <th>Message</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewResult.testResults.map((result) => (
-                      <tr key={result.id}>
-                        <td>{result.groupName}</td>
-                        <td>{result.testCaseName}</td>
-                        <td>
-                          <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                            {submissionStatusLabel(result.verdict)}
-                          </StatusBadge>
-                        </td>
-                        <td>{result.timeMs} ms</td>
-                        <td>{result.memoryKb} KB</td>
-                        <td>{result.message}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="stack">
+                {groupPreviewResults(previewResult.testResults).map((group) => (
+                  <details key={group.groupName} className="result-group">
+                    <summary className="result-group-summary">
+                      <span className="kpi">{group.groupName}</span>
+                      <StatusBadge className={badgeClassForSubmission(group.verdict)}>
+                        {submissionStatusLabel(group.verdict)}
+                      </StatusBadge>
+                      <span className="result-group-meta">Cases: {group.caseCount}</span>
+                      <span className="result-group-meta">Time(max): {group.maxTimeMs} ms</span>
+                      <span className="result-group-meta">Memory: {group.peakMemoryKb} KB</span>
+                    </summary>
+                    <div className="result-group-body">
+                      <div className="table-wrap">
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>Case</th>
+                              <th>Verdict</th>
+                              <th>Time</th>
+                              <th>Memory</th>
+                              <th>Message</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.cases.map((result) => (
+                              <tr key={result.id}>
+                                <td>{result.testCaseName}</td>
+                                <td>
+                                  <StatusBadge className={badgeClassForSubmission(result.verdict)}>
+                                    {submissionStatusLabel(result.verdict)}
+                                  </StatusBadge>
+                                </td>
+                                <td>{result.timeMs} ms</td>
+                                <td>{result.memoryKb} KB</td>
+                                <td>{result.message}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </details>
+                ))}
               </div>
             </div>
           ) : null}

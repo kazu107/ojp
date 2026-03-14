@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { parseLanguage } from "@/lib/api-helpers";
 import { errorResponse } from "@/lib/api-response";
+import { validateProblemPackageCached } from "@/lib/problem-package-cache";
 import { executePackageJudge } from "@/lib/judge-runtime";
-import { validateProblemPackage } from "@/lib/problem-package";
 import { canCreateProblemByRole, getCurrentUser, HttpError } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       throw new HttpError("sourceCode is required", 400);
     }
 
-    const packageData = validateProblemPackage(
+    const packageData = validateProblemPackageCached(
       file.name,
       Buffer.from(await file.arrayBuffer()),
     );

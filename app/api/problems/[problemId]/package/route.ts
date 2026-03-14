@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
-import { validateProblemPackage } from "@/lib/problem-package";
+import { validateProblemPackageCached } from "@/lib/problem-package-cache";
 import { isProblemPackageObjectStorageEnabled, putProblemPackageZip } from "@/lib/problem-package-storage";
 import { applyProblemPackageValidation, getCurrentUser, getProblemById, HttpError } from "@/lib/store";
 
@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: ProblemPackageRouteCont
     }
 
     const zipBuffer = Buffer.from(await file.arrayBuffer());
-    const extracted = validateProblemPackage(file.name, zipBuffer);
+    const extracted = validateProblemPackageCached(file.name, zipBuffer);
     const storageRef = isProblemPackageObjectStorageEnabled()
       ? await putProblemPackageZip({
           problemId,
