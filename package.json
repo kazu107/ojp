@@ -16,6 +16,7 @@
     "db:studio": "node scripts/prisma-with-default-db-url.mjs studio",
     "db:seed": "node scripts/prisma-with-default-db-url.mjs db seed",
     "db:prepare": "npm run db:up && npm run db:generate && npm run db:push && npm run db:seed",
+    "worker:judge": "tsx scripts/judge-worker.ts",
     "template:problem-zip": "node scripts/create-problem-package-template.mjs"
   },
   "dependencies": {

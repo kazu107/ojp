@@ -435,3 +435,22 @@ R2_SECRET_ACCESS_KEY="your-r2-secret-access-key"
 - 新しく登録・更新した問題 package は自動で R2 に保存されます
 - package の展開結果はメモリ cache に保持され、DB スナップショットには object ref のみ保存されます
 - 既存の埋め込み package は migration 実行で zip 再構築して R2 へ移行できます
+
+## Judge Worker Dyno
+
+Heroku container では judge を `worker` dyno に分離できます。
+
+- `web`: `JUDGE_PROCESS_MODE=web`
+- `worker`: `JUDGE_PROCESS_MODE=worker`
+
+`heroku.yml` には両 process を定義済みです。デプロイ後に次を実行してください。
+
+```bash
+heroku ps:scale web=1 worker=1 -a <your-app-name>
+```
+
+補足:
+
+- local / 単一プロセス運用では `JUDGE_PROCESS_MODE` 未設定時に `inline` で従来どおり動きます
+- worker は DB snapshot をポーリングして queue を拾います
+- queue 追加と rejudge は即時 persist するようにしてあるので、worker 側へ比較的早く伝播します

@@ -63,6 +63,12 @@ const DISPLAY_NAME_CHANGE_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
 const STORE_STATE_ID = "default";
 const STORE_PERSIST_INTERVAL_MS = 3_000;
 const STORE_DB_SYNC_ENABLED = process.env.STORE_DB_SYNC !== "0";
+const JUDGE_PROCESS_MODE =
+  process.env.JUDGE_PROCESS_MODE === "web" ||
+  process.env.JUDGE_PROCESS_MODE === "worker"
+    ? process.env.JUDGE_PROCESS_MODE
+    : "inline";
+const DEDICATED_JUDGE_POLL_INTERVAL_MS = 1_000;
 
 function parseCsvEnvSet(raw: string | undefined): Set<string> {
   if (!raw) {
@@ -162,6 +168,7 @@ const globalStore = globalThis as unknown as {
   __ojpStoreLastPersistedSnapshotJson?: string;
   __ojpStorePersistInFlight?: boolean;
   __ojpStorePersistQueued?: boolean;
+  __ojpDedicatedJudgeLoopStarted?: boolean;
 };
 
 export class HttpError extends Error {
@@ -182,6 +189,10 @@ function nowMs(): number {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function canExecuteJudgeJobsInThisProcess(): boolean {
+  return JUDGE_PROCESS_MODE === "inline" || JUDGE_PROCESS_MODE === "worker";
 }
 
 function toSlug(raw: string): string {
@@ -855,6 +866,23 @@ async function hydrateStoreFromDb(): Promise<void> {
   }
 }
 
+async function refreshStoreFromDbNow(): Promise<void> {
+  if (!STORE_DB_SYNC_ENABLED) {
+    return;
+  }
+  const state = await prisma.appState.findUnique({
+    where: { id: STORE_STATE_ID },
+  });
+  if (!state || !state.snapshot || typeof state.snapshot !== "object") {
+    return;
+  }
+
+  applyStoreSnapshotInPlace(store, state.snapshot as unknown as StoreSnapshot);
+  normalizeStoreInPlace(store);
+  globalStore.__ojpStoreLastPersistedSnapshotJson = JSON.stringify(captureStoreSnapshot(store));
+  globalStore.__ojpStoreDbHydrated = true;
+}
+
 function startStorePersistenceLoop(): void {
   if (!STORE_DB_SYNC_ENABLED || globalStore.__ojpStorePersistIntervalStarted) {
     return;
@@ -1222,6 +1250,9 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
 }
 
 function scheduleJudgeWorker(): void {
+  if (!canExecuteJudgeJobsInThisProcess()) {
+    return;
+  }
   if (store.judgeWorkerRunning) {
     return;
   }
@@ -1238,11 +1269,13 @@ function scheduleJudgeWorker(): void {
       store.judgeInFlightSubmissionIds.push(nextJob.submissionId);
     }
     try {
+      void persistStoreSnapshotNow();
       await runJudgeForSubmission(nextJob.submissionId, nextJob.reason);
     } finally {
       store.judgeInFlightSubmissionIds = store.judgeInFlightSubmissionIds.filter(
         (submissionId) => submissionId !== nextJob.submissionId,
       );
+      void persistStoreSnapshotNow();
     }
     setTimeout(() => {
       void tick();
@@ -1951,6 +1984,7 @@ export async function applyProblemPackageValidation(
     }
   }
   problem.updatedAt = nowIso();
+  await persistStoreSnapshotNow();
 
   return problem;
 }
@@ -2214,6 +2248,7 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
 
   store.submissions.unshift(submission);
   enqueueJudgeJob(submission.id, "normal");
+  await persistStoreSnapshotNow();
   return submission;
 }
 
@@ -3087,6 +3122,40 @@ export async function repairJudgeQueueByAdmin(): Promise<{
   };
 }
 
+export function getJudgeProcessMode(): "inline" | "web" | "worker" {
+  return JUDGE_PROCESS_MODE;
+}
+
+export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
+  if (JUDGE_PROCESS_MODE !== "worker") {
+    return;
+  }
+  if (globalStore.__ojpDedicatedJudgeLoopStarted) {
+    return;
+  }
+
+  globalStore.__ojpDedicatedJudgeLoopStarted = true;
+
+  const tick = async () => {
+    if (store.judgeWorkerRunning) {
+      return;
+    }
+    await refreshStoreFromDbNow();
+    const requeued = repairJudgeQueueInternal();
+    if (requeued > 0) {
+      await persistStoreSnapshotNow();
+    }
+    if (store.judgeQueue.length > 0) {
+      scheduleJudgeWorker();
+    }
+  };
+
+  await tick();
+  setInterval(() => {
+    void tick();
+  }, DEDICATED_JUDGE_POLL_INTERVAL_MS);
+}
+
 export async function listAuditLogsForAdmin(limit = 100): Promise<AuditLog[]> {
   const user = await getCurrentUser();
   assertAdmin(user);
@@ -3157,6 +3226,7 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
   });
 
   enqueueJudgeJob(submission.id, "rejudge");
+  await persistStoreSnapshotNow();
 
   return { request, submission };
 }
