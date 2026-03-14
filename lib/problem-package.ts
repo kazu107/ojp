@@ -18,10 +18,10 @@ import {
   Visibility,
 } from "@/lib/types";
 
-const MAX_ZIP_BYTES = 64 * 1024 * 1024;
-const MAX_SINGLE_FILE_BYTES = 8 * 1024 * 1024;
-const MAX_FILES = 1000;
-const MAX_EXPANDED_BYTES = 128 * 1024 * 1024;
+const MAX_ZIP_BYTES = 256 * 1024 * 1024;
+const MAX_SINGLE_FILE_BYTES = 32 * 1024 * 1024;
+const MAX_FILES = 4000;
+const MAX_EXPANDED_BYTES = 512 * 1024 * 1024;
 
 export type {
   ProblemPackageCompareMode,
