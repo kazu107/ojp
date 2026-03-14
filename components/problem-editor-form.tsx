@@ -93,33 +93,6 @@ function groupPreviewResults(
   }));
 }
 
-interface PreviewGroupedResults {
-  groupName: string;
-  verdict: SubmissionStatus;
-  caseCount: number;
-  maxTimeMs: number;
-  peakMemoryKb: number;
-  cases: Submission["testResults"];
-}
-
-function groupPreviewResults(results: Submission["testResults"]): PreviewGroupedResults[] {
-  const grouped = new Map<string, Submission["testResults"]>();
-  for (const result of results) {
-    const entries = grouped.get(result.groupName) ?? [];
-    entries.push(result);
-    grouped.set(result.groupName, entries);
-  }
-
-  return [...grouped.entries()].map(([groupName, cases]) => ({
-    groupName,
-    verdict: pickHighestPriorityVerdict(cases.map((entry) => entry.verdict)),
-    caseCount: cases.length,
-    maxTimeMs: cases.reduce((max, entry) => Math.max(max, entry.timeMs), 0),
-    peakMemoryKb: cases.reduce((max, entry) => Math.max(max, entry.memoryKb), 0),
-    cases,
-  }));
-}
-
 function emptyState(): FormState {
   return {
     title: "",
