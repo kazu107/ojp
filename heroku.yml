@@ -3,5 +3,11 @@ build:
     web: Dockerfile
 
 run:
-  web: JUDGE_PROCESS_MODE=web npm run start -- --hostname 0.0.0.0 --port $PORT
-  worker: JUDGE_PROCESS_MODE=worker npm run worker:judge
+  web:
+    command:
+      - JUDGE_PROCESS_MODE=web npm run start -- --hostname 0.0.0.0 --port $PORT
+    image: web
+  worker:
+    command:
+      - JUDGE_PROCESS_MODE=worker npm run worker:judge
+    image: web
