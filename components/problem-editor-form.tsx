@@ -7,6 +7,7 @@ import { CodeEditor } from "@/components/code-editor";
 import { MarkdownBlock } from "@/components/markdown-block";
 import { ProblemPackageDraftEditor } from "@/components/problem-package-draft-editor";
 import { CHECKER_SOURCE_TEMPLATES } from "@/lib/checker-source-templates";
+import { inspectProblemPackageClient } from "@/lib/problem-package-client-inspect";
 import { buildProblemPackageZipBlob } from "@/lib/problem-package-client-zip";
 import { StatusBadge } from "@/components/status-badge";
 import { badgeClassForSubmission, submissionStatusLabel } from "@/lib/presentation";
@@ -22,7 +23,6 @@ import {
 } from "@/lib/types";
 import {
   ProblemPackageEditorDraft,
-  ProblemPackageInspectResult,
 } from "@/lib/problem-package-types";
 
 type ProblemEditorFormProps =
@@ -161,6 +161,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const [activeTab, setActiveTab] = useState<EditorTab>("content");
   const [isSaving, setIsSaving] = useState(false);
   const [isInspectingPackage, setIsInspectingPackage] = useState(false);
+  const [inspectProgressText, setInspectProgressText] = useState("");
   const [isExportingPackage, setIsExportingPackage] = useState(false);
   const [isRunningPreview, setIsRunningPreview] = useState(false);
   const [error, setError] = useState<string>("");
@@ -202,20 +203,12 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     setIsInspectingPackage(true);
     setPackageError("");
     setPackageNotice("");
+    setInspectProgressText("Preparing ZIP import...");
 
     try {
-      const formData = new FormData();
-      formData.set("file", file);
-      const response = await fetch("/api/problem-packages/inspect", {
-        method: "POST",
-        body: formData,
+      const inspected = await inspectProblemPackageClient(file, (progress) => {
+        setInspectProgressText(`${progress.message} (${progress.current}/${progress.total})`);
       });
-      if (!response.ok) {
-        const message = await parseErrorMessage(response, "failed to inspect ZIP package");
-        throw new Error(message);
-      }
-
-      const inspected = (await response.json()) as ProblemPackageInspectResult;
       setForm((prev) => ({
         ...prev,
         title: inspected.prefill.title || prev.title,
@@ -246,6 +239,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         inspectError instanceof Error ? inspectError.message : "failed to inspect ZIP package",
       );
     } finally {
+      setInspectProgressText("");
       setIsInspectingPackage(false);
     }
   }
@@ -760,7 +754,11 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
             )}
           </div>
 
-          {isInspectingPackage ? <p className="badge badge-blue">Inspecting ZIP...</p> : null}
+          {isInspectingPackage ? (
+            <p className="badge badge-blue">
+              {inspectProgressText || "Inspecting ZIP..."}
+            </p>
+          ) : null}
           {packageNotice ? <p className="badge badge-blue">{packageNotice}</p> : null}
           {packageError ? <p className="badge badge-red">{packageError}</p> : null}
 

@@ -72,6 +72,17 @@ export interface ProblemPackageInspectResult {
       checkerType: ProblemPackageCheckerType;
       checkerLanguage: Language | null;
       compareMode: ProblemPackageCompareMode;
+      problem: {
+        slug: string | null;
+        visibility: Visibility | null;
+        explanationVisibility: ExplanationVisibility | null;
+        difficulty: number | null;
+        testCaseVisibility: TestCaseVisibility | null;
+      };
+      samples: Array<{
+        name: string;
+        description: string;
+      }>;
       groups: Array<{
         name: string;
         score: number | null;
