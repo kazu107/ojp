@@ -1141,6 +1141,9 @@ function repairJudgeQueueInternal(): number {
   if (store.judgeQueue.length > 0) {
     scheduleJudgeWorker();
   }
+  if (requeued > 0) {
+    void persistStoreSnapshotNow();
+  }
 
   return requeued;
 }
