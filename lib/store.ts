@@ -62,6 +62,7 @@ const REJUDGE_LIMIT_PER_WINDOW = 3;
 const DISPLAY_NAME_CHANGE_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
 const STORE_STATE_ID = "default";
 const STORE_PERSIST_INTERVAL_MS = 3_000;
+const STORE_REFRESH_INTERVAL_MS = 1_000;
 const STORE_DB_SYNC_ENABLED = process.env.STORE_DB_SYNC !== "0";
 const JUDGE_PROCESS_MODE =
   process.env.JUDGE_PROCESS_MODE === "web" ||
@@ -165,6 +166,7 @@ const globalStore = globalThis as unknown as {
   __ojpStoreDbHydrationStarted?: boolean;
   __ojpStoreDbHydrated?: boolean;
   __ojpStorePersistIntervalStarted?: boolean;
+  __ojpStoreRefreshIntervalStarted?: boolean;
   __ojpStoreLastPersistedSnapshotJson?: string;
   __ojpStorePersistInFlight?: boolean;
   __ojpStorePersistQueued?: boolean;
@@ -894,6 +896,30 @@ function startStorePersistenceLoop(): void {
   interval.unref?.();
 }
 
+function startStoreRefreshLoop(): void {
+  if (!STORE_DB_SYNC_ENABLED || JUDGE_PROCESS_MODE !== "web") {
+    return;
+  }
+  if (globalStore.__ojpStoreRefreshIntervalStarted) {
+    return;
+  }
+
+  globalStore.__ojpStoreRefreshIntervalStarted = true;
+  const interval = setInterval(() => {
+    if (!globalStore.__ojpStoreDbHydrated || globalStore.__ojpStorePersistInFlight) {
+      return;
+    }
+
+    const currentSnapshotJson = JSON.stringify(captureStoreSnapshot(store));
+    if (currentSnapshotJson !== globalStore.__ojpStoreLastPersistedSnapshotJson) {
+      return;
+    }
+
+    void refreshStoreFromDbNow();
+  }, STORE_REFRESH_INTERVAL_MS);
+  interval.unref?.();
+}
+
 const store = globalStore.__ojpStore ?? createInitialStore();
 
 if (!globalStore.__ojpStore) {
@@ -905,6 +931,7 @@ if (typeof globalStore.__ojpStoreDbHydrated !== "boolean") {
 
 normalizeStoreInPlace(store);
 startStorePersistenceLoop();
+startStoreRefreshLoop();
 if (STORE_DB_SYNC_ENABLED && !globalStore.__ojpStoreDbHydrationStarted) {
   globalStore.__ojpStoreDbHydrationStarted = true;
   void hydrateStoreFromDb();
