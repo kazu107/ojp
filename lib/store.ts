@@ -1560,7 +1560,7 @@ function upsertUserFromOAuthSession(params: {
   login: string;
   name?: string | null;
   bio?: string | null;
-}): User {
+}): { user: User; changed: boolean } {
   const normalizedProvider = normalizeUsername(params.provider);
   const normalizedLogin = normalizeUsername(params.login);
   const accountId = params.accountId?.trim() ?? "";
@@ -1575,6 +1575,7 @@ function upsertUserFromOAuthSession(params: {
         })
       : false;
   const timestamp = nowIso();
+  let changed = false;
 
   let user: User | undefined;
   if (accountKey) {
@@ -1610,6 +1611,7 @@ function upsertUserFromOAuthSession(params: {
       updatedAt: timestamp,
     };
     store.users.push(user);
+    changed = true;
   }
 
   if (user.status === "deleted") {
@@ -1619,10 +1621,12 @@ function upsertUserFromOAuthSession(params: {
   const nextUsername = uniqueUsername(normalizedLogin, user.id);
   if (nextUsername !== user.username) {
     user.username = nextUsername;
+    changed = true;
   }
 
   if ((!user.bio || !user.bio.trim()) && params.bio && params.bio.trim()) {
     user.bio = params.bio.trim();
+    changed = true;
   }
 
   if (shouldGrantAdmin && user.role !== "admin") {
@@ -1639,13 +1643,20 @@ function upsertUserFromOAuthSession(params: {
         nextRole: "admin",
       },
     });
+    changed = true;
   }
 
-  user.updatedAt = timestamp;
   if (accountKey) {
+    if (store.githubIndex[accountKey] !== user.id) {
+      changed = true;
+    }
     store.githubIndex[accountKey] = user.id;
   }
-  return user;
+  if (changed && user.updatedAt !== timestamp) {
+    user.updatedAt = timestamp;
+  }
+
+  return { user, changed };
 }
 
 function getSessionUserLike(session: unknown): SessionUserLike | null {
@@ -1679,13 +1690,18 @@ export async function getCurrentUser(): Promise<User> {
     throw new HttpError("oauth profile is missing required fields", 401);
   }
 
-  return upsertUserFromOAuthSession({
+  const result = upsertUserFromOAuthSession({
     provider,
     accountId: sessionUser.oauthAccountId ?? sessionUser.githubId,
     login,
     name: sessionUser.name,
     bio: sessionUser.oauthBio ?? sessionUser.githubBio,
   });
+  if (result.changed) {
+    await persistStoreSnapshotNow();
+  }
+
+  return result.user;
 }
 
 export async function getOptionalCurrentUser(): Promise<User | null> {
