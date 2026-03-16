@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkdownBlock } from "@/components/markdown-block";
+import { ProblemSamplesSection } from "@/components/problem-samples-section";
 import { StatusBadge } from "@/components/status-badge";
 import {
   badgeClassForDifficulty,
@@ -11,7 +12,6 @@ import {
 } from "@/lib/presentation";
 import {
   canEditProblemByViewer,
-  getProblemPackageData,
   getOptionalCurrentUser,
   getProblemForViewer,
 } from "@/lib/store";
@@ -35,7 +35,6 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
   }
 
   const canEditProblem = me ? canEditProblemByViewer(problem, me.id) : false;
-  const packageData = await getProblemPackageData(problem.id);
   const signInUrl = `/signin?callbackUrl=${encodeURIComponent(`/problems/${problem.id}`)}`;
 
   return (
@@ -107,29 +106,15 @@ export default async function ProblemDetailPage({ params }: ProblemDetailPagePro
         </article>
       </section>
 
-      {packageData && packageData.samples.length > 0 ? (
-        <section className="panel stack">
-          <h2 className="panel-title">Samples</h2>
-          {packageData.samples.map((sample) => (
-            <article key={sample.name} className="package-case-editor stack">
-              <p className="field-label">{sample.name}</p>
-              <div className="form-grid">
-                <div className="field">
-                  <span className="field-label">Input</span>
-                  <pre className="code-block">{sample.input}</pre>
-                </div>
-                <div className="field">
-                  <span className="field-label">Output</span>
-                  <pre className="code-block">{sample.output}</pre>
-                </div>
-              </div>
-              {sample.description ? (
-                <p className="sample-description text-soft">{sample.description}</p>
-              ) : null}
-            </article>
-          ))}
-        </section>
-      ) : null}
+      <ProblemSamplesSection
+        initialSamples={problem.sampleCases}
+        loadUrl={
+          problem.sampleCases.length === 0 && (problem.latestPackageSummary?.samplePairs ?? 0) > 0
+            ? `/api/problems/${problem.id}/samples`
+            : undefined
+        }
+        samplePairCount={problem.latestPackageSummary?.samplePairs ?? problem.sampleCases.length}
+      />
 
       <section className="panel stack">
         <h2 className="panel-title">Submit</h2>

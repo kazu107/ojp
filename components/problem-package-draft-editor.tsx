@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CHECKER_SOURCE_TEMPLATES,
   isDefaultCheckerSourceTemplate,
@@ -16,6 +16,13 @@ import { Language } from "@/lib/types";
 interface ProblemPackageDraftEditorProps {
   draft: ProblemPackageEditorDraft;
   onChange: (next: ProblemPackageEditorDraft) => void;
+  onLoadTestCase?: (params: {
+    groupId: string;
+    groupName: string;
+    caseId: string;
+    caseName: string;
+  }) => Promise<void> | void;
+  loadingTestCaseId?: string | null;
 }
 
 function nextGroupName(groupCount: number): string {
@@ -77,6 +84,8 @@ function shouldReplaceCheckerSource(code: string): boolean {
 export function ProblemPackageDraftEditor({
   draft,
   onChange,
+  onLoadTestCase,
+  loadingTestCaseId,
 }: ProblemPackageDraftEditorProps) {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
     draft.groups[0]?.id ?? null,
@@ -113,6 +122,20 @@ export function ProblemPackageDraftEditor({
   const activeGroupIndex = activeGroup
     ? draft.groups.findIndex((group) => group.id === activeGroup.id)
     : -1;
+  const activeCaseIsLoaded = activeCase?.isLoaded !== false;
+
+  useEffect(() => {
+    if (!activeGroup || !activeCase || !onLoadTestCase || activeCase.isLoaded !== false) {
+      return;
+    }
+
+    void onLoadTestCase({
+      groupId: activeGroup.id,
+      groupName: activeGroup.name,
+      caseId: activeCase.id,
+      caseName: activeCase.name,
+    });
+  }, [activeCase, activeGroup, onLoadTestCase]);
 
   function selectGroup(groupId: string) {
     const nextGroup = draft.groups.find((group) => group.id === groupId);
@@ -131,6 +154,7 @@ export function ProblemPackageDraftEditor({
           name: "01",
           input: "",
           output: "",
+          isLoaded: true,
         },
       ],
     };
@@ -204,6 +228,7 @@ export function ProblemPackageDraftEditor({
       name: nextCaseName(draft.groups[groupIndex]?.tests.length ?? 0),
       input: "",
       output: "",
+      isLoaded: true,
     };
     patchDraft((current) => ({
       ...current,
@@ -364,6 +389,12 @@ export function ProblemPackageDraftEditor({
         <span className="result-group-meta">Files: {displayedFileCount}</span>
         <span className="result-group-meta">Samples: {totalSamples}</span>
       </div>
+      {draft.isPartial ? (
+        <p className="text-soft">
+          Large existing packages are loaded lazily. Test case contents are fetched only when
+          selected, and names stay read-only until all cases are loaded.
+        </p>
+      ) : null}
 
       {draft.warnings.length > 0 ? (
         <div className="package-note-list">
@@ -579,6 +610,7 @@ export function ProblemPackageDraftEditor({
                     <input
                       className="input"
                       value={activeGroup.name}
+                      disabled={draft.isPartial}
                       onChange={(event) =>
                         patchDraft((current) => ({
                           ...current,
@@ -678,11 +710,20 @@ export function ProblemPackageDraftEditor({
                       </div>
                     </div>
 
+                    {!activeCaseIsLoaded ? (
+                      <p className="badge badge-blue">
+                        {loadingTestCaseId === activeCase.id
+                          ? "Loading selected test case..."
+                          : "Loading selected test case on demand..."}
+                      </p>
+                    ) : null}
+
                     <label className="field">
                       <span className="field-label">Case Name</span>
                       <input
                         className="input"
                         value={activeCase.name}
+                        disabled={draft.isPartial}
                         onChange={(event) =>
                           patchDraft((current) => ({
                             ...current,
@@ -712,6 +753,7 @@ export function ProblemPackageDraftEditor({
                         <textarea
                           className="textarea"
                           value={activeCase.input}
+                          disabled={!activeCaseIsLoaded}
                           onChange={(event) =>
                             patchDraft((current) => ({
                               ...current,
@@ -739,6 +781,7 @@ export function ProblemPackageDraftEditor({
                         <textarea
                           className="textarea"
                           value={activeCase.output}
+                          disabled={!activeCaseIsLoaded}
                           onChange={(event) =>
                             patchDraft((current) => ({
                               ...current,

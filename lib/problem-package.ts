@@ -100,6 +100,15 @@ export interface ProblemPackageExtracted {
   groups: ProblemPackageTestGroup[];
 }
 
+export interface ProblemPackageManifest {
+  validation: ProblemPackageValidationResult;
+  scoringType: ProblemPackageScoringType;
+  checkerType: ProblemPackageCheckerType;
+  checkerLanguage: Language | null;
+  compareMode: ProblemPackageCompareMode;
+  sampleCases: ProblemPackageSampleCase[];
+}
+
 interface ParsedConfigSample {
   name: string;
   description: string;
@@ -111,7 +120,7 @@ interface ParsedConfigGroup {
   tests: string[];
 }
 
-interface ParsedConfig {
+export interface ParsedConfig {
   timeLimitMs: number;
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
@@ -131,11 +140,11 @@ interface ParsedConfig {
   warnings: string[];
 }
 
-function normalizePath(entryName: string): string {
+export function normalizePath(entryName: string): string {
   return entryName.replace(/\\/g, "/").replace(/^\.\/+/, "");
 }
 
-function hasPathTraversal(normalizedPath: string): boolean {
+export function hasPathTraversal(normalizedPath: string): boolean {
   if (!normalizedPath || normalizedPath.includes("\0")) {
     return true;
   }
@@ -155,7 +164,7 @@ function diffSet(left: ReadonlySet<string>, right: ReadonlySet<string>): string[
   return [...left].filter((item) => !right.has(item)).sort((a, b) => a.localeCompare(b));
 }
 
-function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string): void {
+export function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string): void {
   if (inSet.size === 0 || outSet.size === 0) {
     throw new Error(`${scope} must include both .in and .out files`);
   }
@@ -273,7 +282,7 @@ function resolveCompareMode(config: Record<string, unknown>): ProblemPackageComp
   return "exact";
 }
 
-function checkerSourceFileName(language: Language): string {
+export function checkerSourceFileName(language: Language): string {
   switch (language) {
     case "cpp":
       return "checker/Main.cpp";
@@ -364,7 +373,7 @@ function parseConfigSample(value: unknown, index: number): ParsedConfigSample {
   };
 }
 
-function parseConfig(configJson: unknown): ParsedConfig {
+export function parseConfig(configJson: unknown): ParsedConfig {
   if (!configJson || typeof configJson !== "object") {
     throw new Error("config.json must be a JSON object");
   }
@@ -758,6 +767,311 @@ export function validateProblemPackage(
   };
 }
 
+interface ProblemPackageArchive {
+  fileName: string;
+  zipBuffer: Buffer;
+  files: AdmZip.IZipEntry[];
+  entryByPath: Map<string, AdmZip.IZipEntry>;
+  config: ParsedConfig;
+  sampleIn: Set<string>;
+  sampleOut: Set<string>;
+  testIn: Map<string, Set<string>>;
+  testOut: Map<string, Set<string>>;
+}
+
+function openProblemPackageArchive(
+  fileName: string,
+  zipBuffer: Buffer,
+): ProblemPackageArchive {
+  if (!fileName.toLowerCase().endsWith(".zip")) {
+    throw new Error("package file must be a .zip");
+  }
+
+  if (zipBuffer.byteLength <= 0) {
+    throw new Error("package file is empty");
+  }
+
+  if (zipBuffer.byteLength > MAX_ZIP_BYTES) {
+    throw new Error(`zip size exceeds limit (${MAX_ZIP_BYTES} bytes)`);
+  }
+
+  let zip: AdmZip;
+  try {
+    zip = new AdmZip(zipBuffer);
+  } catch {
+    throw new Error("invalid zip archive");
+  }
+
+  const entries = zip.getEntries();
+  const files = entries.filter((entry) => !entry.isDirectory);
+  if (files.length === 0) {
+    throw new Error("zip archive has no files");
+  }
+  if (files.length > MAX_FILES) {
+    throw new Error(`file count exceeds limit (${MAX_FILES})`);
+  }
+
+  const entryByPath = new Map<string, AdmZip.IZipEntry>();
+  let expandedBytes = 0;
+  for (const entry of files) {
+    const normalizedPath = normalizePath(entry.entryName);
+    if (hasPathTraversal(normalizedPath)) {
+      throw new Error(`unsafe path is not allowed: ${entry.entryName}`);
+    }
+    if (entryByPath.has(normalizedPath)) {
+      throw new Error(`duplicate file path: ${normalizedPath}`);
+    }
+
+    const size = entry.header.size;
+    if (size > MAX_SINGLE_FILE_BYTES) {
+      throw new Error(
+        `single file size exceeds limit (${MAX_SINGLE_FILE_BYTES} bytes): ${normalizedPath}`,
+      );
+    }
+
+    expandedBytes += size;
+    if (expandedBytes > MAX_EXPANDED_BYTES) {
+      throw new Error(`expanded total size exceeds limit (${MAX_EXPANDED_BYTES} bytes)`);
+    }
+
+    entryByPath.set(normalizedPath, entry);
+  }
+
+  if (!entryByPath.has("statement.md")) {
+    throw new Error("statement.md is required");
+  }
+
+  const sampleIn = new Set<string>();
+  const sampleOut = new Set<string>();
+  const testIn = new Map<string, Set<string>>();
+  const testOut = new Map<string, Set<string>>();
+
+  for (const filePath of entryByPath.keys()) {
+    const sampleMatch = /^samples\/(.+)\.(in|out)$/.exec(filePath);
+    if (sampleMatch) {
+      const [, baseName, extension] = sampleMatch;
+      if (extension === "in") {
+        sampleIn.add(baseName);
+      } else {
+        sampleOut.add(baseName);
+      }
+      continue;
+    }
+
+    const testMatch = /^tests\/([^/]+)\/(.+)\.(in|out)$/.exec(filePath);
+    if (testMatch) {
+      const [, groupName, caseName, extension] = testMatch;
+      if (extension === "in") {
+        pushToSetMap(testIn, groupName, caseName);
+      } else {
+        pushToSetMap(testOut, groupName, caseName);
+      }
+    }
+  }
+
+  validatePairs(sampleIn, sampleOut, "samples");
+
+  const groupNames = new Set<string>([...testIn.keys(), ...testOut.keys()]);
+  if (groupNames.size === 0) {
+    throw new Error("tests/<group-name>/*.in and *.out are required");
+  }
+
+  return {
+    fileName,
+    zipBuffer,
+    files,
+    entryByPath,
+    config: parseConfigFromEntry(entryByPath),
+    sampleIn,
+    sampleOut,
+    testIn,
+    testOut,
+  };
+}
+
+function buildTestGroupDraftManifest(
+  config: ParsedConfig,
+  testIn: ReadonlyMap<string, Set<string>>,
+  testOut: ReadonlyMap<string, Set<string>>,
+): {
+  groups: ProblemPackageEditorGroup[];
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  const allGroupNames = new Set<string>([...testIn.keys(), ...testOut.keys()]);
+  const configGroupNames = new Set(config.groups.map((group) => group.name));
+
+  for (const groupName of configGroupNames) {
+    if (!allGroupNames.has(groupName)) {
+      warnings.push(`config.groups has '${groupName}', but tests/${groupName} is missing.`);
+    }
+  }
+  for (const groupName of allGroupNames) {
+    if (!configGroupNames.has(groupName)) {
+      warnings.push(`tests/${groupName} exists, but config.groups does not include it.`);
+    }
+  }
+
+  const configByName = new Map(config.groups.map((group) => [group.name, group]));
+  const orderedGroupNames = [
+    ...config.groups.map((group) => group.name),
+    ...[...allGroupNames].filter((name) => !configByName.has(name)).sort((a, b) => a.localeCompare(b)),
+  ];
+
+  const groups: ProblemPackageEditorGroup[] = [];
+  for (const [groupIndex, groupName] of orderedGroupNames.entries()) {
+    const inSet = testIn.get(groupName) ?? new Set<string>();
+    const outSet = testOut.get(groupName) ?? new Set<string>();
+    validatePairs(inSet, outSet, `tests/${groupName}`);
+
+    const configured = configByName.get(groupName);
+    const discoveredCases = [...inSet].sort((a, b) => a.localeCompare(b));
+    const caseNames = configured && configured.tests.length > 0 ? configured.tests : discoveredCases;
+
+    groups.push({
+      id: `group-${groupIndex + 1}`,
+      name: groupName,
+      score: config.scoringType === "sum_of_groups" ? configured?.score ?? 0 : null,
+      tests: caseNames.map((caseName, caseIndex) => ({
+        id: `group-${groupIndex + 1}-case-${caseIndex + 1}`,
+        name: caseName,
+        input: "",
+        output: "",
+        isLoaded: false,
+      })),
+    });
+  }
+
+  return { groups, warnings };
+}
+
+export function buildEditorDraftManifestFromZip(
+  fileName: string,
+  zipBuffer: Buffer,
+): ProblemPackageEditorDraft {
+  const archive = openProblemPackageArchive(fileName, zipBuffer);
+  const samples = buildSampleCases(archive.config.samples, archive.entryByPath, archive.sampleIn).map(
+    (sample, sampleIndex): ProblemPackageEditorSampleCase => ({
+      id: `sample-${sampleIndex + 1}`,
+      name: sample.name,
+      description: sample.description,
+      input: sample.input,
+      output: sample.output,
+    }),
+  );
+  const { groups, warnings: groupWarnings } = buildTestGroupDraftManifest(
+    archive.config,
+    archive.testIn,
+    archive.testOut,
+  );
+
+  return {
+    sourceLabel: fileName,
+    checkerType: archive.config.checkerType,
+    checkerLanguage: archive.config.checkerLanguage ?? "python",
+    checkerSourceCode: archive.config.checkerSourceCode ?? "",
+    compareMode: archive.config.compareMode,
+    zipSizeBytes: zipBuffer.byteLength,
+    fileCount: archive.files.length,
+    isPartial: true,
+    samples,
+    warnings: [...archive.config.warnings, ...groupWarnings],
+    groups,
+  };
+}
+
+export function inspectProblemPackageManifestFromZip(
+  fileName: string,
+  zipBuffer: Buffer,
+): ProblemPackageManifest {
+  const archive = openProblemPackageArchive(fileName, zipBuffer);
+  const sampleCases = buildSampleCases(
+    archive.config.samples,
+    archive.entryByPath,
+    archive.sampleIn,
+  );
+  const { groups, warnings: groupWarnings } = buildTestGroupDraftManifest(
+    archive.config,
+    archive.testIn,
+    archive.testOut,
+  );
+  const warnings = [...archive.config.warnings, ...groupWarnings];
+  const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
+  const testsByGroupName = new Map(groups.map((group) => [group.name, group.tests.length]));
+
+  return {
+    validation: {
+      fileName,
+      zipSizeBytes: zipBuffer.byteLength,
+      fileCount: archive.files.length,
+      samplePairs: sampleCases.length,
+      testGroupCount: groups.length,
+      totalTestPairs,
+      config: {
+        timeLimitMs: archive.config.timeLimitMs,
+        memoryLimitMb: archive.config.memoryLimitMb,
+        scoringType: archive.config.scoringType,
+        checkerType: archive.config.checkerType,
+        checkerLanguage: archive.config.checkerLanguage,
+        compareMode: archive.config.compareMode,
+        problem: {
+          slug: archive.config.problemSettings.slug ?? null,
+          visibility: archive.config.problemSettings.visibility ?? null,
+          explanationVisibility: archive.config.problemSettings.explanationVisibility ?? null,
+          difficulty:
+            archive.config.problemSettings.difficulty === undefined
+              ? null
+              : archive.config.problemSettings.difficulty,
+          testCaseVisibility: archive.config.problemSettings.testCaseVisibility ?? null,
+        },
+        samples: sampleCases.map((sample) => ({
+          name: sample.name,
+          description: sample.description,
+        })),
+        groups: groups.map((group) => ({
+          name: group.name,
+          score: group.score,
+          tests: testsByGroupName.get(group.name) ?? 0,
+        })),
+      },
+      warnings,
+    },
+    scoringType: archive.config.scoringType,
+    checkerType: archive.config.checkerType,
+    checkerLanguage: archive.config.checkerLanguage,
+    compareMode: archive.config.compareMode,
+    sampleCases,
+  };
+}
+
+export function readProblemPackageTestCaseFromZip(
+  fileName: string,
+  zipBuffer: Buffer,
+  params: {
+    groupName: string;
+    caseName: string;
+  },
+): ProblemPackageTestCase {
+  const archive = openProblemPackageArchive(fileName, zipBuffer);
+  const normalizedGroupName = params.groupName.trim();
+  const normalizedCaseName = params.caseName.trim();
+  if (!normalizedGroupName || !normalizedCaseName) {
+    throw new Error("groupName and caseName are required");
+  }
+
+  const inEntry = archive.entryByPath.get(casePath(normalizedGroupName, normalizedCaseName, "in"));
+  const outEntry = archive.entryByPath.get(casePath(normalizedGroupName, normalizedCaseName, "out"));
+  if (!inEntry || !outEntry) {
+    throw new Error(`tests/${normalizedGroupName}/${normalizedCaseName}.in/.out is required`);
+  }
+
+  return {
+    name: normalizedCaseName,
+    input: inEntry.getData().toString("utf8"),
+    output: outEntry.getData().toString("utf8"),
+  };
+}
+
 function trimBlankLines(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/^\s*\n+|\n+\s*$/g, "").trimEnd();
 }
@@ -919,6 +1233,7 @@ export function buildEditorDraftFromExtracted(
     compareMode: extracted.compareMode,
     zipSizeBytes: extracted.validation.zipSizeBytes,
     fileCount: extracted.validation.fileCount,
+    isPartial: false,
     samples: extracted.samples.map((sample, sampleIndex): ProblemPackageEditorSampleCase => ({
       id: `sample-${sampleIndex + 1}`,
       name: sample.name,
@@ -936,6 +1251,7 @@ export function buildEditorDraftFromExtracted(
         name: test.name,
         input: test.input,
         output: test.output,
+        isLoaded: true,
       })),
     })),
   };

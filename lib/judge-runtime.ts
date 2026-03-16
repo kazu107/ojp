@@ -8,6 +8,7 @@ import type {
   ProblemPackageScoringType,
   ProblemPackageCompareMode,
 } from "@/lib/problem-package";
+import type { LazyProblemPackageSource } from "@/lib/problem-package-lazy";
 import type { Language, Submission, SubmissionStatus } from "@/lib/types";
 import {
   isAcceptedSubmissionStatus,
@@ -414,7 +415,8 @@ export async function executePackageJudge(input: {
   language: Language;
   timeLimitMs: number;
   memoryLimitMb: number;
-  packageData: ProblemPackageExtracted;
+  packageData?: ProblemPackageExtracted;
+  packageSource?: LazyProblemPackageSource;
   nextTestResultId: () => string;
   onPhaseChange?: (status: "compiling" | "running" | "judging") => void;
   onTestResult?: (params: {
@@ -423,6 +425,34 @@ export async function executePackageJudge(input: {
     peakMemoryKb: number;
   }) => void;
 }): Promise<JudgeResult> {
+  const packageMeta = input.packageSource
+    ? {
+        scoringType: input.packageSource.manifest.scoringType,
+        checkerType: input.packageSource.manifest.checkerType,
+        checkerLanguage: input.packageSource.manifest.checkerLanguage,
+        checkerSourceCode: input.packageSource.checkerSourceCode,
+        compareMode: input.packageSource.manifest.compareMode,
+        groups: input.packageSource.groups,
+      }
+    : input.packageData
+      ? {
+          scoringType: input.packageData.scoringType,
+          checkerType: input.packageData.checkerType,
+          checkerLanguage: input.packageData.checkerLanguage,
+          checkerSourceCode: input.packageData.checkerSourceCode,
+          compareMode: input.packageData.compareMode,
+          groups: input.packageData.groups.map((group) => ({
+            name: group.name,
+            score: group.score,
+            orderIndex: group.orderIndex,
+            caseNames: group.tests.map((testCase) => testCase.name),
+          })),
+        }
+      : null;
+  if (!packageMeta) {
+    throw new Error("package data is required");
+  }
+
   const workspace = await mkdtemp(path.join(os.tmpdir(), "ojp-judge-"));
   try {
     const submissionWorkspace = path.join(workspace, "submission");
@@ -460,8 +490,8 @@ export async function executePackageJudge(input: {
 
     let checkerRuntime: CommandTemplate | null = null;
     let checkerWorkspace: string | null = null;
-    if (input.packageData.checkerType === "special_judge") {
-      if (!input.packageData.checkerLanguage || !input.packageData.checkerSourceCode) {
+    if (packageMeta.checkerType === "special_judge") {
+      if (!packageMeta.checkerLanguage || !packageMeta.checkerSourceCode) {
         return {
           status: "internal_error",
           score: 0,
@@ -483,9 +513,9 @@ export async function executePackageJudge(input: {
 
       checkerWorkspace = path.join(workspace, "checker");
       await mkdir(checkerWorkspace, { recursive: true });
-      const checkerCommands = resolveLanguageCommands(input.packageData.checkerLanguage);
+      const checkerCommands = resolveLanguageCommands(packageMeta.checkerLanguage);
       const checkerSourcePath = path.join(checkerWorkspace, checkerCommands.sourceFileName);
-      await writeFile(checkerSourcePath, input.packageData.checkerSourceCode, "utf8");
+      await writeFile(checkerSourcePath, packageMeta.checkerSourceCode, "utf8");
 
       const checkerCompile = await compileProgram(checkerWorkspace, checkerCommands);
       if (!checkerCompile.ok) {
@@ -519,9 +549,17 @@ export async function executePackageJudge(input: {
     let totalTimeMs = 0;
     let peakMemoryKb = 0;
 
-    for (const group of input.packageData.groups) {
+    for (const group of packageMeta.groups) {
       let groupAccepted = true;
-      for (const testCase of group.tests) {
+      for (const caseName of group.caseNames) {
+        const testCase = input.packageSource
+          ? await input.packageSource.readTestCase(group.name, caseName)
+          : input.packageData!.groups
+              .find((candidate) => candidate.name === group.name)
+              ?.tests.find((candidate) => candidate.name === caseName);
+        if (!testCase) {
+          throw new Error(`test case not found: ${group.name}/${caseName}`);
+        }
         input.onPhaseChange?.("running");
         const executed = await runWithFallback(runtimeTemplate, {
           cwd: submissionWorkspace,
@@ -549,7 +587,7 @@ export async function executePackageJudge(input: {
         } else if (runResult.exitCode !== 0) {
           verdict = "runtime_error";
           message = runResult.stderr || "Runtime error.";
-        } else if (input.packageData.checkerType === "special_judge") {
+        } else if (packageMeta.checkerType === "special_judge") {
           const checked =
             checkerRuntime && checkerWorkspace
               ? await runSpecialJudgeCase({
@@ -565,9 +603,7 @@ export async function executePackageJudge(input: {
                 };
           verdict = checked.verdict;
           message = checked.message;
-        } else if (
-          !isOutputAccepted(runResult.stdout, testCase.output, input.packageData.compareMode)
-        ) {
+        } else if (!isOutputAccepted(runResult.stdout, testCase.output, packageMeta.compareMode)) {
           verdict = "wrong_answer";
           message = "Expected output differs.";
         }
@@ -602,7 +638,7 @@ export async function executePackageJudge(input: {
     input.onPhaseChange?.("judging");
     return {
       status: overallVerdict(results),
-      score: scoreFromGroups(input.packageData.scoringType, judgedGroupStates),
+      score: scoreFromGroups(packageMeta.scoringType, judgedGroupStates),
       totalTimeMs,
       peakMemoryKb,
       testResults: results,

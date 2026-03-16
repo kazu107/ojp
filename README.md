@@ -61,7 +61,7 @@ AtCoder 風プラットフォームの MVP プロトタイプです。
   - 表示名一意制約
   - 監査ログ記録
 - 問題 ZIP 検証 API:
-  - `POST /api/problems/:problemId/package`
+  - `GET/POST /api/problems/:problemId/package`
   - 必須ファイル・`.in/.out` ペア・path traversal・容量上限を検証
   - 検証成功時に `timeLimitMs / memoryLimitMb / scoringType` を問題設定へ反映
 
@@ -236,8 +236,15 @@ npm run build
 - `POST /api/problems/:problemId/unpublish`
 - `POST /api/problem-packages/inspect`
 - `POST /api/problem-packages/test`
+- `PUT /api/problem-packages/upload`
+- `GET /api/package-jobs/:jobId`
+- `GET /api/problems/:problemId/package`
+- `PUT /api/problems/:problemId/package`
+- `GET /api/problems/:problemId/package/manifest`
 - `POST /api/problems/:problemId/package`
+- `GET /api/problems/:problemId/package/testcase?groupName=&caseName=`
 - `POST /api/problems/:problemId/package/manual`
+- `GET /api/problems/:problemId/samples`
 - `GET /api/problems/:problemId/explanation`
 - `PUT /api/problems/:problemId/explanation`
 - `GET /api/announcements`
@@ -307,6 +314,15 @@ npm run db:push -- --accept-data-loss
 
 - ZIP import:
   `statement.md` と `config.json` からフォームを自動入力
+- 既存問題の編集ページでは:
+  stored ZIP を必要な時だけ読み込むため、大きい package でも初期表示は軽量
+  - package manifest だけ先に読み込む
+  - testcase 本文は選択時に遅延取得
+  - 保存 / test run / ZIP export の直前に、未読込 testcase があれば読み込む
+- 保存 / test run:
+  - ZIP はまず object storage へ送信
+  - 重い package apply / preview は worker で実行
+  - client は package job を polling して完了を待つ
 - Manual editor:
   samples / groups / cases / score / checker をページ上で直接編集
   - special judge の checker フィールドには言語別テンプレートを自動入力
@@ -374,6 +390,12 @@ problem-package.zip
   - `0` = AC
   - `1` = WA
   - その他 = judge error (`internal_error`)
+
+## Problem Detail Samples
+
+- 問題詳細ページは `Problem.sampleCases` を優先して表示
+- 既存問題で `sampleCases` が未保存の場合のみ `/api/problems/:problemId/samples` から遅延取得
+- これにより problem detail の初期表示で package 全体を server-side 展開しません
 
 ### 検証ルール
 

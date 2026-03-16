@@ -30,10 +30,12 @@ import {
   buildEditorDraftFromExtracted,
   buildProblemPackageZip,
   type ProblemPackageExtracted,
+  type ProblemPackageManifest,
 } from "@/lib/problem-package";
 import { validateProblemPackageCached } from "@/lib/problem-package-cache";
 import { executePackageJudge } from "@/lib/judge-runtime";
 import { getJudgeEnvironmentVersion } from "@/lib/judge-config";
+import { createLazyProblemPackageSourceFromStorageRef } from "@/lib/problem-package-lazy";
 import {
   deleteProblemPackageZip,
   getProblemPackageZip,
@@ -63,6 +65,8 @@ const DISPLAY_NAME_CHANGE_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
 const STORE_STATE_ID = "default";
 const STORE_PERSIST_INTERVAL_MS = 3_000;
 const STORE_REFRESH_INTERVAL_MS = 1_000;
+const PROBLEM_PACKAGE_MEMORY_CACHE_LIMIT = 2;
+const PROBLEM_PACKAGE_MEMORY_CACHE_MAX_ZIP_BYTES = 4 * 1024 * 1024;
 const STORE_DB_SYNC_ENABLED = process.env.STORE_DB_SYNC !== "0";
 const JUDGE_PROCESS_MODE =
   process.env.JUDGE_PROCESS_MODE === "web" ||
@@ -100,6 +104,52 @@ function shouldGrantAdminFromGitHub(params: { githubLogin: string; githubId?: st
   return false;
 }
 type JudgeJobReason = "normal" | "rejudge";
+type PackageJobStatus = "queued" | "running" | "completed" | "failed";
+
+interface PackageJobPreviewResult {
+  status: SubmissionStatus;
+  score: number;
+  totalTimeMs: number;
+  peakMemoryKb: number;
+  testResults: Submission["testResults"];
+}
+
+type PackageJobRecord =
+  | {
+      id: string;
+      type: "apply";
+      requestedBy: string;
+      status: PackageJobStatus;
+      createdAt: string;
+      startedAt: string | null;
+      finishedAt: string | null;
+      error: string | null;
+      problemId: string;
+      fileName: string;
+      storageRef: ProblemPackageStorageRef;
+      previousRef: ProblemPackageStorageRef | null;
+      result: {
+        problemId: string;
+      } | null;
+    }
+  | {
+      id: string;
+      type: "preview";
+      requestedBy: string;
+      status: PackageJobStatus;
+      createdAt: string;
+      startedAt: string | null;
+      finishedAt: string | null;
+      error: string | null;
+      problemId: string | null;
+      fileName: string;
+      storageRef: ProblemPackageStorageRef;
+      language: Language;
+      sourceCode: string;
+      timeLimitMs: number;
+      memoryLimitMb: number;
+      result: PackageJobPreviewResult | null;
+    };
 
 interface RateLimits {
   submissionByUserWindow: Record<string, number[]>;
@@ -120,6 +170,9 @@ interface Store {
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
   githubIndex: Record<string, string>;
+  packageJobs: PackageJobRecord[];
+  packageJobQueue: string[];
+  packageJobWorkerRunning: boolean;
   judgeQueue: Array<{
     id: string;
     submissionId: string;
@@ -140,6 +193,7 @@ interface Store {
     audit: number;
     rejudge: number;
     judgeJob: number;
+    packageJob: number;
   };
   rateLimits: RateLimits;
 }
@@ -156,6 +210,8 @@ interface StoreSnapshot {
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
   githubIndex: Record<string, string>;
+  packageJobs: PackageJobRecord[];
+  packageJobQueue: string[];
   judgeQueue: Store["judgeQueue"];
   counters: Store["counters"];
   rateLimits: RateLimits;
@@ -171,6 +227,7 @@ const globalStore = globalThis as unknown as {
   __ojpStorePersistInFlight?: boolean;
   __ojpStorePersistQueued?: boolean;
   __ojpDedicatedJudgeLoopStarted?: boolean;
+  __ojpProblemPackageCacheOrder?: string[];
 };
 
 export class HttpError extends Error {
@@ -271,6 +328,7 @@ function createInitialStore(): Store {
       scoringType: "sum",
       testCaseVisibility: "case_index_only",
       latestPackageSummary: null,
+      sampleCases: [],
       createdAt,
       updatedAt: createdAt,
     },
@@ -294,6 +352,7 @@ function createInitialStore(): Store {
       scoringType: "sum",
       testCaseVisibility: "case_index_only",
       latestPackageSummary: null,
+      sampleCases: [],
       createdAt,
       updatedAt: createdAt,
     },
@@ -587,6 +646,9 @@ function createInitialStore(): Store {
     auditLogs,
     rejudgeRequests: [],
     githubIndex: {},
+    packageJobs: [],
+    packageJobQueue: [],
+    packageJobWorkerRunning: false,
     judgeQueue: [],
     judgeInFlightSubmissionIds: [],
     judgeWorkerRunning: false,
@@ -601,6 +663,7 @@ function createInitialStore(): Store {
       audit: 1001,
       rejudge: 1000,
       judgeJob: 1000,
+      packageJob: 1000,
     },
     rateLimits: {
       submissionByUserWindow: {},
@@ -612,6 +675,15 @@ function createInitialStore(): Store {
 }
 
 function normalizeStoreInPlace(target: Store): void {
+  if (!Array.isArray(target.packageJobs)) {
+    target.packageJobs = [];
+  }
+  if (!Array.isArray(target.packageJobQueue)) {
+    target.packageJobQueue = [];
+  }
+  if (typeof target.packageJobWorkerRunning !== "boolean") {
+    target.packageJobWorkerRunning = false;
+  }
   if (!Array.isArray(target.judgeQueue)) {
     target.judgeQueue = [];
   }
@@ -638,6 +710,9 @@ function normalizeStoreInPlace(target: Store): void {
   }
   if (typeof target.counters.judgeJob !== "number") {
     target.counters.judgeJob = 1000;
+  }
+  if (typeof target.counters.packageJob !== "number") {
+    target.counters.packageJob = 1000;
   }
   if (!target.problemPackages || typeof target.problemPackages !== "object") {
     target.problemPackages = {};
@@ -702,12 +777,21 @@ function normalizeStoreInPlace(target: Store): void {
     const legacyProblem = problem as Problem & {
       difficulty?: number | null;
       latestPackageSummary?: Problem["latestPackageSummary"];
+      sampleCases?: Problem["sampleCases"];
     };
     if (legacyProblem.difficulty === undefined) {
       legacyProblem.difficulty = null;
     }
     if (legacyProblem.latestPackageSummary === undefined) {
       legacyProblem.latestPackageSummary = null;
+    }
+    if (!Array.isArray(legacyProblem.sampleCases)) {
+      legacyProblem.sampleCases = target.problemPackages[problem.id]?.samples.map((sample) => ({
+        name: sample.name,
+        description: sample.description,
+        input: sample.input,
+        output: sample.output,
+      })) ?? [];
     }
   }
   for (const submission of target.submissions) {
@@ -753,6 +837,8 @@ function captureStoreSnapshot(target: Store): StoreSnapshot {
       auditLogs: target.auditLogs,
       rejudgeRequests: target.rejudgeRequests,
       githubIndex: target.githubIndex,
+      packageJobs: target.packageJobs,
+      packageJobQueue: target.packageJobQueue,
       judgeQueue: target.judgeQueue,
       counters: target.counters,
       rateLimits: target.rateLimits,
@@ -779,6 +865,8 @@ function applyStoreSnapshotInPlace(target: Store, snapshot: StoreSnapshot): void
   target.rejudgeRequests = Array.isArray(snapshot.rejudgeRequests) ? snapshot.rejudgeRequests : [];
   target.githubIndex =
     snapshot.githubIndex && typeof snapshot.githubIndex === "object" ? snapshot.githubIndex : {};
+  target.packageJobs = Array.isArray(snapshot.packageJobs) ? snapshot.packageJobs : [];
+  target.packageJobQueue = Array.isArray(snapshot.packageJobQueue) ? snapshot.packageJobQueue : [];
   target.judgeQueue = Array.isArray(snapshot.judgeQueue) ? snapshot.judgeQueue : [];
   target.counters = {
     ...target.counters,
@@ -790,8 +878,40 @@ function applyStoreSnapshotInPlace(target: Store, snapshot: StoreSnapshot): void
     rejudgeByUserWindow: snapshot.rateLimits?.rejudgeByUserWindow ?? {},
     rejudgeCooldownByProblem: snapshot.rateLimits?.rejudgeCooldownByProblem ?? {},
   };
+  target.packageJobWorkerRunning = false;
   target.judgeInFlightSubmissionIds = [];
   target.judgeWorkerRunning = false;
+  globalStore.__ojpProblemPackageCacheOrder = Object.keys(target.problemPackages);
+}
+
+function forgetProblemPackageData(problemId: string): void {
+  delete store.problemPackages[problemId];
+  globalStore.__ojpProblemPackageCacheOrder = (
+    globalStore.__ojpProblemPackageCacheOrder ?? []
+  ).filter((entry) => entry !== problemId);
+}
+
+function rememberProblemPackageData(
+  problemId: string,
+  packageData: ProblemPackageExtracted,
+): void {
+  if (packageData.validation.zipSizeBytes > PROBLEM_PACKAGE_MEMORY_CACHE_MAX_ZIP_BYTES) {
+    forgetProblemPackageData(problemId);
+    return;
+  }
+
+  store.problemPackages[problemId] = packageData;
+  const order = (globalStore.__ojpProblemPackageCacheOrder ?? []).filter(
+    (entry) => entry !== problemId,
+  );
+  order.push(problemId);
+  while (order.length > PROBLEM_PACKAGE_MEMORY_CACHE_LIMIT) {
+    const evicted = order.shift();
+    if (evicted) {
+      delete store.problemPackages[evicted];
+    }
+  }
+  globalStore.__ojpProblemPackageCacheOrder = order;
 }
 
 async function persistStoreSnapshotNow(): Promise<void> {
@@ -994,6 +1114,12 @@ function nextRejudgeId(): string {
 function nextJudgeJobId(): string {
   const id = `jq${store.counters.judgeJob}`;
   store.counters.judgeJob += 1;
+  return id;
+}
+
+function nextPackageJobId(): string {
+  const id = `pj${store.counters.packageJob}`;
+  store.counters.packageJob += 1;
   return id;
 }
 
@@ -1203,8 +1329,19 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
     return;
   }
 
-  const packageData = await loadProblemPackageData(problem.id);
-  if (!packageData || packageData.groups.length === 0) {
+  const packageRef = store.problemPackageRefs[problem.id];
+  const packageData = packageRef ? null : await loadProblemPackageData(problem.id);
+  const packageSource =
+    packageRef && isProblemPackageObjectStorageEnabled()
+      ? await createLazyProblemPackageSourceFromStorageRef({
+          ref: packageRef,
+          fileName: problem.latestPackageSummary?.fileName ?? `${problem.slug}.zip`,
+        })
+      : null;
+  const hasGroups =
+    packageSource ? packageSource.groups.length > 0 : (packageData?.groups.length ?? 0) > 0;
+  if (!hasGroups) {
+    await packageSource?.cleanup();
     markSubmissionAsInternalError(
       submission,
       "problem package is not configured. upload ZIP package before judging",
@@ -1231,7 +1368,8 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       language: submission.language,
       timeLimitMs: problem.timeLimitMs,
       memoryLimitMb: problem.memoryLimitMb,
-      packageData,
+      packageData: packageData ?? undefined,
+      packageSource: packageSource ?? undefined,
       nextTestResultId,
       onPhaseChange: (phase) => {
         submission.status = phase;
@@ -1276,6 +1414,8 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
         score: String(submission.score),
       },
     });
+  } finally {
+    await packageSource?.cleanup();
   }
 }
 
@@ -1339,6 +1479,43 @@ function enqueueJudgeJob(submissionId: string, reason: JudgeJobReason = "normal"
     requestedAt,
   });
   scheduleJudgeWorker();
+}
+
+function findPackageJobById(jobId: string): PackageJobRecord | undefined {
+  return store.packageJobs.find((job) => job.id === jobId);
+}
+
+function schedulePackageJobWorker(): void {
+  if (!canExecuteJudgeJobsInThisProcess()) {
+    return;
+  }
+  if (store.packageJobWorkerRunning) {
+    return;
+  }
+
+  store.packageJobWorkerRunning = true;
+  const tick = async () => {
+    const nextJobId = store.packageJobQueue.shift();
+    if (!nextJobId) {
+      store.packageJobWorkerRunning = false;
+      return;
+    }
+
+    try {
+      void persistStoreSnapshotNow();
+      await runPackageJobInternal(nextJobId);
+    } finally {
+      void persistStoreSnapshotNow();
+    }
+
+    setTimeout(() => {
+      void tick();
+    }, 50);
+  };
+
+  setTimeout(() => {
+    void tick();
+  }, 100);
 }
 
 function sortBySubmittedAtAsc<T extends { submittedAt: string }>(items: T[]): T[] {
@@ -1816,7 +1993,7 @@ async function loadProblemPackageData(problemId: string): Promise<ProblemPackage
     ? storedFileName
     : `${storedFileName}.zip`;
   const extracted = validateProblemPackageCached(fileName, zipBuffer);
-  store.problemPackages[problemId] = extracted;
+  rememberProblemPackageData(problemId, extracted);
   return extracted;
 }
 
@@ -1904,6 +2081,12 @@ export async function getProblemPackageData(
   return loadProblemPackageData(problemId);
 }
 
+export function getProblemPackageStorageRef(
+  problemId: string,
+): ProblemPackageStorageRef | undefined {
+  return store.problemPackageRefs[problemId];
+}
+
 export async function createProblem(input: CreateProblemInput): Promise<Problem> {
   uniqueSlugOrThrow("problem", input.slug);
   const user = await getCurrentUser();
@@ -1929,6 +2112,7 @@ export async function createProblem(input: CreateProblemInput): Promise<Problem>
     scoringType: "sum",
     testCaseVisibility: input.testCaseVisibility,
     latestPackageSummary: null,
+    sampleCases: [],
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -2007,6 +2191,14 @@ export async function applyProblemPackageValidation(
     throw new HttpError("you cannot upload package for this problem", 403);
   }
 
+  return applyProblemPackageExtractedInternal(problem, packageData, storageRef ?? null);
+}
+
+async function applyProblemPackageExtractedInternal(
+  problem: Problem,
+  packageData: ProblemPackageExtracted,
+  storageRef: ProblemPackageStorageRef | null,
+): Promise<Problem> {
   problem.timeLimitMs = packageData.validation.config.timeLimitMs;
   problem.memoryLimitMb = packageData.validation.config.memoryLimitMb;
   problem.scoringType =
@@ -2021,8 +2213,14 @@ export async function applyProblemPackageValidation(
     warnings: packageData.validation.warnings,
     validatedAt: nowIso(),
   };
+  problem.sampleCases = packageData.samples.map((sample) => ({
+    name: sample.name,
+    description: sample.description,
+    input: sample.input,
+    output: sample.output,
+  }));
   const previousRef = store.problemPackageRefs[problem.id];
-  store.problemPackages[problem.id] = packageData;
+  rememberProblemPackageData(problem.id, packageData);
   if (storageRef) {
     store.problemPackageRefs[problem.id] = storageRef;
     if (previousRef && previousRef.key !== storageRef.key) {
@@ -2033,6 +2231,233 @@ export async function applyProblemPackageValidation(
   await persistStoreSnapshotNow();
 
   return problem;
+}
+
+async function applyProblemPackageManifestInternal(
+  problem: Problem,
+  manifest: ProblemPackageManifest,
+  storageRef: ProblemPackageStorageRef | null,
+  previousRef: ProblemPackageStorageRef | null,
+): Promise<Problem> {
+  problem.timeLimitMs = manifest.validation.config.timeLimitMs;
+  problem.memoryLimitMb = manifest.validation.config.memoryLimitMb;
+  problem.scoringType =
+    manifest.scoringType === "sum_of_groups" ? "sum_of_groups" : manifest.scoringType;
+  problem.latestPackageSummary = {
+    fileName: manifest.validation.fileName,
+    zipSizeBytes: manifest.validation.zipSizeBytes,
+    fileCount: manifest.validation.fileCount,
+    samplePairs: manifest.validation.samplePairs,
+    testGroupCount: manifest.validation.testGroupCount,
+    totalTestPairs: manifest.validation.totalTestPairs,
+    warnings: manifest.validation.warnings,
+    validatedAt: nowIso(),
+  };
+  problem.sampleCases = manifest.sampleCases.map((sample) => ({
+    name: sample.name,
+    description: sample.description,
+    input: sample.input,
+    output: sample.output,
+  }));
+  forgetProblemPackageData(problem.id);
+  if (storageRef) {
+    store.problemPackageRefs[problem.id] = storageRef;
+    if (previousRef && previousRef.key !== storageRef.key) {
+      await deleteProblemPackageZip(previousRef);
+    }
+  }
+  problem.updatedAt = nowIso();
+  await persistStoreSnapshotNow();
+  return problem;
+}
+
+function repairPackageJobQueueInternal(): number {
+  const queuedJobIds = new Set(store.packageJobQueue);
+  let requeued = 0;
+  for (const job of store.packageJobs) {
+    if (job.status !== "queued" && job.status !== "running") {
+      continue;
+    }
+    if (queuedJobIds.has(job.id)) {
+      continue;
+    }
+    if (job.status === "running") {
+      job.status = "queued";
+      job.startedAt = null;
+      job.finishedAt = null;
+      job.error = null;
+    }
+    store.packageJobQueue.push(job.id);
+    requeued += 1;
+  }
+  if (store.packageJobQueue.length > 0) {
+    schedulePackageJobWorker();
+  }
+  if (requeued > 0) {
+    void persistStoreSnapshotNow();
+  }
+  return requeued;
+}
+
+async function runPackageJobInternal(jobId: string): Promise<void> {
+  const job = findPackageJobById(jobId);
+  if (!job || (job.status !== "queued" && job.status !== "running")) {
+    return;
+  }
+
+  job.status = "running";
+  job.startedAt = nowIso();
+  job.finishedAt = null;
+  job.error = null;
+
+  try {
+    const packageSource = await createLazyProblemPackageSourceFromStorageRef({
+      ref: job.storageRef,
+      fileName: job.fileName,
+    });
+
+    try {
+      if (job.type === "apply") {
+        const manifest = packageSource.manifest;
+        const problem = resolveProblemIfExists(job.problemId);
+        await applyProblemPackageManifestInternal(
+          problem,
+          manifest,
+          job.storageRef,
+          job.previousRef,
+        );
+        job.result = {
+          problemId: problem.id,
+        };
+      } else {
+        let testResultCounter = 0;
+        const result = await executePackageJudge({
+          sourceCode: job.sourceCode,
+          language: job.language,
+          timeLimitMs: job.timeLimitMs,
+          memoryLimitMb: job.memoryLimitMb,
+          packageSource,
+          nextTestResultId: () => `preview-test-result-${++testResultCounter}`,
+        });
+        job.result = result;
+      }
+
+      job.status = "completed";
+      job.finishedAt = nowIso();
+    } finally {
+      await packageSource.cleanup();
+    }
+  } catch (error) {
+    job.status = "failed";
+    job.error = error instanceof Error ? error.message : "package job failed";
+    job.finishedAt = nowIso();
+    if (job.type === "apply") {
+      const currentRef = store.problemPackageRefs[job.problemId];
+      if (!currentRef || currentRef.key !== job.storageRef.key) {
+        try {
+          await deleteProblemPackageZip(job.storageRef);
+        } catch {
+          // noop
+        }
+      }
+    }
+  } finally {
+    if (job.type === "preview") {
+      try {
+        await deleteProblemPackageZip(job.storageRef);
+      } catch {
+        // noop
+      }
+    }
+  }
+}
+
+export async function createProblemPackageApplyJob(input: {
+  problemId: string;
+  fileName: string;
+  storageRef: ProblemPackageStorageRef;
+}): Promise<PackageJobRecord> {
+  const actor = await getCurrentUser();
+  const problem = resolveProblemIfExists(input.problemId);
+  if (actor.role !== "admin" && problem.authorId !== actor.id) {
+    throw new HttpError("you cannot upload package for this problem", 403);
+  }
+
+  const job: PackageJobRecord = {
+    id: nextPackageJobId(),
+    type: "apply",
+    requestedBy: actor.id,
+    status: "queued",
+    createdAt: nowIso(),
+    startedAt: null,
+    finishedAt: null,
+    error: null,
+    problemId: problem.id,
+    fileName: input.fileName,
+    storageRef: input.storageRef,
+    previousRef: store.problemPackageRefs[problem.id] ?? null,
+    result: null,
+  };
+  store.packageJobs.unshift(job);
+  store.packageJobQueue.push(job.id);
+  await persistStoreSnapshotNow();
+  schedulePackageJobWorker();
+  return job;
+}
+
+export async function createProblemPackagePreviewJob(input: {
+  problemId?: string | null;
+  fileName: string;
+  storageRef: ProblemPackageStorageRef;
+  sourceCode: string;
+  language: Language;
+  timeLimitMs: number;
+  memoryLimitMb: number;
+}): Promise<PackageJobRecord> {
+  const actor = await getCurrentUser();
+  assertActiveUser(actor);
+  if (!canCreateProblemByRole(actor.role)) {
+    throw new HttpError("problem creation requires problem_author role", 403);
+  }
+
+  const job: PackageJobRecord = {
+    id: nextPackageJobId(),
+    type: "preview",
+    requestedBy: actor.id,
+    status: "queued",
+    createdAt: nowIso(),
+    startedAt: null,
+    finishedAt: null,
+    error: null,
+    problemId: input.problemId ?? null,
+    fileName: input.fileName,
+    storageRef: input.storageRef,
+    language: input.language,
+    sourceCode: input.sourceCode,
+    timeLimitMs: input.timeLimitMs,
+    memoryLimitMb: input.memoryLimitMb,
+    result: null,
+  };
+  store.packageJobs.unshift(job);
+  store.packageJobQueue.push(job.id);
+  await persistStoreSnapshotNow();
+  schedulePackageJobWorker();
+  return job;
+}
+
+export async function getPackageJobForViewer(jobId: string): Promise<PackageJobRecord> {
+  const actor = await getCurrentUser();
+  if (JUDGE_PROCESS_MODE === "web") {
+    await refreshStoreFromDbNow();
+  }
+  const job = findPackageJobById(jobId);
+  if (!job) {
+    throw new HttpError("package job not found", 404);
+  }
+  if (actor.role !== "admin" && job.requestedBy !== actor.id) {
+    throw new HttpError("you cannot access this package job", 403);
+  }
+  return job;
 }
 
 export function listContestsForListView(viewerId: string): Contest[] {
@@ -2985,7 +3410,7 @@ export async function deleteProblemByAdmin(
 
   store.problems = store.problems.filter((item) => item.id !== problemId);
   const packageRef = store.problemPackageRefs[problemId];
-  delete store.problemPackages[problemId];
+  forgetProblemPackageData(problemId);
   delete store.problemPackageRefs[problemId];
   store.contests = store.contests.map((contest) => ({
     ...contest,
@@ -3183,16 +3608,23 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
   globalStore.__ojpDedicatedJudgeLoopStarted = true;
 
   const tick = async () => {
-    if (store.judgeWorkerRunning) {
+    if (store.judgeWorkerRunning || store.packageJobWorkerRunning) {
       return;
     }
     await refreshStoreFromDbNow();
     const requeued = repairJudgeQueueInternal();
+    const requeuedPackageJobs = repairPackageJobQueueInternal();
     if (requeued > 0) {
+      await persistStoreSnapshotNow();
+    }
+    if (requeuedPackageJobs > 0) {
       await persistStoreSnapshotNow();
     }
     if (store.judgeQueue.length > 0) {
       scheduleJudgeWorker();
+    }
+    if (store.packageJobQueue.length > 0) {
+      schedulePackageJobWorker();
     }
   };
 

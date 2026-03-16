@@ -14,6 +14,7 @@ export interface ProblemPackageEditorTestCase {
   name: string;
   input: string;
   output: string;
+  isLoaded?: boolean;
 }
 
 export interface ProblemPackageEditorSampleCase
@@ -36,6 +37,7 @@ export interface ProblemPackageEditorDraft {
   compareMode: ProblemPackageCompareMode;
   zipSizeBytes: number;
   fileCount: number;
+  isPartial?: boolean;
   samples: ProblemPackageEditorSampleCase[];
   warnings: string[];
   groups: ProblemPackageEditorGroup[];

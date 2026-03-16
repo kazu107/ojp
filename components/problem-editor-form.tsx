@@ -64,6 +64,28 @@ interface PackageTestPreviewResult {
   testResults: Submission["testResults"];
 }
 
+interface UploadedPackageRef {
+  provider: "r2";
+  bucket: string;
+  key: string;
+  uploadedAt: string;
+  sizeBytes: number;
+  etag: string | null;
+}
+
+interface PackageJobEnvelope {
+  job: {
+    id: string;
+    type: "apply" | "preview";
+    status: "queued" | "running" | "completed" | "failed";
+    createdAt: string;
+    startedAt: string | null;
+    finishedAt: string | null;
+    error: string | null;
+    result: unknown;
+  };
+}
+
 interface PreviewGroupedTestResults {
   groupName: string;
   verdict: SubmissionStatus;
@@ -142,6 +164,7 @@ function createBlankPackageDraft(): ProblemPackageEditorDraft {
     compareMode: "exact",
     zipSizeBytes: 0,
     fileCount: 0,
+    isPartial: false,
     samples: [
       {
         id: createId("sample"),
@@ -163,6 +186,7 @@ function createBlankPackageDraft(): ProblemPackageEditorDraft {
             name: "01",
             input: "",
             output: "",
+            isLoaded: true,
           },
         ],
       },
@@ -193,11 +217,14 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const [isInspectingPackage, setIsInspectingPackage] = useState(false);
   const [inspectProgressText, setInspectProgressText] = useState("");
   const [isExportingPackage, setIsExportingPackage] = useState(false);
+  const [isLoadingExistingPackage, setIsLoadingExistingPackage] = useState(false);
+  const [loadingTestCaseId, setLoadingTestCaseId] = useState<string | null>(null);
   const [isRunningPreview, setIsRunningPreview] = useState(false);
   const [error, setError] = useState<string>("");
   const [packageError, setPackageError] = useState<string>("");
   const [packageNotice, setPackageNotice] = useState<string>("");
   const [previewError, setPreviewError] = useState("");
+  const [previewNotice, setPreviewNotice] = useState("");
   const [packageDraft, setPackageDraft] = useState<ProblemPackageEditorDraft | null>(
     props.initialPackageDraft ?? null,
   );
@@ -222,6 +249,8 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   }, [props]);
 
   const method = props.mode === "edit" ? "PATCH" : "POST";
+  const hasExistingStoredPackage =
+    props.mode === "edit" && Boolean(props.initialProblem.latestPackageSummary);
 
   async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
     try {
@@ -308,14 +337,255 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     }
   }
 
-  async function buildCurrentPackageFile(): Promise<File> {
+  function patchLoadedTestCase(
+    draft: ProblemPackageEditorDraft,
+    params: {
+      groupId: string;
+      caseId: string;
+    },
+    testCase: {
+      input: string;
+      output: string;
+    },
+  ): ProblemPackageEditorDraft {
+    return {
+      ...draft,
+      groups: draft.groups.map((group) =>
+        group.id !== params.groupId
+          ? group
+          : {
+              ...group,
+              tests: group.tests.map((entry) =>
+                entry.id !== params.caseId
+                  ? entry
+                  : {
+                      ...entry,
+                      input: testCase.input,
+                      output: testCase.output,
+                      isLoaded: true,
+                    },
+              ),
+            },
+      ),
+    };
+  }
+
+  async function loadExistingPackage() {
+    if (props.mode !== "edit") {
+      return;
+    }
+
+    setIsLoadingExistingPackage(true);
+    setPackageError("");
+    setPackageNotice("");
+    setInspectProgressText("Loading stored package manifest...");
+
+    try {
+      const response = await fetch(`/api/problems/${props.initialProblem.id}/package/manifest`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const message = await parseErrorMessage(response, "failed to load stored package");
+        throw new Error(message);
+      }
+
+      const body = (await response.json()) as { draft: ProblemPackageEditorDraft };
+      setPackageDraft(body.draft);
+      importedPackageFileRef.current = null;
+      importedPackageSignatureRef.current = null;
+      generatedPackageFileCacheRef.current = null;
+      setPackageNotice(
+        "Loaded package metadata. Individual test cases will be fetched only when selected.",
+      );
+    } catch (loadError) {
+      setPackageError(
+        loadError instanceof Error ? loadError.message : "failed to load stored package",
+      );
+    } finally {
+      setInspectProgressText("");
+      setIsLoadingExistingPackage(false);
+    }
+  }
+
+  async function loadExistingTestCase(params: {
+    groupId: string;
+    groupName: string;
+    caseId: string;
+    caseName: string;
+  }) {
+    if (props.mode !== "edit") {
+      return;
+    }
+
+    const currentDraft = packageDraft;
+    const currentCase = currentDraft?.groups
+      .find((group) => group.id === params.groupId)
+      ?.tests.find((testCase) => testCase.id === params.caseId);
+    if (!currentDraft || currentCase?.isLoaded !== false || loadingTestCaseId === params.caseId) {
+      return;
+    }
+
+    setLoadingTestCaseId(params.caseId);
+    try {
+      const url = new URL(
+        `/api/problems/${props.initialProblem.id}/package/testcase`,
+        window.location.origin,
+      );
+      url.searchParams.set("groupName", params.groupName);
+      url.searchParams.set("caseName", params.caseName);
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const message = await parseErrorMessage(response, "failed to load test case");
+        throw new Error(message);
+      }
+
+      const body = (await response.json()) as {
+        testCase: {
+          input: string;
+          output: string;
+        };
+      };
+      setPackageDraft((current) =>
+        current ? patchLoadedTestCase(current, params, body.testCase) : current,
+      );
+    } catch (loadError) {
+      setPackageError(loadError instanceof Error ? loadError.message : "failed to load test case");
+    } finally {
+      setLoadingTestCaseId((current) => (current === params.caseId ? null : current));
+    }
+  }
+
+  async function hydratePartialPackageDraftIfNeeded(): Promise<ProblemPackageEditorDraft> {
     if (!packageDraft) {
       throw new Error("Judge package is required.");
     }
+    if (!packageDraft.isPartial || props.mode !== "edit") {
+      return packageDraft;
+    }
+
+    let nextDraft = packageDraft;
+    const missingCases = nextDraft.groups.flatMap((group) =>
+      group.tests
+        .filter((testCase) => testCase.isLoaded === false)
+        .map((testCase) => ({
+          groupId: group.id,
+          groupName: group.name,
+          caseId: testCase.id,
+          caseName: testCase.name,
+        })),
+    );
+    if (missingCases.length === 0) {
+      const completedDraft = {
+        ...nextDraft,
+        isPartial: false,
+      };
+      setPackageDraft(completedDraft);
+      return completedDraft;
+    }
+
+    setIsLoadingExistingPackage(true);
+    setPackageError("");
+    try {
+      for (const [index, missingCase] of missingCases.entries()) {
+        setInspectProgressText(
+          `Loading ${missingCase.groupName}/${missingCase.caseName} (${index + 1}/${missingCases.length})`,
+        );
+        const url = new URL(
+          `/api/problems/${props.initialProblem.id}/package/testcase`,
+          window.location.origin,
+        );
+        url.searchParams.set("groupName", missingCase.groupName);
+        url.searchParams.set("caseName", missingCase.caseName);
+        const response = await fetch(url.toString(), {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          const message = await parseErrorMessage(response, "failed to load test case");
+          throw new Error(message);
+        }
+        const body = (await response.json()) as {
+          testCase: {
+            input: string;
+            output: string;
+          };
+        };
+        nextDraft = patchLoadedTestCase(nextDraft, missingCase, body.testCase);
+        setPackageDraft(nextDraft);
+      }
+
+      nextDraft = {
+        ...nextDraft,
+        isPartial: false,
+      };
+      setPackageDraft(nextDraft);
+      return nextDraft;
+    } finally {
+      setInspectProgressText("");
+      setIsLoadingExistingPackage(false);
+    }
+  }
+
+  async function uploadPackageToR2(file: File): Promise<{
+    storageRef: UploadedPackageRef;
+    fileName: string;
+  }> {
+    const response = await fetch("/api/problem-packages/upload", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/zip",
+        "x-ojp-file-name": file.name,
+        "x-ojp-file-size": String(file.size),
+      },
+      body: file,
+    });
+    if (!response.ok) {
+      const message = await parseErrorMessage(response, "failed to upload problem package");
+      throw new Error(message);
+    }
+
+    return (await response.json()) as {
+      storageRef: UploadedPackageRef;
+      fileName: string;
+    };
+  }
+
+  async function pollPackageJob<T>(
+    jobId: string,
+    onProgress?: (status: "queued" | "running" | "completed" | "failed") => void,
+  ): Promise<T> {
+    for (;;) {
+      const response = await fetch(`/api/package-jobs/${jobId}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const message = await parseErrorMessage(response, "failed to fetch package job");
+        throw new Error(message);
+      }
+
+      const body = (await response.json()) as PackageJobEnvelope;
+      onProgress?.(body.job.status);
+      if (body.job.status === "completed") {
+        return body.job.result as T;
+      }
+      if (body.job.status === "failed") {
+        throw new Error(body.job.error || "package job failed");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  async function buildCurrentPackageFile(): Promise<File> {
+    const resolvedDraft = await hydratePartialPackageDraftIfNeeded();
 
     const signature = JSON.stringify({
       form,
-      draft: packageDraft,
+      draft: resolvedDraft,
     });
     if (
       importedPackageFileRef.current &&
@@ -342,11 +612,11 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       testCaseVisibility: form.testCaseVisibility,
       timeLimitMs: form.timeLimitMs,
       memoryLimitMb: form.memoryLimitMb,
-      draft: packageDraft,
+      draft: resolvedDraft,
     });
     const file = new File(
       [zipBlob],
-      `${form.slug.trim() || packageDraft.sourceLabel || "problem-package"}.zip`,
+      `${form.slug.trim() || resolvedDraft.sourceLabel || "problem-package"}.zip`,
       { type: "application/zip" },
     );
     generatedPackageFileCacheRef.current = {
@@ -361,12 +631,16 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       return;
     }
 
-    const formData = new FormData();
-    formData.set("file", await buildCurrentPackageFile());
+    const packageFile = await buildCurrentPackageFile();
 
     const uploadResponse = await fetch(`/api/problems/${problemId}/package`, {
-      method: "POST",
-      body: formData,
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/zip",
+        "x-ojp-file-name": packageFile.name,
+        "x-ojp-file-size": String(packageFile.size),
+      },
+      body: packageFile,
     });
     if (!uploadResponse.ok) {
       const packageMessage = await parseErrorMessage(
@@ -374,6 +648,24 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         "failed to save problem package",
       );
       throw new Error(packageMessage);
+    }
+
+    const body = (await uploadResponse.json()) as
+      | PackageJobEnvelope
+      | {
+          package?: unknown;
+          problem?: Problem;
+        };
+    if ("job" in body && body.job) {
+      setPackageNotice("Package uploaded. Waiting for worker validation...");
+      await pollPackageJob<{ problemId: string }>(body.job.id, (status) => {
+        setPackageNotice(
+          status === "running"
+            ? "Worker is validating and applying the package..."
+            : "Package job is queued...",
+        );
+      });
+      setPackageNotice("Package validation completed.");
     }
   }
 
@@ -391,27 +683,71 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
     setIsRunningPreview(true);
     setPreviewError("");
+    setPreviewNotice("");
     setPreviewResult(null);
 
     try {
-      const formData = new FormData();
-      formData.set("file", await buildCurrentPackageFile());
-      formData.set("language", previewLanguage);
-      formData.set("sourceCode", sourceCode);
-      formData.set("timeLimitMs", String(form.timeLimitMs));
-      formData.set("memoryLimitMb", String(form.memoryLimitMb));
+      const packageFile = await buildCurrentPackageFile();
 
-      const response = await fetch("/api/problem-packages/test", {
-        method: "POST",
-        body: formData,
-      });
-      if (!response.ok) {
-        const message = await parseErrorMessage(response, "failed to run package test");
-        throw new Error(message);
+      try {
+        setPreviewNotice("Uploading package ZIP to object storage...");
+        const upload = await uploadPackageToR2(packageFile);
+        const response = await fetch("/api/problem-packages/test", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            storageRef: upload.storageRef,
+            fileName: upload.fileName,
+            sourceCode,
+            language: previewLanguage,
+            timeLimitMs: form.timeLimitMs,
+            memoryLimitMb: form.memoryLimitMb,
+            problemId: props.mode === "edit" ? props.initialProblem.id : null,
+          }),
+        });
+        if (!response.ok) {
+          const message = await parseErrorMessage(response, "failed to run package test");
+          throw new Error(message);
+        }
+
+        const body = (await response.json()) as PackageJobEnvelope;
+        setPreviewNotice("Preview job queued. Waiting for worker...");
+        const result = await pollPackageJob<PackageTestPreviewResult>(body.job.id, (status) => {
+          setPreviewNotice(
+            status === "running" ? "Worker is running the preview..." : "Preview job is queued...",
+          );
+        });
+        setPreviewResult(result);
+        setPreviewNotice("Preview completed.");
+      } catch (asyncError) {
+        const message = asyncError instanceof Error ? asyncError.message : "failed to run package test";
+        if (message.includes("R2 is required")) {
+          setPreviewNotice("R2 upload is unavailable. Falling back to direct server preview...");
+          const formData = new FormData();
+          formData.set("file", packageFile);
+          formData.set("language", previewLanguage);
+          formData.set("sourceCode", sourceCode);
+          formData.set("timeLimitMs", String(form.timeLimitMs));
+          formData.set("memoryLimitMb", String(form.memoryLimitMb));
+
+          const response = await fetch("/api/problem-packages/test", {
+            method: "POST",
+            body: formData,
+          });
+          if (!response.ok) {
+            const fallbackMessage = await parseErrorMessage(response, "failed to run package test");
+            throw new Error(fallbackMessage);
+          }
+
+          const body = (await response.json()) as { result: PackageTestPreviewResult };
+          setPreviewResult(body.result);
+          setPreviewNotice("Preview completed.");
+        } else {
+          throw asyncError;
+        }
       }
-
-      const body = (await response.json()) as { result: PackageTestPreviewResult };
-      setPreviewResult(body.result);
     } catch (previewRunError) {
       setPreviewError(
         previewRunError instanceof Error
@@ -753,17 +1089,37 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
           <div className="button-row">
             {!packageDraft ? (
-              <button
-                type="button"
-                className="button"
-                onClick={() => {
-                  setPackageDraft(createBlankPackageDraft());
-                  setPackageNotice("Started a blank manual package.");
-                  setPackageError("");
-                }}
-              >
-                Start Manual Package
-              </button>
+              <>
+                {hasExistingStoredPackage ? (
+                  <>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => void loadExistingPackage()}
+                      disabled={isLoadingExistingPackage || isInspectingPackage}
+                    >
+                      {isLoadingExistingPackage ? "Loading Package Metadata..." : "Load Existing Package"}
+                    </button>
+                    <a
+                      className="button button-secondary"
+                      href={`/api/problems/${props.initialProblem.id}/package`}
+                    >
+                      Download Stored ZIP
+                    </a>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  className={hasExistingStoredPackage ? "button button-secondary" : "button"}
+                  onClick={() => {
+                    setPackageDraft(createBlankPackageDraft());
+                    setPackageNotice("Started a blank manual package.");
+                    setPackageError("");
+                  }}
+                >
+                  Start Manual Package
+                </button>
+              </>
             ) : (
               <>
                 <button
@@ -800,6 +1156,16 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                 >
                   {isExportingPackage ? "Exporting..." : "Download ZIP"}
                 </button>
+                {packageDraft.isPartial ? (
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() => void hydratePartialPackageDraftIfNeeded()}
+                    disabled={isLoadingExistingPackage}
+                  >
+                    {isLoadingExistingPackage ? "Loading All Cases..." : "Load All Cases"}
+                  </button>
+                ) : null}
               </>
             )}
           </div>
@@ -813,11 +1179,26 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
           {packageError ? <p className="badge badge-red">{packageError}</p> : null}
 
           {packageDraft ? (
-            <ProblemPackageDraftEditor draft={packageDraft} onChange={setPackageDraft} />
+            <ProblemPackageDraftEditor
+              draft={packageDraft}
+              onChange={setPackageDraft}
+              onLoadTestCase={props.mode === "edit" ? loadExistingTestCase : undefined}
+              loadingTestCaseId={loadingTestCaseId}
+            />
           ) : (
-            <p className="empty">
-              No package is attached yet. Start from a blank manual package or import a ZIP.
-            </p>
+            <div className="stack">
+              <p className="empty">
+                {hasExistingStoredPackage
+                  ? "This problem already has a stored package. Load it only when you need to inspect or edit tests."
+                  : "No package is attached yet. Start from a blank manual package or import a ZIP."}
+              </p>
+              {hasExistingStoredPackage ? (
+                <p className="text-soft">
+                  Stored ZIP: {props.initialProblem.latestPackageSummary?.fileName} (
+                  {Math.ceil((props.initialProblem.latestPackageSummary?.zipSizeBytes ?? 0) / 1024 / 1024)} MB)
+                </p>
+              ) : null}
+            </div>
           )}
         </section>
       ) : null}
@@ -861,6 +1242,16 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
           </div>
 
           <div className="button-row">
+            {!packageDraft && hasExistingStoredPackage ? (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => void loadExistingPackage()}
+                disabled={isLoadingExistingPackage || isInspectingPackage}
+              >
+                {isLoadingExistingPackage ? "Loading Package Metadata..." : "Load Existing Package First"}
+              </button>
+            ) : null}
             <button
               type="button"
               className="button"
@@ -872,6 +1263,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
           </div>
 
           {previewError ? <p className="badge badge-red">{previewError}</p> : null}
+          {previewNotice ? <p className="badge badge-blue">{previewNotice}</p> : null}
 
           {previewResult ? (
             <div className="stack">

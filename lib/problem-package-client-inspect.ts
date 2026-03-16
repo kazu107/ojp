@@ -363,6 +363,7 @@ export async function inspectProblemPackageClient(
         name: caseName,
         input: textByPath.get(`tests/${groupName}/${caseName}.in`) ?? "",
         output: textByPath.get(`tests/${groupName}/${caseName}.out`) ?? "",
+        isLoaded: true,
       })),
     };
   });
@@ -437,6 +438,7 @@ export async function inspectProblemPackageClient(
       compareMode,
       zipSizeBytes: file.size,
       fileCount: fileEntries.length,
+      isPartial: false,
       samples,
       warnings: [],
       groups,

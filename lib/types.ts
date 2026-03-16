@@ -43,6 +43,13 @@ export interface ProblemPackageSummary {
   validatedAt: string;
 }
 
+export interface ProblemSampleCase {
+  name: string;
+  description: string;
+  input: string;
+  output: string;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -73,6 +80,7 @@ export interface Problem {
   scoringType: "sum" | "binary" | "sum_of_groups";
   testCaseVisibility: TestCaseVisibility;
   latestPackageSummary: ProblemPackageSummary | null;
+  sampleCases: ProblemSampleCase[];
   createdAt: string;
   updatedAt: string;
 }

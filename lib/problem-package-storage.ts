@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { Readable } from "node:stream";
 
 export interface ProblemPackageStorageRef {
   provider: "r2";
@@ -87,24 +88,25 @@ function sanitizeFileName(fileName: string): string {
   return normalized.endsWith(".zip") ? normalized : `${normalized}.zip`;
 }
 
-function buildObjectKey(problemId: string, fileName: string): string {
+function buildObjectKey(prefix: string, fileName: string): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  return `problem-packages/${problemId}/${stamp}-${sanitizeFileName(fileName)}`;
+  return `${prefix}/${stamp}-${sanitizeFileName(fileName)}`;
 }
 
-export async function putProblemPackageZip(input: {
-  problemId: string;
+async function putPackageZip(input: {
+  keyPrefix: string;
   fileName: string;
-  zipBuffer: Buffer;
+  body: Buffer | Uint8Array | Readable;
+  sizeBytes: number;
 }): Promise<ProblemPackageStorageRef> {
   const bucket = getR2Bucket();
-  const key = buildObjectKey(input.problemId, input.fileName);
+  const key = buildObjectKey(input.keyPrefix, input.fileName);
   const client = getR2Client();
   const response = await client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      Body: input.zipBuffer,
+      Body: input.body,
       ContentType: "application/zip",
     }),
   );
@@ -114,9 +116,36 @@ export async function putProblemPackageZip(input: {
     bucket,
     key,
     uploadedAt: new Date().toISOString(),
-    sizeBytes: input.zipBuffer.byteLength,
+    sizeBytes: input.sizeBytes,
     etag: response.ETag ?? null,
   };
+}
+
+export async function putProblemPackageZip(input: {
+  problemId: string;
+  fileName: string;
+  zipBuffer: Buffer;
+}): Promise<ProblemPackageStorageRef> {
+  return putPackageZip({
+    keyPrefix: `problem-packages/${input.problemId}`,
+    fileName: input.fileName,
+    body: input.zipBuffer,
+    sizeBytes: input.zipBuffer.byteLength,
+  });
+}
+
+export async function putProblemPackageZipStream(input: {
+  keyPrefix: string;
+  fileName: string;
+  body: Readable;
+  sizeBytes: number;
+}): Promise<ProblemPackageStorageRef> {
+  return putPackageZip({
+    keyPrefix: input.keyPrefix,
+    fileName: input.fileName,
+    body: input.body,
+    sizeBytes: input.sizeBytes,
+  });
 }
 
 export async function getProblemPackageZip(
@@ -136,6 +165,28 @@ export async function getProblemPackageZip(
 
   const bytes = await response.Body.transformToByteArray();
   return Buffer.from(bytes);
+}
+
+export async function getProblemPackageZipStream(
+  ref: ProblemPackageStorageRef,
+): Promise<ReadableStream<Uint8Array>> {
+  const client = getR2Client();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: ref.bucket,
+      Key: ref.key,
+    }),
+  );
+
+  if (!response.Body) {
+    throw new Error(`R2 object body is empty: ${ref.key}`);
+  }
+
+  if (typeof response.Body.transformToWebStream === "function") {
+    return response.Body.transformToWebStream();
+  }
+
+  return Readable.toWeb(response.Body as Readable) as ReadableStream<Uint8Array>;
 }
 
 export async function deleteProblemPackageZip(

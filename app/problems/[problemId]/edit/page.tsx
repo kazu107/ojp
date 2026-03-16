@@ -2,11 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProblemEditorForm } from "@/components/problem-editor-form";
 import { VisibilityActionButtons } from "@/components/visibility-action-buttons";
-import { buildEditorDraftFromExtracted } from "@/lib/problem-package";
 import {
   canEditProblemByViewer,
   getCurrentUser,
-  getProblemPackageData,
   getProblemForViewer,
 } from "@/lib/store";
 
@@ -25,10 +23,6 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
   }
 
   const canEdit = canEditProblemByViewer(problem, me.id);
-  const loadedPackageData = canEdit ? await getProblemPackageData(problem.id) : null;
-  const resolvedPackageDraft = loadedPackageData
-    ? buildEditorDraftFromExtracted(loadedPackageData)
-    : null;
 
   return (
     <div className="page">
@@ -45,11 +39,7 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
       {canEdit ? (
         <>
           <section className="panel">
-            <ProblemEditorForm
-              mode="edit"
-              initialProblem={problem}
-              initialPackageDraft={resolvedPackageDraft}
-            />
+            <ProblemEditorForm mode="edit" initialProblem={problem} />
           </section>
           <section className="panel stack">
             <h2 className="panel-title">Publish Settings</h2>
