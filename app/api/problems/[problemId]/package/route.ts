@@ -111,6 +111,9 @@ export async function PUT(request: Request, { params }: ProblemPackageRouteConte
     if (!fileName) {
       throw new HttpError("x-ojp-file-name header is required", 400);
     }
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      throw new HttpError("x-ojp-file-size header is required for streamed uploads", 400);
+    }
     if (Number.isFinite(sizeBytes) && sizeBytes > MAX_UPLOAD_BYTES) {
       throw new HttpError(`zip size exceeds limit (${MAX_UPLOAD_BYTES} bytes)`, 400);
     }
@@ -130,7 +133,7 @@ export async function PUT(request: Request, { params }: ProblemPackageRouteConte
       keyPrefix: `problem-packages/${problemId}/pending`,
       fileName,
       body: Readable.fromWeb(request.body as unknown as NodeReadableStream<Uint8Array>),
-      sizeBytes: Number.isFinite(sizeBytes) && sizeBytes > 0 ? sizeBytes : 0,
+      sizeBytes,
     });
     const job = await createProblemPackageApplyJob({
       problemId,

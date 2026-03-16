@@ -108,6 +108,7 @@ async function putPackageZip(input: {
       Key: key,
       Body: input.body,
       ContentType: "application/zip",
+      ContentLength: input.sizeBytes > 0 ? input.sizeBytes : undefined,
     }),
   );
 

@@ -86,6 +86,11 @@ interface PackageJobEnvelope {
   };
 }
 
+interface ActionProgressState {
+  phase: string;
+  percent: number;
+}
+
 interface PreviewGroupedTestResults {
   groupName: string;
   verdict: SubmissionStatus;
@@ -214,6 +219,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   );
   const [activeTab, setActiveTab] = useState<EditorTab>("content");
   const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<ActionProgressState | null>(null);
   const [isInspectingPackage, setIsInspectingPackage] = useState(false);
   const [inspectProgressText, setInspectProgressText] = useState("");
   const [isExportingPackage, setIsExportingPackage] = useState(false);
@@ -530,28 +536,73 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     }
   }
 
-  async function uploadPackageToR2(file: File): Promise<{
+  async function uploadFileWithProgress<T>(input: {
+    url: string;
+    file: File;
+    onProgress?: (ratio: number) => void;
+  }): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", input.url);
+      xhr.setRequestHeader("Content-Type", "application/zip");
+      xhr.setRequestHeader("x-ojp-file-name", input.file.name);
+      xhr.setRequestHeader("x-ojp-file-size", String(input.file.size));
+      xhr.responseType = "text";
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || !input.onProgress) {
+          return;
+        }
+        input.onProgress(Math.max(0, Math.min(1, event.loaded / event.total)));
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("upload failed"));
+      };
+      xhr.onload = () => {
+        let body: unknown = null;
+        try {
+          body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+        } catch {
+          body = null;
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(body as T);
+          return;
+        }
+
+        reject(
+          new Error(
+            typeof body === "object" &&
+              body !== null &&
+              "error" in body &&
+              typeof (body as { error?: unknown }).error === "string"
+              ? ((body as { error: string }).error)
+              : "upload failed",
+          ),
+        );
+      };
+
+      xhr.send(input.file);
+    });
+  }
+
+  async function uploadPackageToR2(
+    file: File,
+    onProgress?: (ratio: number) => void,
+  ): Promise<{
     storageRef: UploadedPackageRef;
     fileName: string;
   }> {
-    const response = await fetch("/api/problem-packages/upload", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/zip",
-        "x-ojp-file-name": file.name,
-        "x-ojp-file-size": String(file.size),
-      },
-      body: file,
-    });
-    if (!response.ok) {
-      const message = await parseErrorMessage(response, "failed to upload problem package");
-      throw new Error(message);
-    }
-
-    return (await response.json()) as {
+    return uploadFileWithProgress<{
       storageRef: UploadedPackageRef;
       fileName: string;
-    };
+    }>({
+      url: "/api/problem-packages/upload",
+      file,
+      onProgress,
+    });
   }
 
   async function pollPackageJob<T>(
@@ -631,41 +682,58 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       return;
     }
 
+    setSaveProgress({
+      phase: "Building package ZIP...",
+      percent: 20,
+    });
     const packageFile = await buildCurrentPackageFile();
 
-    const uploadResponse = await fetch(`/api/problems/${problemId}/package`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/zip",
-        "x-ojp-file-name": packageFile.name,
-        "x-ojp-file-size": String(packageFile.size),
-      },
-      body: packageFile,
-    });
-    if (!uploadResponse.ok) {
-      const packageMessage = await parseErrorMessage(
-        uploadResponse,
-        "failed to save problem package",
-      );
-      throw new Error(packageMessage);
-    }
-
-    const body = (await uploadResponse.json()) as
+    const body = await uploadFileWithProgress<
       | PackageJobEnvelope
       | {
           package?: unknown;
           problem?: Problem;
-        };
+        }
+    >({
+      url: `/api/problems/${problemId}/package`,
+      file: packageFile,
+      onProgress: (ratio) => {
+        setSaveProgress({
+          phase: "Uploading package ZIP...",
+          percent: 20 + Math.round(ratio * 40),
+        });
+      },
+    });
     if ("job" in body && body.job) {
       setPackageNotice("Package uploaded. Waiting for worker validation...");
+      setSaveProgress({
+        phase: "Package uploaded. Waiting for worker...",
+        percent: 65,
+      });
       await pollPackageJob<{ problemId: string }>(body.job.id, (status) => {
         setPackageNotice(
           status === "running"
             ? "Worker is validating and applying the package..."
             : "Package job is queued...",
         );
+        setSaveProgress({
+          phase:
+            status === "running"
+              ? "Worker is validating and applying the package..."
+              : "Package job is queued...",
+          percent: status === "running" ? 85 : 75,
+        });
       });
       setPackageNotice("Package validation completed.");
+      setSaveProgress({
+        phase: "Package validation completed.",
+        percent: 95,
+      });
+    } else {
+      setSaveProgress({
+        phase: "Package validation completed.",
+        percent: 95,
+      });
     }
   }
 
@@ -691,7 +759,9 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
       try {
         setPreviewNotice("Uploading package ZIP to object storage...");
-        const upload = await uploadPackageToR2(packageFile);
+        const upload = await uploadPackageToR2(packageFile, (ratio) => {
+          setPreviewNotice(`Uploading package ZIP to object storage... (${Math.round(ratio * 100)}%)`);
+        });
         const response = await fetch("/api/problem-packages/test", {
           method: "POST",
           headers: {
@@ -803,6 +873,10 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     setIsSaving(true);
     setError("");
     setCreatedProblemId(null);
+    setSaveProgress({
+      phase: "Saving problem metadata...",
+      percent: 10,
+    });
 
     try {
       const response = await fetch(endpoint, {
@@ -825,12 +899,21 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       if (props.mode === "create") {
         setCreatedProblemId(body.problem.id);
       }
+      setSaveProgress({
+        phase: packageDraft ? "Problem metadata saved. Preparing package..." : "Problem metadata saved.",
+        percent: packageDraft ? 15 : 85,
+      });
       await saveProblemPackage(body.problem.id);
 
+      setSaveProgress({
+        phase: "Redirecting to problem page...",
+        percent: 100,
+      });
       router.push(`/problems/${body.problem.id}`);
       router.refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unexpected error occurred.");
+      setSaveProgress(null);
     } finally {
       setIsSaving(false);
     }
@@ -1325,6 +1408,14 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         </section>
       ) : null}
 
+      {saveProgress ? (
+        <div className="panel stack">
+          <p className="badge badge-blue">
+            {saveProgress.phase} ({saveProgress.percent}%)
+          </p>
+          <progress max={100} value={saveProgress.percent} />
+        </div>
+      ) : null}
       {error ? <p className="badge badge-red">{error}</p> : null}
       {props.mode === "create" && createdProblemId ? (
         <div className="button-row">
