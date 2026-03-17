@@ -1940,14 +1940,44 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
 
   try {
     let phase: SubmissionStatus = "compiling";
-    let orderIndex = 0;
-    await replaceSubmissionRuntimeTestResults(submissionId, []);
+    const existingResults = await listSubmissionRuntimeTestResults(submissionId);
+    const orderedCases = packageSource
+      ? packageSource.groups.flatMap((group) =>
+          group.caseNames.map((caseName) => ({
+            groupName: group.name,
+            testCaseName: caseName,
+          })),
+        )
+      : (packageData?.groups ?? []).flatMap((group) =>
+          group.tests.map((testCase) => ({
+            groupName: group.name,
+            testCaseName: testCase.name,
+          })),
+        );
+    const canResume =
+      existingResults.length > 0 &&
+      existingResults.every((result, index) => {
+        const expected = orderedCases[index];
+        return (
+          expected &&
+          result.groupName === expected.groupName &&
+          result.testCaseName === expected.testCaseName
+        );
+      });
+    let orderIndex = canResume ? existingResults.length : 0;
+    if (!canResume) {
+      await replaceSubmissionRuntimeTestResults(submissionId, []);
+    }
     await upsertSubmissionRuntimeState({
       submissionId,
       status: "compiling",
       score: 0,
-      totalTimeMs: 0,
-      peakMemoryKb: 0,
+      totalTimeMs: canResume
+        ? existingResults.reduce((max, result) => Math.max(max, result.timeMs), 0)
+        : 0,
+      peakMemoryKb: canResume
+        ? existingResults.reduce((max, result) => Math.max(max, result.memoryKb), 0)
+        : 0,
       judgeStartedAt,
       judgedAt: null,
       judgeEnvironmentVersion,
@@ -1960,6 +1990,7 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       memoryLimitMb: problem.memoryLimitMb,
       packageData: packageData ?? undefined,
       packageSource: packageSource ?? undefined,
+      existingResults: canResume ? existingResults : [],
       nextTestResultId,
       onPhaseChange: async (nextPhase) => {
         phase = nextPhase;

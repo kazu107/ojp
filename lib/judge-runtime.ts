@@ -435,6 +435,7 @@ export async function executePackageJudge(input: {
   memoryLimitMb: number;
   packageData?: ProblemPackageExtracted;
   packageSource?: LazyProblemPackageSource;
+  existingResults?: Submission["testResults"];
   nextTestResultId: () => string;
   onPhaseChange?: (status: "compiling" | "running" | "judging") => void | Promise<void>;
   onTestResult?: (params: {
@@ -562,14 +563,30 @@ export async function executePackageJudge(input: {
       };
     }
 
-    const results: Submission["testResults"] = [];
+    const existingResults = input.existingResults ?? [];
+    const results: Submission["testResults"] = [...existingResults];
     const judgedGroupStates: Array<{ score: number; accepted: boolean }> = [];
-    let totalTimeMs = 0;
-    let peakMemoryKb = 0;
+    let totalTimeMs = existingResults.reduce((max, result) => Math.max(max, result.timeMs), 0);
+    let peakMemoryKb = existingResults.reduce((max, result) => Math.max(max, result.memoryKb), 0);
+    let existingIndex = 0;
 
     for (const group of packageMeta.groups) {
       let groupAccepted = true;
       for (const caseName of group.caseNames) {
+        const existing = existingResults[existingIndex];
+        if (
+          existing &&
+          existing.groupName === group.name &&
+          existing.testCaseName === caseName
+        ) {
+          if (!isAcceptedSubmissionStatus(existing.verdict)) {
+            groupAccepted = false;
+          }
+          existingIndex += 1;
+          totalTimeMs = Math.max(totalTimeMs, existing.timeMs);
+          peakMemoryKb = Math.max(peakMemoryKb, existing.memoryKb);
+          continue;
+        }
         const testCase = input.packageSource
           ? await input.packageSource.readTestCase(group.name, caseName)
           : input.packageData!.groups
