@@ -174,6 +174,13 @@ interface SubmissionRuntimeSummary {
   judgeEnvironmentVersion: string | null;
 }
 
+export interface ProblemPackageCaseManifest {
+  groups: Array<{
+    name: string;
+    caseNames: string[];
+  }>;
+}
+
 interface Store {
   users: User[];
   problems: Problem[];
@@ -1362,9 +1369,7 @@ function nextSubmissionId(): string {
 }
 
 function nextTestResultId(): string {
-  const id = `tr${store.counters.testResult}`;
-  store.counters.testResult += 1;
-  return id;
+  return `tr-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
 function nextAnnouncementId(): string {
@@ -2538,6 +2543,39 @@ export async function updateCurrentUserProfile(payload: {
 
 export function getProblemById(problemId: string): Problem | undefined {
   return store.problems.find((problem) => problem.id === problemId);
+}
+
+export async function getProblemPackageCaseManifest(
+  problemId: string,
+): Promise<ProblemPackageCaseManifest | null> {
+  const ref = store.problemPackageRefs[problemId];
+  if (ref && isProblemPackageObjectStorageEnabled()) {
+    const source = await createLazyProblemPackageSourceFromStorageRef({
+      ref,
+      fileName: store.problems.find((problem) => problem.id === problemId)?.latestPackageSummary?.fileName ?? `${problemId}.zip`,
+    });
+    try {
+      return {
+        groups: source.groups.map((group) => ({
+          name: group.name,
+          caseNames: group.caseNames,
+        })),
+      };
+    } finally {
+      await source.cleanup();
+    }
+  }
+
+  const packageData = await loadProblemPackageData(problemId);
+  if (!packageData) {
+    return null;
+  }
+  return {
+    groups: packageData.groups.map((group) => ({
+      name: group.name,
+      caseNames: group.tests.map((testCase) => testCase.name),
+    })),
+  };
 }
 
 async function loadProblemPackageData(problemId: string): Promise<ProblemPackageExtracted | undefined> {

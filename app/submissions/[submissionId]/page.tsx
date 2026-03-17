@@ -17,7 +17,7 @@ import {
   canRequestRejudgeByViewer,
   findUser,
   getOptionalCurrentUser,
-  getProblemPackageData,
+  getProblemPackageCaseManifest,
   getProblemById,
   getSubmissionWithAccess,
 } from "@/lib/store";
@@ -94,8 +94,8 @@ function buildDisplayResults(input: {
   submission: Submission;
   testCaseVisibility: "group_only" | "case_index_only" | "case_name_visible";
   canViewSource: boolean;
-  packageData:
-    | Awaited<ReturnType<typeof getProblemPackageData>>
+  packageManifest:
+    | Awaited<ReturnType<typeof getProblemPackageCaseManifest>>
     | null
     | undefined;
 }): Submission["testResults"] {
@@ -106,7 +106,7 @@ function buildDisplayResults(input: {
     ]),
   );
 
-  if (!input.packageData) {
+  if (!input.packageManifest) {
     return input.submission.testResults;
   }
 
@@ -116,9 +116,9 @@ function buildDisplayResults(input: {
   }
 
   if (!input.canViewSource && input.testCaseVisibility === "group_only") {
-    return input.packageData.groups.map((group) => {
-      const groupActualResults = group.tests
-        .map((testCase) => actualByKey.get(`${group.name}::${testCase.name}`))
+    return input.packageManifest.groups.map((group) => {
+      const groupActualResults = group.caseNames
+        .map((caseName) => actualByKey.get(`${group.name}::${caseName}`))
         .filter((result): result is Submission["testResults"][number] => Boolean(result));
       if (groupActualResults.length === 0) {
         return waitingResult(group.name, "-");
@@ -134,7 +134,7 @@ function buildDisplayResults(input: {
         timeMs: groupActualResults.reduce((max, result) => Math.max(max, result.timeMs), 0),
         memoryKb: groupActualResults.reduce((max, result) => Math.max(max, result.memoryKb), 0),
         message:
-          groupActualResults.length === group.tests.length
+          groupActualResults.length === group.caseNames.length
             ? "Judged"
             : "Waiting Judge",
       };
@@ -142,17 +142,17 @@ function buildDisplayResults(input: {
   }
 
   let caseIndex = 0;
-  return input.packageData.groups.flatMap((group) =>
-    group.tests.map((testCase) => {
+  return input.packageManifest.groups.flatMap((group) =>
+    group.caseNames.map((caseName) => {
       caseIndex += 1;
-      const actual = actualByKey.get(`${group.name}::${testCase.name}`);
+      const actual = actualByKey.get(`${group.name}::${caseName}`);
       if (actual) {
         return actual;
       }
       const visibleCaseName =
         !input.canViewSource && input.testCaseVisibility === "case_index_only"
           ? `#${caseIndex}`
-          : testCase.name;
+          : caseName;
       return waitingResult(group.name, visibleCaseName);
     }),
   );
@@ -172,12 +172,15 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
   const user = findUser(submission.userId);
   const canRequestRejudge = me ? canRequestRejudgeByViewer(submission, me.id) : false;
   const testCaseVisibility = problem?.testCaseVisibility ?? "case_index_only";
-  const packageData = problem ? await getProblemPackageData(problem.id) : null;
+  const packageManifest =
+    problem && isWaitingSubmissionStatus(submission.status)
+      ? await getProblemPackageCaseManifest(problem.id)
+      : null;
   const displayResults = buildDisplayResults({
     submission,
     testCaseVisibility,
     canViewSource,
-    packageData,
+    packageManifest,
   });
   const groupedResults = groupTestResults(displayResults);
   const canExpandCaseDetails = canViewSource || testCaseVisibility !== "group_only";
