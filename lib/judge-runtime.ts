@@ -21,6 +21,7 @@ interface CommandResult {
   exitCode: number | null;
   timedOut: boolean;
   durationMs: number;
+  wallDurationMs: number;
   memoryKb: number;
   spawnErrorCode?: string;
 }
@@ -97,7 +98,7 @@ async function runCommand(
 
   const wrappedCommand = timeWrapperCommand ?? command;
   const wrappedArgs = useTimeWrapper
-    ? ["-f", "%M", "-o", metricsPath, command, ...args]
+    ? ["-f", "%U\n%S\n%M", "-o", metricsPath, command, ...args]
     : args;
 
   return new Promise<CommandResult>((resolve) => {
@@ -138,15 +139,30 @@ async function runCommand(
       settled = true;
       clearTimeout(timeout);
 
+      const wallDurationMs = Date.now() - startedAt;
       let memoryKb = 0;
+      let cpuDurationMs = wallDurationMs;
       if (useTimeWrapper) {
         try {
-          const raw = (await readFile(metricsPath, "utf8")).trim();
-          const parsed = Number(raw);
-          if (Number.isFinite(parsed) && parsed >= 0) {
-            memoryKb = Math.floor(parsed);
+          const rawLines = (await readFile(metricsPath, "utf8"))
+            .trim()
+            .split(/\r?\n/);
+          const userSeconds = Number(rawLines[0] ?? "");
+          const systemSeconds = Number(rawLines[1] ?? "");
+          const memoryValue = Number(rawLines[2] ?? "");
+          if (
+            Number.isFinite(userSeconds) &&
+            userSeconds >= 0 &&
+            Number.isFinite(systemSeconds) &&
+            systemSeconds >= 0
+          ) {
+            cpuDurationMs = Math.round((userSeconds + systemSeconds) * 1000);
+          }
+          if (Number.isFinite(memoryValue) && memoryValue >= 0) {
+            memoryKb = Math.floor(memoryValue);
           }
         } catch {
+          cpuDurationMs = wallDurationMs;
           memoryKb = 0;
         }
       }
@@ -164,7 +180,8 @@ async function runCommand(
         stderr,
         exitCode,
         timedOut,
-        durationMs: Date.now() - startedAt,
+        durationMs: cpuDurationMs,
+        wallDurationMs,
         memoryKb,
         spawnErrorCode,
       });
@@ -201,6 +218,7 @@ async function runWithFallback(
         exitCode: null,
         timedOut: false,
         durationMs: 0,
+        wallDurationMs: 0,
         memoryKb: 0,
         spawnErrorCode: "ENOENT",
       } as CommandResult),

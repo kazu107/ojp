@@ -160,6 +160,8 @@ heroku run "node -v && python3 --version && g++ --version && javac -version && j
   - 追加 worker は leader 障害時の failover として待機します
 - package 未設定問題は `internal_error` になります
 - `JUDGE_ENVIRONMENT_VERSION` を Config Vars に設定すると提出へ記録されます
+- 共有 dyno 上の wall-clock ぶれを減らすため、表示用の実行時間は `/usr/bin/time` が使える環境では CPU time (`user + system`) を優先します
+  - 強制停止用の timeout は引き続き wall-clock ベースです
 
 ## DB セットアップ (Prisma / PostgreSQL)
 
