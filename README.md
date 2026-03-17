@@ -154,7 +154,10 @@ heroku run "node -v && python3 --version && g++ --version && javac -version && j
 
 注意:
 
-- 現在は単一アプリ状態のため、Heroku では `web=1` を推奨します
+- `web=1` は引き続き推奨です
+- `worker` は複数 dyno を起動できます
+  - ただし `AppState` JSON snapshot 構成のため、queue drain は Postgres の worker lease を取った leader 1 台が担当します
+  - 追加 worker は leader 障害時の failover として待機します
 - package 未設定問題は `internal_error` になります
 - `JUDGE_ENVIRONMENT_VERSION` を Config Vars に設定すると提出へ記録されます
 
@@ -294,7 +297,8 @@ npm run build
 
 注意:
 
-- 複数プロセスでの状態競合を避けるため `web=1` を推奨
+- `web=1` は引き続き推奨
+- `worker` は複数起動可能だが、leader lease により 1 台が active drain を担当
 - 大きなテスト資産は将来的に object storage へ分離した方が安全
 
 ## Legacy DB Enum Migration

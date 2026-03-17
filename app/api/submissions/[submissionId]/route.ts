@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: SubmissionRouteContext)
   try {
     const { submissionId } = await params;
     const user = await getOptionalCurrentUser();
-    const result = getSubmissionWithAccess(submissionId, user?.id ?? "guest");
+    const result = await getSubmissionWithAccess(submissionId, user?.id ?? "guest");
     if (!result) {
       return apiError(404, "submission not found");
     }

@@ -25,7 +25,7 @@ import {
   UserRole,
   Visibility,
 } from "@/lib/types";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   buildEditorDraftFromExtracted,
   buildProblemPackageZip,
@@ -74,6 +74,12 @@ const JUDGE_PROCESS_MODE =
     ? process.env.JUDGE_PROCESS_MODE
     : "inline";
 const DEDICATED_JUDGE_POLL_INTERVAL_MS = 1_000;
+const APP_STATE_WRITE_LEASE_ID = "app-state-write";
+const WORKER_LEASE_DURATION_MS = 15_000;
+const JOB_CLAIM_STALE_MS = 60_000;
+const WORKER_INSTANCE_ID =
+  process.env.DYNO?.trim() ||
+  `worker-${process.pid}-${Math.random().toString(16).slice(2, 10)}`;
 
 function parseCsvEnvSet(raw: string | undefined): Set<string> {
   if (!raw) {
@@ -158,6 +164,16 @@ interface RateLimits {
   rejudgeCooldownByProblem: Record<string, number>;
 }
 
+interface SubmissionRuntimeSummary {
+  status: SubmissionStatus;
+  score: number;
+  totalTimeMs: number;
+  peakMemoryKb: number;
+  judgeStartedAt: string | null;
+  judgedAt: string | null;
+  judgeEnvironmentVersion: string | null;
+}
+
 interface Store {
   users: User[];
   problems: Problem[];
@@ -210,9 +226,6 @@ interface StoreSnapshot {
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
   githubIndex: Record<string, string>;
-  packageJobs: PackageJobRecord[];
-  packageJobQueue: string[];
-  judgeQueue: Store["judgeQueue"];
   counters: Store["counters"];
   rateLimits: RateLimits;
 }
@@ -228,6 +241,9 @@ const globalStore = globalThis as unknown as {
   __ojpStorePersistQueued?: boolean;
   __ojpDedicatedJudgeLoopStarted?: boolean;
   __ojpProblemPackageCacheOrder?: string[];
+  __ojpSubmissionRuntimeCache?: Record<string, SubmissionRuntimeSummary>;
+  __ojpSubmissionRuntimeCacheRefreshInFlight?: boolean;
+  __ojpSubmissionRuntimeCacheLastRefreshAt?: number;
 };
 
 export class HttpError extends Error {
@@ -837,9 +853,6 @@ function captureStoreSnapshot(target: Store): StoreSnapshot {
       auditLogs: target.auditLogs,
       rejudgeRequests: target.rejudgeRequests,
       githubIndex: target.githubIndex,
-      packageJobs: target.packageJobs,
-      packageJobQueue: target.packageJobQueue,
-      judgeQueue: target.judgeQueue,
       counters: target.counters,
       rateLimits: target.rateLimits,
     }),
@@ -865,9 +878,9 @@ function applyStoreSnapshotInPlace(target: Store, snapshot: StoreSnapshot): void
   target.rejudgeRequests = Array.isArray(snapshot.rejudgeRequests) ? snapshot.rejudgeRequests : [];
   target.githubIndex =
     snapshot.githubIndex && typeof snapshot.githubIndex === "object" ? snapshot.githubIndex : {};
-  target.packageJobs = Array.isArray(snapshot.packageJobs) ? snapshot.packageJobs : [];
-  target.packageJobQueue = Array.isArray(snapshot.packageJobQueue) ? snapshot.packageJobQueue : [];
-  target.judgeQueue = Array.isArray(snapshot.judgeQueue) ? snapshot.judgeQueue : [];
+  target.packageJobs = [];
+  target.packageJobQueue = [];
+  target.judgeQueue = [];
   target.counters = {
     ...target.counters,
     ...(snapshot.counters ?? {}),
@@ -1040,6 +1053,273 @@ function startStoreRefreshLoop(): void {
   interval.unref?.();
 }
 
+function defaultSubmissionRuntimeSummary(submission: Submission): SubmissionRuntimeSummary {
+  return {
+    status: submission.status,
+    score: submission.score,
+    totalTimeMs: submission.totalTimeMs,
+    peakMemoryKb: submission.peakMemoryKb,
+    judgeStartedAt: submission.judgeStartedAt,
+    judgedAt: submission.judgedAt,
+    judgeEnvironmentVersion: submission.judgeEnvironmentVersion,
+  };
+}
+
+function getSubmissionRuntimeCache(): Record<string, SubmissionRuntimeSummary> {
+  if (!globalStore.__ojpSubmissionRuntimeCache) {
+    globalStore.__ojpSubmissionRuntimeCache = {};
+  }
+  return globalStore.__ojpSubmissionRuntimeCache;
+}
+
+function isMissingTableError(error: unknown, tableName: string): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2021" &&
+    typeof error.meta?.table === "string" &&
+    error.meta.table.includes(tableName)
+  );
+}
+
+function applySubmissionRuntimeSummary(
+  submission: Submission,
+  summary?: SubmissionRuntimeSummary,
+): Submission {
+  const resolved = summary ?? getSubmissionRuntimeCache()[submission.id];
+  if (!resolved) {
+    return submission;
+  }
+  return {
+    ...submission,
+    status: resolved.status,
+    score: resolved.score,
+    totalTimeMs: resolved.totalTimeMs,
+    peakMemoryKb: resolved.peakMemoryKb,
+    judgeStartedAt: resolved.judgeStartedAt,
+    judgedAt: resolved.judgedAt,
+    judgeEnvironmentVersion: resolved.judgeEnvironmentVersion,
+  };
+}
+
+async function refreshSubmissionRuntimeCacheNow(): Promise<void> {
+  if (!STORE_DB_SYNC_ENABLED) {
+    return;
+  }
+  try {
+    const rows = await prisma.submissionRuntimeState.findMany();
+    const nextCache: Record<string, SubmissionRuntimeSummary> = {};
+    for (const row of rows) {
+      nextCache[row.submissionId] = {
+        status: normalizeSubmissionStatus(row.status) ?? "internal_error",
+        score: row.score,
+        totalTimeMs: row.totalTimeMs,
+        peakMemoryKb: row.peakMemoryKb,
+        judgeStartedAt: row.judgeStartedAt?.toISOString() ?? null,
+        judgedAt: row.judgedAt?.toISOString() ?? null,
+        judgeEnvironmentVersion: row.judgeEnvironmentVersion,
+      };
+    }
+    globalStore.__ojpSubmissionRuntimeCache = nextCache;
+  } catch (error) {
+    if (isMissingTableError(error, "SubmissionRuntimeState")) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function maybeRefreshSubmissionRuntimeCache(): void {
+  if (!STORE_DB_SYNC_ENABLED) {
+    return;
+  }
+  if (globalStore.__ojpSubmissionRuntimeCacheRefreshInFlight) {
+    return;
+  }
+  const lastRefreshAt = globalStore.__ojpSubmissionRuntimeCacheLastRefreshAt ?? 0;
+  if (Date.now() - lastRefreshAt < STORE_REFRESH_INTERVAL_MS) {
+    return;
+  }
+  globalStore.__ojpSubmissionRuntimeCacheRefreshInFlight = true;
+  void refreshSubmissionRuntimeCacheNow()
+    .catch(() => {
+      // noop
+    })
+    .finally(() => {
+      globalStore.__ojpSubmissionRuntimeCacheRefreshInFlight = false;
+      globalStore.__ojpSubmissionRuntimeCacheLastRefreshAt = Date.now();
+    });
+}
+
+async function upsertSubmissionRuntimeState(input: {
+  submissionId: string;
+  status: SubmissionStatus;
+  score: number;
+  totalTimeMs: number;
+  peakMemoryKb: number;
+  judgeStartedAt: string | null;
+  judgedAt: string | null;
+  judgeEnvironmentVersion: string | null;
+}): Promise<void> {
+  await prisma.submissionRuntimeState.upsert({
+    where: { submissionId: input.submissionId },
+    update: {
+      status: input.status,
+      score: input.score,
+      totalTimeMs: input.totalTimeMs,
+      peakMemoryKb: input.peakMemoryKb,
+      judgeStartedAt: input.judgeStartedAt ? new Date(input.judgeStartedAt) : null,
+      judgedAt: input.judgedAt ? new Date(input.judgedAt) : null,
+      judgeEnvironmentVersion: input.judgeEnvironmentVersion,
+    },
+    create: {
+      submissionId: input.submissionId,
+      status: input.status,
+      score: input.score,
+      totalTimeMs: input.totalTimeMs,
+      peakMemoryKb: input.peakMemoryKb,
+      judgeStartedAt: input.judgeStartedAt ? new Date(input.judgeStartedAt) : null,
+      judgedAt: input.judgedAt ? new Date(input.judgedAt) : null,
+      judgeEnvironmentVersion: input.judgeEnvironmentVersion,
+    },
+  });
+  getSubmissionRuntimeCache()[input.submissionId] = {
+    status: input.status,
+    score: input.score,
+    totalTimeMs: input.totalTimeMs,
+    peakMemoryKb: input.peakMemoryKb,
+    judgeStartedAt: input.judgeStartedAt,
+    judgedAt: input.judgedAt,
+    judgeEnvironmentVersion: input.judgeEnvironmentVersion,
+  };
+}
+
+async function getSubmissionRuntimeState(
+  submissionId: string,
+): Promise<SubmissionRuntimeSummary | null> {
+  const cached = getSubmissionRuntimeCache()[submissionId];
+  if (cached) {
+    return cached;
+  }
+  let row;
+  try {
+    row = await prisma.submissionRuntimeState.findUnique({
+      where: { submissionId },
+    });
+  } catch (error) {
+    if (isMissingTableError(error, "SubmissionRuntimeState")) {
+      return null;
+    }
+    throw error;
+  }
+  if (!row) {
+    return null;
+  }
+  const summary: SubmissionRuntimeSummary = {
+    status: normalizeSubmissionStatus(row.status) ?? "internal_error",
+    score: row.score,
+    totalTimeMs: row.totalTimeMs,
+    peakMemoryKb: row.peakMemoryKb,
+    judgeStartedAt: row.judgeStartedAt?.toISOString() ?? null,
+    judgedAt: row.judgedAt?.toISOString() ?? null,
+    judgeEnvironmentVersion: row.judgeEnvironmentVersion,
+  };
+  getSubmissionRuntimeCache()[submissionId] = summary;
+  return summary;
+}
+
+async function replaceSubmissionRuntimeTestResults(
+  submissionId: string,
+  results: Submission["testResults"],
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await tx.submissionRuntimeTestResult.deleteMany({
+      where: { submissionId },
+    });
+    if (results.length > 0) {
+      await tx.submissionRuntimeTestResult.createMany({
+        data: results.map((result, index) => ({
+          id: result.id,
+          submissionId,
+          orderIndex: index,
+          groupName: result.groupName,
+          testCaseName: result.testCaseName,
+          verdict: result.verdict,
+          timeMs: result.timeMs,
+          memoryKb: result.memoryKb,
+          message: result.message,
+        })),
+      });
+    }
+  });
+}
+
+async function appendSubmissionRuntimeTestResult(
+  submissionId: string,
+  result: Submission["testResults"][number],
+  orderIndex: number,
+): Promise<void> {
+  await prisma.submissionRuntimeTestResult.create({
+    data: {
+      id: result.id,
+      submissionId,
+      orderIndex,
+      groupName: result.groupName,
+      testCaseName: result.testCaseName,
+      verdict: result.verdict,
+      timeMs: result.timeMs,
+      memoryKb: result.memoryKb,
+      message: result.message,
+    },
+  });
+}
+
+async function listSubmissionRuntimeTestResults(
+  submissionId: string,
+): Promise<Submission["testResults"]> {
+  try {
+    const rows = await prisma.submissionRuntimeTestResult.findMany({
+      where: { submissionId },
+      orderBy: { orderIndex: "asc" },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      groupName: row.groupName,
+      testCaseName: row.testCaseName,
+      verdict: normalizeSubmissionStatus(row.verdict) ?? "internal_error",
+      timeMs: row.timeMs,
+      memoryKb: row.memoryKb,
+      message: row.message,
+    }));
+  } catch (error) {
+    if (isMissingTableError(error, "SubmissionRuntimeTestResult")) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+async function resetSubmissionRuntime(
+  submissionId: string,
+  input: {
+    status: SubmissionStatus;
+    judgeStartedAt: string | null;
+    judgedAt: string | null;
+    judgeEnvironmentVersion: string | null;
+  },
+): Promise<void> {
+  await replaceSubmissionRuntimeTestResults(submissionId, []);
+  await upsertSubmissionRuntimeState({
+    submissionId,
+    status: input.status,
+    score: 0,
+    totalTimeMs: 0,
+    peakMemoryKb: 0,
+    judgeStartedAt: input.judgeStartedAt,
+    judgedAt: input.judgedAt,
+    judgeEnvironmentVersion: input.judgeEnvironmentVersion,
+  });
+}
+
 const store = globalStore.__ojpStore ?? createInitialStore();
 
 if (!globalStore.__ojpStore) {
@@ -1123,6 +1403,291 @@ function nextPackageJobId(): string {
   return id;
 }
 
+function toPackageJobRecord(row: {
+  id: string;
+  type: string;
+  requestedBy: string;
+  problemId: string | null;
+  fileName: string;
+  status: string;
+  storageRef: Prisma.JsonValue;
+  previousRef: Prisma.JsonValue | null;
+  language: Language | null;
+  sourceCode: string | null;
+  timeLimitMs: number | null;
+  memoryLimitMb: number | null;
+  result: Prisma.JsonValue | null;
+  claimedBy: string | null;
+  claimedAt: Date | null;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  error: string | null;
+  createdAt: Date;
+}): PackageJobRecord {
+  if (row.type === "apply") {
+    return {
+      id: row.id,
+      type: "apply",
+      requestedBy: row.requestedBy,
+      status: row.status as PackageJobStatus,
+      createdAt: row.createdAt.toISOString(),
+      startedAt: row.startedAt?.toISOString() ?? null,
+      finishedAt: row.finishedAt?.toISOString() ?? null,
+      error: row.error,
+      problemId: row.problemId ?? "",
+      fileName: row.fileName,
+      storageRef: row.storageRef as unknown as ProblemPackageStorageRef,
+      previousRef: row.previousRef as ProblemPackageStorageRef | null,
+      result: (row.result as { problemId: string } | null) ?? null,
+    };
+  }
+
+  return {
+    id: row.id,
+    type: "preview",
+    requestedBy: row.requestedBy,
+    status: row.status as PackageJobStatus,
+    createdAt: row.createdAt.toISOString(),
+    startedAt: row.startedAt?.toISOString() ?? null,
+    finishedAt: row.finishedAt?.toISOString() ?? null,
+    error: row.error,
+    problemId: row.problemId,
+    fileName: row.fileName,
+    storageRef: row.storageRef as unknown as ProblemPackageStorageRef,
+    language: (row.language as Language | null) ?? "python",
+    sourceCode: row.sourceCode ?? "",
+    timeLimitMs: row.timeLimitMs ?? 0,
+    memoryLimitMb: row.memoryLimitMb ?? 0,
+    result: (row.result as PackageJobPreviewResult | null) ?? null,
+  };
+}
+
+async function enqueueJudgeJobDb(
+  submissionId: string,
+  reason: JudgeJobReason,
+): Promise<void> {
+  await prisma.judgeJob.create({
+    data: {
+      id: nextJudgeJobId(),
+      submissionId,
+      reason,
+      status: "queued",
+    },
+  });
+}
+
+async function claimNextJudgeJobDb(): Promise<{
+  id: string;
+  submissionId: string;
+  reason: JudgeJobReason;
+} | null> {
+  const staleBefore = new Date(Date.now() - JOB_CLAIM_STALE_MS);
+  const claimedAt = new Date();
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<
+      Array<{ id: string; submissionId: string; reason: string }>
+    >`
+      WITH candidate AS (
+        SELECT id
+        FROM "JudgeJob"
+        WHERE status = 'queued' OR (status = 'running' AND "claimedAt" < ${staleBefore})
+        ORDER BY "createdAt" ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1
+      )
+      UPDATE "JudgeJob" AS job
+      SET
+        status = 'running',
+        "claimedBy" = ${WORKER_INSTANCE_ID},
+        "claimedAt" = ${claimedAt},
+        "startedAt" = COALESCE(job."startedAt", ${claimedAt})
+      FROM candidate
+      WHERE job.id = candidate.id
+      RETURNING job.id, job."submissionId", job.reason
+    `;
+    if (rows.length === 0) {
+      return null;
+    }
+    return {
+      id: rows[0].id,
+      submissionId: rows[0].submissionId,
+      reason: (rows[0].reason as JudgeJobReason) ?? "normal",
+    };
+  });
+}
+
+async function finishJudgeJobDb(input: {
+  id: string;
+  status: "completed" | "failed";
+  error?: string | null;
+}): Promise<void> {
+  await prisma.judgeJob.update({
+    where: { id: input.id },
+    data: {
+      status: input.status,
+      error: input.error ?? null,
+      finishedAt: new Date(),
+    },
+  });
+}
+
+async function listJudgeJobsDb(limit = 50): Promise<
+  Array<{
+    id: string;
+    submissionId: string;
+    queuedAt: string;
+    reason: JudgeJobReason;
+    requestedAt: string;
+  }>
+> {
+  const jobs = await prisma.judgeJob.findMany({
+    where: {
+      status: {
+        in: ["queued", "running"],
+      },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+    take: limit,
+  });
+  return jobs.map((job) => ({
+    id: job.id,
+    submissionId: job.submissionId,
+    queuedAt: job.createdAt.toISOString(),
+    requestedAt: job.createdAt.toISOString(),
+    reason: (job.reason as JudgeJobReason) ?? "normal",
+  }));
+}
+
+async function activeJudgeJobSubmissionIdsDb(): Promise<Set<string>> {
+  const jobs = await prisma.judgeJob.findMany({
+    where: {
+      status: {
+        in: ["queued", "running"],
+      },
+    },
+    select: {
+      submissionId: true,
+    },
+  });
+  return new Set(jobs.map((job) => job.submissionId));
+}
+
+async function enqueueMissingJudgeJobsDb(): Promise<number> {
+  const rows = await prisma.submissionRuntimeState.findMany({
+    where: {
+      status: {
+        in: ["pending", "queued", "compiling", "running", "judging"],
+      },
+    },
+    select: {
+      submissionId: true,
+      status: true,
+    },
+  });
+  const activeIds = await activeJudgeJobSubmissionIdsDb();
+  let requeued = 0;
+  for (const row of rows) {
+    const submissionId = row.submissionId;
+    if (activeIds.has(submissionId)) {
+      continue;
+    }
+    const waitingSubmission = findSubmissionByIdInternal(submissionId);
+    if (waitingSubmission?.status === "pending") {
+      waitingSubmission.status = "queued";
+    }
+    await enqueueJudgeJobDb(submissionId, "normal");
+    requeued += 1;
+  }
+  return requeued;
+}
+
+async function createPackageJobDb(input: {
+  type: "apply" | "preview";
+  requestedBy: string;
+  problemId?: string | null;
+  fileName: string;
+  storageRef: ProblemPackageStorageRef;
+  previousRef?: ProblemPackageStorageRef | null;
+  language?: Language;
+  sourceCode?: string;
+  timeLimitMs?: number;
+  memoryLimitMb?: number;
+}): Promise<PackageJobRecord> {
+  const row = await prisma.packageJob.create({
+    data: {
+      id: nextPackageJobId(),
+      type: input.type,
+      requestedBy: input.requestedBy,
+      problemId: input.problemId ?? null,
+      fileName: input.fileName,
+      status: "queued",
+      storageRef: input.storageRef as unknown as Prisma.InputJsonValue,
+      previousRef: input.previousRef
+        ? (input.previousRef as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      language: input.language,
+      sourceCode: input.sourceCode ?? null,
+      timeLimitMs: input.timeLimitMs ?? null,
+      memoryLimitMb: input.memoryLimitMb ?? null,
+      result: Prisma.DbNull,
+      error: null,
+    },
+  });
+  return toPackageJobRecord(row);
+}
+
+async function claimNextPackageJobDb(): Promise<PackageJobRecord | null> {
+  const staleBefore = new Date(Date.now() - JOB_CLAIM_STALE_MS);
+  const claimedAt = new Date();
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>`
+      WITH candidate AS (
+        SELECT id
+        FROM "PackageJob"
+        WHERE status = 'queued' OR (status = 'running' AND "claimedAt" < ${staleBefore})
+        ORDER BY "createdAt" ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1
+      )
+      UPDATE "PackageJob" AS job
+      SET
+        status = 'running',
+        "claimedBy" = ${WORKER_INSTANCE_ID},
+        "claimedAt" = ${claimedAt},
+        "startedAt" = COALESCE(job."startedAt", ${claimedAt})
+      FROM candidate
+      WHERE job.id = candidate.id
+      RETURNING job.id
+    `;
+    if (rows.length === 0) {
+      return null;
+    }
+    const row = await tx.packageJob.findUnique({
+      where: { id: rows[0].id },
+    });
+    return row ? toPackageJobRecord(row) : null;
+  });
+}
+
+async function finishPackageJobDb(input: {
+  id: string;
+  status: "completed" | "failed";
+  error?: string | null;
+  result?: Prisma.InputJsonValue;
+}): Promise<void> {
+  await prisma.packageJob.update({
+    where: { id: input.id },
+    data: {
+      status: input.status,
+      error: input.error ?? null,
+      result: input.result ?? Prisma.DbNull,
+      finishedAt: new Date(),
+    },
+  });
+}
+
 function appendAuditLog(params: {
   actorId: string;
   action: AuditAction;
@@ -1182,25 +1747,6 @@ function uniqueSlugOrThrow(
   }
 }
 
-function markSubmissionAsInternalError(submission: Submission, message: string): void {
-  submission.status = "internal_error";
-  submission.score = 0;
-  submission.totalTimeMs = 0;
-  submission.peakMemoryKb = 0;
-  submission.judgedAt = nowIso();
-  submission.testResults = [
-    {
-      id: nextTestResultId(),
-      groupName: "system",
-      testCaseName: "-",
-      verdict: "internal_error",
-      timeMs: 0,
-      memoryKb: 0,
-      message,
-    },
-  ];
-}
-
 function findSubmissionByIdInternal(submissionId: string): Submission | undefined {
   return store.submissions.find((submission) => submission.id === submissionId);
 }
@@ -1220,49 +1766,6 @@ function collectWaitingSubmissionIds(): string[] {
   return store.submissions
     .filter((submission) => isWaitingSubmissionStatus(submission.status))
     .map((submission) => submission.id);
-}
-
-function getJudgeQueueStatsInternal(): {
-  queuedJobs: number;
-  waitingSubmissions: number;
-  running: boolean;
-} {
-  return {
-    queuedJobs: store.judgeQueue.length,
-    waitingSubmissions: collectWaitingSubmissionIds().length,
-    running: store.judgeWorkerRunning,
-  };
-}
-
-function getJudgeQueueDiagnosticsInternal(limit = 50): {
-  stats: {
-    queuedJobs: number;
-    waitingSubmissions: number;
-    running: boolean;
-  };
-  jobs: Array<{
-    id: string;
-    submissionId: string;
-    queuedAt: string;
-    reason: JudgeJobReason;
-    requestedAt: string;
-  }>;
-  orphanWaitingSubmissionIds: string[];
-} {
-  const waitingSubmissionIds = collectWaitingSubmissionIds();
-  const queuedSubmissionIds = new Set<string>([
-    ...store.judgeQueue.map((job) => job.submissionId),
-    ...store.judgeInFlightSubmissionIds,
-  ]);
-  const orphanWaitingSubmissionIds = waitingSubmissionIds.filter(
-    (submissionId) => !queuedSubmissionIds.has(submissionId),
-  );
-
-  return {
-    stats: getJudgeQueueStatsInternal(),
-    jobs: [...store.judgeQueue].slice(0, limit),
-    orphanWaitingSubmissionIds,
-  };
 }
 
 function repairJudgeQueueInternal(): number {
@@ -1306,15 +1809,42 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
   if (!submission) {
     return;
   }
-  if (!isWaitingSubmissionStatus(submission.status)) {
+  const currentRuntime = (await getSubmissionRuntimeState(submissionId)) ?? defaultSubmissionRuntimeSummary(submission);
+  if (!isWaitingSubmissionStatus(currentRuntime.status)) {
     return;
   }
-  submission.judgeStartedAt = submission.judgeStartedAt ?? nowIso();
-  submission.judgeEnvironmentVersion = getJudgeEnvironmentVersion();
+
+  const judgeStartedAt = currentRuntime.judgeStartedAt ?? nowIso();
+  const judgeEnvironmentVersion = getJudgeEnvironmentVersion();
+  await resetSubmissionRuntime(submissionId, {
+    status: "queued",
+    judgeStartedAt,
+    judgedAt: null,
+    judgeEnvironmentVersion,
+  });
 
   const problem = getProblemById(submission.problemId);
   if (!problem) {
-    markSubmissionAsInternalError(submission, "problem not found while judging");
+    const result = {
+      id: nextTestResultId(),
+      groupName: "system",
+      testCaseName: "-",
+      verdict: "internal_error" as SubmissionStatus,
+      timeMs: 0,
+      memoryKb: 0,
+      message: "problem not found while judging",
+    };
+    await replaceSubmissionRuntimeTestResults(submissionId, [result]);
+    await upsertSubmissionRuntimeState({
+      submissionId,
+      status: "internal_error",
+      score: 0,
+      totalTimeMs: 0,
+      peakMemoryKb: 0,
+      judgeStartedAt,
+      judgedAt: nowIso(),
+      judgeEnvironmentVersion,
+    });
     appendAuditLog({
       actorId: submission.userId,
       action: "submission.judge",
@@ -1322,8 +1852,8 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       targetId: submission.id,
       reason,
       metadata: {
-        result: submission.status,
-        score: String(submission.score),
+        result: "internal_error",
+        score: "0",
       },
     });
     return;
@@ -1342,10 +1872,26 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
     packageSource ? packageSource.groups.length > 0 : (packageData?.groups.length ?? 0) > 0;
   if (!hasGroups) {
     await packageSource?.cleanup();
-    markSubmissionAsInternalError(
-      submission,
-      "problem package is not configured. upload ZIP package before judging",
-    );
+    const result = {
+      id: nextTestResultId(),
+      groupName: "system",
+      testCaseName: "-",
+      verdict: "internal_error" as SubmissionStatus,
+      timeMs: 0,
+      memoryKb: 0,
+      message: "problem package is not configured. upload ZIP package before judging",
+    };
+    await replaceSubmissionRuntimeTestResults(submissionId, [result]);
+    await upsertSubmissionRuntimeState({
+      submissionId,
+      status: "internal_error",
+      score: 0,
+      totalTimeMs: 0,
+      peakMemoryKb: 0,
+      judgeStartedAt,
+      judgedAt: nowIso(),
+      judgeEnvironmentVersion,
+    });
     appendAuditLog({
       actorId: submission.userId,
       action: "submission.judge",
@@ -1353,15 +1899,27 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       targetId: submission.id,
       reason,
       metadata: {
-        result: submission.status,
-        score: String(submission.score),
+        result: "internal_error",
+        score: "0",
       },
     });
     return;
   }
 
   try {
-    submission.status = "compiling";
+    let phase: SubmissionStatus = "compiling";
+    let orderIndex = 0;
+    await replaceSubmissionRuntimeTestResults(submissionId, []);
+    await upsertSubmissionRuntimeState({
+      submissionId,
+      status: "compiling",
+      score: 0,
+      totalTimeMs: 0,
+      peakMemoryKb: 0,
+      judgeStartedAt,
+      judgedAt: null,
+      judgeEnvironmentVersion,
+    });
 
     const judged = await executePackageJudge({
       sourceCode: submission.sourceCode,
@@ -1371,21 +1929,47 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       packageData: packageData ?? undefined,
       packageSource: packageSource ?? undefined,
       nextTestResultId,
-      onPhaseChange: (phase) => {
-        submission.status = phase;
+      onPhaseChange: async (nextPhase) => {
+        phase = nextPhase;
+        const current = (await getSubmissionRuntimeState(submissionId)) ?? defaultSubmissionRuntimeSummary(submission);
+        await upsertSubmissionRuntimeState({
+          submissionId,
+          status: nextPhase,
+          score: current.score,
+          totalTimeMs: current.totalTimeMs,
+          peakMemoryKb: current.peakMemoryKb,
+          judgeStartedAt,
+          judgedAt: null,
+          judgeEnvironmentVersion,
+        });
       },
-      onTestResult: ({ result, totalTimeMs, peakMemoryKb }) => {
-        submission.testResults = [...submission.testResults, result];
-        submission.totalTimeMs = totalTimeMs;
-        submission.peakMemoryKb = peakMemoryKb;
+      onTestResult: async ({ result, totalTimeMs, peakMemoryKb }) => {
+        await appendSubmissionRuntimeTestResult(submissionId, result, orderIndex++);
+        await upsertSubmissionRuntimeState({
+          submissionId,
+          status: phase,
+          score: 0,
+          totalTimeMs,
+          peakMemoryKb,
+          judgeStartedAt,
+          judgedAt: null,
+          judgeEnvironmentVersion,
+        });
       },
     });
-    submission.status = judged.status;
-    submission.score = judged.score;
-    submission.totalTimeMs = judged.totalTimeMs;
-    submission.peakMemoryKb = judged.peakMemoryKb;
-    submission.judgedAt = nowIso();
-    submission.testResults = judged.testResults;
+    if (orderIndex !== judged.testResults.length) {
+      await replaceSubmissionRuntimeTestResults(submissionId, judged.testResults);
+    }
+    await upsertSubmissionRuntimeState({
+      submissionId,
+      status: judged.status,
+      score: judged.score,
+      totalTimeMs: judged.totalTimeMs,
+      peakMemoryKb: judged.peakMemoryKb,
+      judgeStartedAt,
+      judgedAt: nowIso(),
+      judgeEnvironmentVersion,
+    });
 
     appendAuditLog({
       actorId: submission.userId,
@@ -1394,15 +1978,32 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       targetId: submission.id,
       reason,
       metadata: {
-        result: submission.status,
-        score: String(submission.score),
+        result: judged.status,
+        score: String(judged.score),
       },
     });
   } catch (error) {
-    markSubmissionAsInternalError(
-      submission,
-      error instanceof Error ? error.message : "judge internal error",
-    );
+    const message = error instanceof Error ? error.message : "judge internal error";
+    const result = {
+      id: nextTestResultId(),
+      groupName: "system",
+      testCaseName: "-",
+      verdict: "internal_error" as SubmissionStatus,
+      timeMs: 0,
+      memoryKb: 0,
+      message,
+    };
+    await replaceSubmissionRuntimeTestResults(submissionId, [result]);
+    await upsertSubmissionRuntimeState({
+      submissionId,
+      status: "internal_error",
+      score: 0,
+      totalTimeMs: 0,
+      peakMemoryKb: 0,
+      judgeStartedAt,
+      judgedAt: nowIso(),
+      judgeEnvironmentVersion,
+    });
     appendAuditLog({
       actorId: submission.userId,
       action: "submission.judge",
@@ -1410,8 +2011,8 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       targetId: submission.id,
       reason,
       metadata: {
-        result: submission.status,
-        score: String(submission.score),
+        result: "internal_error",
+        score: "0",
       },
     });
   } finally {
@@ -1479,43 +2080,6 @@ function enqueueJudgeJob(submissionId: string, reason: JudgeJobReason = "normal"
     requestedAt,
   });
   scheduleJudgeWorker();
-}
-
-function findPackageJobById(jobId: string): PackageJobRecord | undefined {
-  return store.packageJobs.find((job) => job.id === jobId);
-}
-
-function schedulePackageJobWorker(): void {
-  if (!canExecuteJudgeJobsInThisProcess()) {
-    return;
-  }
-  if (store.packageJobWorkerRunning) {
-    return;
-  }
-
-  store.packageJobWorkerRunning = true;
-  const tick = async () => {
-    const nextJobId = store.packageJobQueue.shift();
-    if (!nextJobId) {
-      store.packageJobWorkerRunning = false;
-      return;
-    }
-
-    try {
-      void persistStoreSnapshotNow();
-      await runPackageJobInternal(nextJobId);
-    } finally {
-      void persistStoreSnapshotNow();
-    }
-
-    setTimeout(() => {
-      void tick();
-    }, 50);
-  };
-
-  setTimeout(() => {
-    void tick();
-  }, 100);
 }
 
 function sortBySubmittedAtAsc<T extends { submittedAt: string }>(items: T[]): T[] {
@@ -2271,45 +2835,7 @@ async function applyProblemPackageManifestInternal(
   return problem;
 }
 
-function repairPackageJobQueueInternal(): number {
-  const queuedJobIds = new Set(store.packageJobQueue);
-  let requeued = 0;
-  for (const job of store.packageJobs) {
-    if (job.status !== "queued" && job.status !== "running") {
-      continue;
-    }
-    if (queuedJobIds.has(job.id)) {
-      continue;
-    }
-    if (job.status === "running") {
-      job.status = "queued";
-      job.startedAt = null;
-      job.finishedAt = null;
-      job.error = null;
-    }
-    store.packageJobQueue.push(job.id);
-    requeued += 1;
-  }
-  if (store.packageJobQueue.length > 0) {
-    schedulePackageJobWorker();
-  }
-  if (requeued > 0) {
-    void persistStoreSnapshotNow();
-  }
-  return requeued;
-}
-
-async function runPackageJobInternal(jobId: string): Promise<void> {
-  const job = findPackageJobById(jobId);
-  if (!job || (job.status !== "queued" && job.status !== "running")) {
-    return;
-  }
-
-  job.status = "running";
-  job.startedAt = nowIso();
-  job.finishedAt = null;
-  job.error = null;
-
+async function runPackageJobInternal(job: PackageJobRecord): Promise<void> {
   try {
     const packageSource = await createLazyProblemPackageSourceFromStorageRef({
       ref: job.storageRef,
@@ -2319,16 +2845,31 @@ async function runPackageJobInternal(jobId: string): Promise<void> {
     try {
       if (job.type === "apply") {
         const manifest = packageSource.manifest;
-        const problem = resolveProblemIfExists(job.problemId);
-        await applyProblemPackageManifestInternal(
-          problem,
-          manifest,
-          job.storageRef,
-          job.previousRef,
-        );
+        while (!(await tryAcquireOrRenewLease(APP_STATE_WRITE_LEASE_ID))) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        try {
+          await refreshStoreFromDbNow();
+          const problem = resolveProblemIfExists(job.problemId);
+          await applyProblemPackageManifestInternal(
+            problem,
+            manifest,
+            job.storageRef,
+            job.previousRef,
+          );
+        } finally {
+          await releaseLease(APP_STATE_WRITE_LEASE_ID);
+        }
         job.result = {
-          problemId: problem.id,
+          problemId: job.problemId,
         };
+        await finishPackageJobDb({
+          id: job.id,
+          status: "completed",
+          result: {
+            problemId: job.problemId,
+          },
+        });
       } else {
         let testResultCounter = 0;
         const result = await executePackageJudge({
@@ -2340,17 +2881,21 @@ async function runPackageJobInternal(jobId: string): Promise<void> {
           nextTestResultId: () => `preview-test-result-${++testResultCounter}`,
         });
         job.result = result;
+        await finishPackageJobDb({
+          id: job.id,
+          status: "completed",
+          result: result as unknown as Prisma.InputJsonValue,
+        });
       }
-
-      job.status = "completed";
-      job.finishedAt = nowIso();
     } finally {
       await packageSource.cleanup();
     }
   } catch (error) {
-    job.status = "failed";
-    job.error = error instanceof Error ? error.message : "package job failed";
-    job.finishedAt = nowIso();
+    await finishPackageJobDb({
+      id: job.id,
+      status: "failed",
+      error: error instanceof Error ? error.message : "package job failed",
+    });
     if (job.type === "apply") {
       const currentRef = store.problemPackageRefs[job.problemId];
       if (!currentRef || currentRef.key !== job.storageRef.key) {
@@ -2382,26 +2927,19 @@ export async function createProblemPackageApplyJob(input: {
   if (actor.role !== "admin" && problem.authorId !== actor.id) {
     throw new HttpError("you cannot upload package for this problem", 403);
   }
-
-  const job: PackageJobRecord = {
-    id: nextPackageJobId(),
+  const job = await createPackageJobDb({
     type: "apply",
     requestedBy: actor.id,
-    status: "queued",
-    createdAt: nowIso(),
-    startedAt: null,
-    finishedAt: null,
-    error: null,
     problemId: problem.id,
     fileName: input.fileName,
     storageRef: input.storageRef,
     previousRef: store.problemPackageRefs[problem.id] ?? null,
-    result: null,
-  };
-  store.packageJobs.unshift(job);
-  store.packageJobQueue.push(job.id);
-  await persistStoreSnapshotNow();
-  schedulePackageJobWorker();
+  });
+  if (JUDGE_PROCESS_MODE === "inline") {
+    await runPackageJobInternal(job);
+    const row = await prisma.packageJob.findUnique({ where: { id: job.id } });
+    return row ? toPackageJobRecord(row) : job;
+  }
   return job;
 }
 
@@ -2419,16 +2957,9 @@ export async function createProblemPackagePreviewJob(input: {
   if (!canCreateProblemByRole(actor.role)) {
     throw new HttpError("problem creation requires problem_author role", 403);
   }
-
-  const job: PackageJobRecord = {
-    id: nextPackageJobId(),
+  const job = await createPackageJobDb({
     type: "preview",
     requestedBy: actor.id,
-    status: "queued",
-    createdAt: nowIso(),
-    startedAt: null,
-    finishedAt: null,
-    error: null,
     problemId: input.problemId ?? null,
     fileName: input.fileName,
     storageRef: input.storageRef,
@@ -2436,21 +2967,21 @@ export async function createProblemPackagePreviewJob(input: {
     sourceCode: input.sourceCode,
     timeLimitMs: input.timeLimitMs,
     memoryLimitMb: input.memoryLimitMb,
-    result: null,
-  };
-  store.packageJobs.unshift(job);
-  store.packageJobQueue.push(job.id);
-  await persistStoreSnapshotNow();
-  schedulePackageJobWorker();
+  });
+  if (JUDGE_PROCESS_MODE === "inline") {
+    await runPackageJobInternal(job);
+    const row = await prisma.packageJob.findUnique({ where: { id: job.id } });
+    return row ? toPackageJobRecord(row) : job;
+  }
   return job;
 }
 
 export async function getPackageJobForViewer(jobId: string): Promise<PackageJobRecord> {
   const actor = await getCurrentUser();
-  if (JUDGE_PROCESS_MODE === "web") {
-    await refreshStoreFromDbNow();
-  }
-  const job = findPackageJobById(jobId);
+  const row = await prisma.packageJob.findUnique({
+    where: { id: jobId },
+  });
+  const job = row ? toPackageJobRecord(row) : null;
   if (!job) {
     throw new HttpError("package job not found", 404);
   }
@@ -2604,8 +3135,10 @@ export function listSubmissionsForViewer(
   options: ListSubmissionsOptions = {},
 ): Submission[] {
   void viewerId;
-  repairJudgeQueueInternal();
-  const filtered = [...store.submissions].filter((submission) => {
+  maybeRefreshSubmissionRuntimeCache();
+  const filtered = [...store.submissions]
+    .map((submission) => applySubmissionRuntimeSummary(submission))
+    .filter((submission) => {
     if (options.userId && submission.userId !== options.userId) {
       return false;
     }
@@ -2642,8 +3175,9 @@ export function listSubmissionsForViewer(
 }
 
 export function listRecentSubmissions(limit = 15): Submission[] {
-  repairJudgeQueueInternal();
+  maybeRefreshSubmissionRuntimeCache();
   return [...store.submissions]
+    .map((submission) => applySubmissionRuntimeSummary(submission))
     .sort(
       (left, right) =>
         new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime(),
@@ -2652,8 +3186,9 @@ export function listRecentSubmissions(limit = 15): Submission[] {
 }
 
 export function getSubmissionById(submissionId: string): Submission | undefined {
-  repairJudgeQueueInternal();
-  return findSubmissionByIdInternal(submissionId);
+  maybeRefreshSubmissionRuntimeCache();
+  const submission = findSubmissionByIdInternal(submissionId);
+  return submission ? applySubmissionRuntimeSummary(submission) : undefined;
 }
 
 export async function createSubmission(input: CreateSubmissionInput): Promise<Submission> {
@@ -2718,9 +3253,23 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   };
 
   store.submissions.unshift(submission);
-  enqueueJudgeJob(submission.id, "normal");
+  if (JUDGE_PROCESS_MODE === "inline") {
+    enqueueJudgeJob(submission.id, "normal");
+  } else {
+    await enqueueJudgeJobDb(submission.id, "normal");
+  }
+  await upsertSubmissionRuntimeState({
+    submissionId: submission.id,
+    status: "queued",
+    score: 0,
+    totalTimeMs: 0,
+    peakMemoryKb: 0,
+    judgeStartedAt: null,
+    judgedAt: null,
+    judgeEnvironmentVersion: null,
+  });
   await persistStoreSnapshotNow();
-  return submission;
+  return applySubmissionRuntimeSummary(submission, getSubmissionRuntimeCache()[submission.id]);
 }
 
 function getWrongBeforeAccepted(
@@ -2760,7 +3309,9 @@ export function buildScoreboard(contestId: string): ScoreboardRow[] {
   const contestProblems = [...contest.problems].sort((left, right) => left.orderIndex - right.orderIndex);
   const contestStartMs = new Date(contest.startAt).getTime();
   const contestEndMs = new Date(contest.endAt).getTime();
-  const inContestSubmissions = store.submissions.filter(
+  const inContestSubmissions = store.submissions
+    .map((submission) => applySubmissionRuntimeSummary(submission))
+    .filter(
     (submission) => {
       if (submission.contestId !== contestId) {
         return false;
@@ -2960,7 +3511,6 @@ export function dumpStoreSnapshot(): {
   auditLogs: AuditLog[];
   rejudgeRequests: RejudgeRequest[];
   githubIndex: Record<string, string>;
-  judgeQueue: Store["judgeQueue"];
   counters: Store["counters"];
   rateLimits: RateLimits;
 } {
@@ -3081,11 +3631,24 @@ export function canRequestRejudgeByViewer(
   return false;
 }
 
-export function getSubmissionWithAccess(
+export async function getSubmissionWithAccess(
   submissionId: string,
   viewerId: string,
-): { submission: Submission; canViewSource: boolean } | undefined {
-  const submission = getSubmissionById(submissionId);
+): Promise<{ submission: Submission; canViewSource: boolean } | undefined> {
+  const baseSubmission = getSubmissionById(submissionId);
+  if (!baseSubmission) {
+    return undefined;
+  }
+
+  const runtimeSummary = await getSubmissionRuntimeState(submissionId);
+  const runtimeResults = await listSubmissionRuntimeTestResults(submissionId);
+  const submission = applySubmissionRuntimeSummary(
+    {
+      ...baseSubmission,
+      testResults: runtimeResults.length > 0 ? runtimeResults : baseSubmission.testResults,
+    },
+    runtimeSummary ?? undefined,
+  );
   if (!submission) {
     return undefined;
   }
@@ -3542,8 +4105,25 @@ export async function getJudgeQueueStatsForAdmin(): Promise<{
 }> {
   const user = await getCurrentUser();
   assertAdmin(user);
-  repairJudgeQueueInternal();
-  return getJudgeQueueStatsInternal();
+  const [queuedJobs, runningJobs] = await Promise.all([
+    prisma.judgeJob.count({
+      where: {
+        status: {
+          in: ["queued", "running"],
+        },
+      },
+    }),
+    prisma.judgeJob.count({
+      where: {
+        status: "running",
+      },
+    }),
+  ]);
+  return {
+    queuedJobs,
+    waitingSubmissions: collectWaitingSubmissionIds().length,
+    running: runningJobs > 0,
+  };
 }
 
 export async function getJudgeQueueDiagnosticsForAdmin(limit = 50): Promise<{
@@ -3563,7 +4143,23 @@ export async function getJudgeQueueDiagnosticsForAdmin(limit = 50): Promise<{
 }> {
   const user = await getCurrentUser();
   assertAdmin(user);
-  return getJudgeQueueDiagnosticsInternal(limit);
+  const jobs = await listJudgeJobsDb(limit);
+  const activeIds = await activeJudgeJobSubmissionIdsDb();
+  const waitingSubmissionIds = collectWaitingSubmissionIds();
+  const runningJobs = await prisma.judgeJob.count({
+    where: {
+      status: "running",
+    },
+  });
+  return {
+    stats: {
+      queuedJobs: activeIds.size,
+      waitingSubmissions: waitingSubmissionIds.length,
+      running: runningJobs > 0,
+    },
+    jobs,
+    orphanWaitingSubmissionIds: waitingSubmissionIds.filter((submissionId) => !activeIds.has(submissionId)),
+  };
 }
 
 export async function repairJudgeQueueByAdmin(): Promise<{
@@ -3586,11 +4182,64 @@ export async function repairJudgeQueueByAdmin(): Promise<{
 }> {
   const user = await getCurrentUser();
   assertAdmin(user);
-  const requeued = repairJudgeQueueInternal();
+  const requeued = await enqueueMissingJudgeJobsDb();
   return {
     requeued,
-    diagnostics: getJudgeQueueDiagnosticsInternal(),
+    diagnostics: await getJudgeQueueDiagnosticsForAdmin(),
   };
+}
+
+async function tryAcquireOrRenewLease(leaseId: string): Promise<boolean> {
+  if (!STORE_DB_SYNC_ENABLED) {
+    return true;
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + WORKER_LEASE_DURATION_MS);
+  const updated = await prisma.workerLease.updateMany({
+    where: {
+      id: leaseId,
+      OR: [
+        { ownerId: WORKER_INSTANCE_ID },
+        { expiresAt: { lt: now } },
+      ],
+    },
+    data: {
+      ownerId: WORKER_INSTANCE_ID,
+      expiresAt,
+    },
+  });
+  if (updated.count > 0) {
+    return true;
+  }
+
+  try {
+    await prisma.workerLease.create({
+      data: {
+        id: leaseId,
+        ownerId: WORKER_INSTANCE_ID,
+        expiresAt,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function releaseLease(leaseId: string): Promise<void> {
+  if (!STORE_DB_SYNC_ENABLED) {
+    return;
+  }
+  await prisma.workerLease.updateMany({
+    where: {
+      id: leaseId,
+      ownerId: WORKER_INSTANCE_ID,
+    },
+    data: {
+      expiresAt: new Date(0),
+    },
+  });
 }
 
 export function getJudgeProcessMode(): "inline" | "web" | "worker" {
@@ -3612,19 +4261,39 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
       return;
     }
     await refreshStoreFromDbNow();
-    const requeued = repairJudgeQueueInternal();
-    const requeuedPackageJobs = repairPackageJobQueueInternal();
+    const requeued = await enqueueMissingJudgeJobsDb();
     if (requeued > 0) {
       await persistStoreSnapshotNow();
     }
-    if (requeuedPackageJobs > 0) {
-      await persistStoreSnapshotNow();
+    const judgeJob = await claimNextJudgeJobDb();
+    if (judgeJob) {
+      store.judgeWorkerRunning = true;
+      try {
+        await runJudgeForSubmission(judgeJob.submissionId, judgeJob.reason);
+        await finishJudgeJobDb({
+          id: judgeJob.id,
+          status: "completed",
+        });
+      } catch (error) {
+        await finishJudgeJobDb({
+          id: judgeJob.id,
+          status: "failed",
+          error: error instanceof Error ? error.message : "judge job failed",
+        });
+      } finally {
+        store.judgeWorkerRunning = false;
+      }
+      return;
     }
-    if (store.judgeQueue.length > 0) {
-      scheduleJudgeWorker();
-    }
-    if (store.packageJobQueue.length > 0) {
-      schedulePackageJobWorker();
+
+    const packageJob = await claimNextPackageJobDb();
+    if (packageJob) {
+      store.packageJobWorkerRunning = true;
+      try {
+        await runPackageJobInternal(packageJob);
+      } finally {
+        store.packageJobWorkerRunning = false;
+      }
     }
   };
 
@@ -3703,8 +4372,21 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     metadata: { requestId: request.id, problemId: problem.id },
   });
 
-  enqueueJudgeJob(submission.id, "rejudge");
+  if (JUDGE_PROCESS_MODE === "inline") {
+    enqueueJudgeJob(submission.id, "rejudge");
+  } else {
+    await enqueueJudgeJobDb(submission.id, "rejudge");
+  }
+  await resetSubmissionRuntime(submission.id, {
+    status: "queued",
+    judgeStartedAt: null,
+    judgedAt: null,
+    judgeEnvironmentVersion: null,
+  });
   await persistStoreSnapshotNow();
 
-  return { request, submission };
+  return {
+    request,
+    submission: applySubmissionRuntimeSummary(submission, getSubmissionRuntimeCache()[submission.id]),
+  };
 }

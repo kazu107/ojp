@@ -161,7 +161,7 @@ function buildDisplayResults(input: {
 export default async function SubmissionDetailPage({ params }: SubmissionDetailPageProps) {
   const { submissionId } = await params;
   const me = await getOptionalCurrentUser();
-  const result = getSubmissionWithAccess(submissionId, me?.id ?? "guest");
+  const result = await getSubmissionWithAccess(submissionId, me?.id ?? "guest");
 
   if (!result) {
     notFound();

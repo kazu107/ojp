@@ -418,12 +418,12 @@ export async function executePackageJudge(input: {
   packageData?: ProblemPackageExtracted;
   packageSource?: LazyProblemPackageSource;
   nextTestResultId: () => string;
-  onPhaseChange?: (status: "compiling" | "running" | "judging") => void;
+  onPhaseChange?: (status: "compiling" | "running" | "judging") => void | Promise<void>;
   onTestResult?: (params: {
     result: Submission["testResults"][number];
     totalTimeMs: number;
     peakMemoryKb: number;
-  }) => void;
+  }) => void | Promise<void>;
 }): Promise<JudgeResult> {
   const packageMeta = input.packageSource
     ? {
@@ -461,7 +461,7 @@ export async function executePackageJudge(input: {
     const submissionSourcePath = path.join(submissionWorkspace, submissionCommands.sourceFileName);
     await writeFile(submissionSourcePath, input.sourceCode, "utf8");
 
-    input.onPhaseChange?.("compiling");
+    await input.onPhaseChange?.("compiling");
     const submissionCompile = await compileProgram(submissionWorkspace, submissionCommands);
     if (!submissionCompile.ok) {
       return {
@@ -560,7 +560,7 @@ export async function executePackageJudge(input: {
         if (!testCase) {
           throw new Error(`test case not found: ${group.name}/${caseName}`);
         }
-        input.onPhaseChange?.("running");
+        await input.onPhaseChange?.("running");
         const executed = await runWithFallback(runtimeTemplate, {
           cwd: submissionWorkspace,
           stdin: testCase.input,
@@ -622,7 +622,7 @@ export async function executePackageJudge(input: {
           message,
         };
         results.push(nextResult);
-        input.onTestResult?.({
+        await input.onTestResult?.({
           result: nextResult,
           totalTimeMs,
           peakMemoryKb,
@@ -635,7 +635,7 @@ export async function executePackageJudge(input: {
       });
     }
 
-    input.onPhaseChange?.("judging");
+    await input.onPhaseChange?.("judging");
     return {
       status: overallVerdict(results),
       score: scoreFromGroups(packageMeta.scoringType, judgedGroupStates),
