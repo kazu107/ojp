@@ -76,7 +76,8 @@ const JUDGE_PROCESS_MODE =
 const DEDICATED_JUDGE_POLL_INTERVAL_MS = 1_000;
 const APP_STATE_WRITE_LEASE_ID = "app-state-write";
 const WORKER_LEASE_DURATION_MS = 15_000;
-const JOB_CLAIM_STALE_MS = 60_000;
+const JOB_CLAIM_STALE_MS = 10 * 60_000;
+const JOB_HEARTBEAT_INTERVAL_MS = 10_000;
 const WORKER_INSTANCE_ID =
   process.env.DYNO?.trim() ||
   `worker-${process.pid}-${Math.random().toString(16).slice(2, 10)}`;
@@ -1536,6 +1537,19 @@ async function finishJudgeJobDb(input: {
   });
 }
 
+async function heartbeatJudgeJobDb(id: string): Promise<void> {
+  await prisma.judgeJob.updateMany({
+    where: {
+      id,
+      status: "running",
+      claimedBy: WORKER_INSTANCE_ID,
+    },
+    data: {
+      claimedAt: new Date(),
+    },
+  });
+}
+
 async function listJudgeJobsDb(limit = 50): Promise<
   Array<{
     id: string;
@@ -1689,6 +1703,19 @@ async function finishPackageJobDb(input: {
       error: input.error ?? null,
       result: input.result ?? Prisma.DbNull,
       finishedAt: new Date(),
+    },
+  });
+}
+
+async function heartbeatPackageJobDb(id: string): Promise<void> {
+  await prisma.packageJob.updateMany({
+    where: {
+      id,
+      status: "running",
+      claimedBy: WORKER_INSTANCE_ID,
+    },
+    data: {
+      claimedAt: new Date(),
     },
   });
 }
@@ -4306,6 +4333,10 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
     const judgeJob = await claimNextJudgeJobDb();
     if (judgeJob) {
       store.judgeWorkerRunning = true;
+      const heartbeat = setInterval(() => {
+        void heartbeatJudgeJobDb(judgeJob.id);
+      }, JOB_HEARTBEAT_INTERVAL_MS);
+      heartbeat.unref?.();
       try {
         await runJudgeForSubmission(judgeJob.submissionId, judgeJob.reason);
         await finishJudgeJobDb({
@@ -4319,6 +4350,7 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
           error: error instanceof Error ? error.message : "judge job failed",
         });
       } finally {
+        clearInterval(heartbeat);
         store.judgeWorkerRunning = false;
       }
       return;
@@ -4327,9 +4359,14 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
     const packageJob = await claimNextPackageJobDb();
     if (packageJob) {
       store.packageJobWorkerRunning = true;
+      const heartbeat = setInterval(() => {
+        void heartbeatPackageJobDb(packageJob.id);
+      }, JOB_HEARTBEAT_INTERVAL_MS);
+      heartbeat.unref?.();
       try {
         await runPackageJobInternal(packageJob);
       } finally {
+        clearInterval(heartbeat);
         store.packageJobWorkerRunning = false;
       }
     }
