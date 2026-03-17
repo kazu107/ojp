@@ -1848,8 +1848,12 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
 
   const judgeStartedAt = currentRuntime.judgeStartedAt ?? nowIso();
   const judgeEnvironmentVersion = getJudgeEnvironmentVersion();
-  await resetSubmissionRuntime(submissionId, {
-    status: "queued",
+  await upsertSubmissionRuntimeState({
+    submissionId,
+    status: currentRuntime.status,
+    score: currentRuntime.score,
+    totalTimeMs: currentRuntime.totalTimeMs,
+    peakMemoryKb: currentRuntime.peakMemoryKb,
     judgeStartedAt,
     judgedAt: null,
     judgeEnvironmentVersion,
