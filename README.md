@@ -1,7 +1,6 @@
-# OJP (AtCoder-like Platform MVP)
+﻿# OJP (AtCoder-like Platform MVP)
 
-`atcoder_like_platform_spec_draft.md` をもとに、Next.js App Router で実装した
-AtCoder 風プラットフォームの MVP プロトタイプです。
+`atcoder_like_platform_spec_draft.md` をもとに、Next.js App Router で実装した AtCoder 風オンラインジャッジの MVP プロトタイプです。
 
 ## 実装済み機能
 
@@ -14,6 +13,8 @@ AtCoder 風プラットフォームの MVP プロトタイプです。
   - ケース追加・編集・並び替え
   - special judge 設定
   - 保存前テスト実行
+  - 既存 package の manifest 遅延読込
+  - testcase 本文のオンデマンド読込
 - 提出フォーム / 提出一覧 / 提出詳細
 - 問題ページ下部からの直接提出
 - コンテスト一覧 / コンテスト詳細 / 順位表
@@ -24,12 +25,54 @@ AtCoder 風プラットフォームの MVP プロトタイプです。
 - 管理者画面
   - 通報管理
   - ユーザー凍結 / 解除
-  - 作成ロール変更
+  - ロール変更
   - 問題 / コンテスト非公開化
   - 問題 / コンテスト削除
   - 再ジャッジ要求確認
-  - ジャッジキュー修復
+  - ジャッジキュー診断
 - GitHub / Google OAuth ログイン
+- Cloudflare R2 への問題 package 保存
+- worker dyno による非同期 judge
+
+## 現在のアーキテクチャ
+
+### 永続化
+
+このプロジェクトは 2 系統の永続化を使っています。
+
+1. `AppState` JSON snapshot
+- ユーザー
+- 問題メタデータ
+- コンテスト
+- 通報
+- 監査ログ
+- 再ジャッジ要求
+- そのほかアプリ全体の基本状態
+
+2. 専用テーブル / object storage
+- `JudgeJob`: 提出ジャッジ用ジョブキュー
+- `PackageJob`: package apply / preview 用ジョブキュー
+- `SubmissionRuntimeState`: 提出の runtime 状態
+- `SubmissionRuntimeTestResult`: testcase ごとの runtime 結果
+- `WorkerLease`: AppState 書き込み用 lease
+- Cloudflare R2: 問題 package ZIP 本体
+
+### worker モデル
+
+- `web`: 通常のページ表示、提出受付、問題 package upload、job enqueue を担当
+- `worker`: `JudgeJob` / `PackageJob` を処理
+- job claim は PostgreSQL の `FOR UPDATE SKIP LOCKED` を使います
+- 複数 worker を起動しても同じ job を二重取得しない構成です
+- ただし `Problem` などの本体メタデータはまだ `AppState` 側にあるため、AppState 書き換えが必要な job は内部で lease を取って直列化します
+
+### 問題 package の読み込み方
+
+- 問題詳細ページ:
+  `Problem.sampleCases` を優先表示し、必要な場合だけ samples を遅延読込します
+- 問題編集ページ:
+  初期表示では package 全体を展開せず、manifest を読み込んで group / case 一覧だけを表示します
+- testcase 本文は、編集時に選択したケースだけオンデマンドで取得します
+- 保存 / test run / ZIP export の直前に、未読込 testcase が残っていれば必要分を読み込みます
 
 ## 仕様との対応
 
@@ -60,27 +103,28 @@ AtCoder 風プラットフォームの MVP プロトタイプです。
   - 30 日クールダウン
   - 表示名一意制約
   - 監査ログ記録
-- 問題 ZIP 検証 API:
-  - `GET/POST /api/problems/:problemId/package`
-  - 必須ファイル・`.in/.out` ペア・path traversal・容量上限を検証
-  - 検証成功時に `timeLimitMs / memoryLimitMb / scoringType` を問題設定へ反映
 
-## 実装上の制約
+## judge の現在仕様
 
-- アプリ状態は PostgreSQL の `AppState` テーブルへ JSON スナップショットとして保存します。
-- 問題パッケージと提出コードは DB 管理状態に保持されます。
 - judge は非同期です:
   `pending -> queued -> compiling -> running -> judging -> final`
-- 問題 ZIP が登録されている問題は `config.json` と `tests/*` を使って実行ジャッジします。
-  - 提出言語: `C++ / Python / Java / JavaScript`
-  - 比較方式: `exact / ignore_trailing_spaces`
-  - 採点方式: `binary / sum_of_groups`
-  - special judge:
-    `cpp / python / java / javascript` で checker を実装可能
+- 問題 ZIP が登録されている問題は `config.json` と `tests/*` を使って実行ジャッジします
+- 比較方式:
+  `exact / ignore_trailing_spaces`
+- 採点方式:
+  `binary / sum_of_groups`
 - 判定優先順:
   `CE > IE > RE > MLE > TLE > WA > AC`
-- 問題 ZIP / 手動 package 未設定の問題は `internal_error` になります。
-- `judgeEnvironmentVersion` を提出に保存します。
+- special judge:
+  `cpp / python / java / javascript` で checker を実装可能
+- package 未設定問題は `internal_error` になります
+- `judgeEnvironmentVersion` を提出に保存します
+
+### 実行時間表示
+
+- 表示用の実行時間は 1ms 単位の wall-clock です
+- `/usr/bin/time` が使える環境では CPU time も内部で取得しています
+- 強制停止用の timeout は wall-clock ベースです
 
 ## 起動
 
@@ -115,8 +159,6 @@ OAuth callback URL:
 - Google Heroku:
   `https://<your-app-name>.herokuapp.com/api/auth/callback/google`
 
-`AUTH_SECRET` は `openssl rand -base64 32` などで生成した十分に長いランダム文字列を推奨します。
-
 ### PKCE エラーについて
 
 OAuth サインインで
@@ -130,8 +172,7 @@ OAuth サインインで
 
 ## Heroku Container デプロイ
 
-このリポジトリには `Dockerfile` と `heroku.yml` が含まれており、
-judge に必要な実行環境
+このリポジトリには `Dockerfile` と `heroku.yml` が含まれており、judge に必要な実行環境
 `g++ / python3 / javac / java / node`
 を同梱できます。
 
@@ -140,10 +181,10 @@ heroku stack:set container -a <your-app-name>
 git push heroku main
 ```
 
-初回またはスキーマ変更時:
+初回または schema 変更時:
 
 ```bash
-heroku run npm run db:push -a <your-app-name>
+heroku run -- npm run db:push -a <your-app-name>
 ```
 
 ツールチェーン確認:
@@ -152,16 +193,25 @@ heroku run npm run db:push -a <your-app-name>
 heroku run "node -v && python3 --version && g++ --version && javac -version && java -version" -a <your-app-name>
 ```
 
-注意:
+worker を有効化:
+
+```bash
+heroku ps:scale web=1 worker=1 -a <your-app-name>
+```
+
+複数 worker:
+
+```bash
+heroku ps:scale web=1 worker=3 -a <your-app-name>
+```
+
+補足:
 
 - `web=1` は引き続き推奨です
 - `worker` は複数 dyno を起動できます
-  - ただし `AppState` JSON snapshot 構成のため、queue drain は Postgres の worker lease を取った leader 1 台が担当します
-  - 追加 worker は leader 障害時の failover として待機します
+- `JudgeJob` / `PackageJob` は DB claim (`SKIP LOCKED`) により複数 worker 対応です
+- ただし AppState 書き換えが必要な処理は lease により直列化されます
 - package 未設定問題は `internal_error` になります
-- `JUDGE_ENVIRONMENT_VERSION` を Config Vars に設定すると提出へ記録されます
-- 表示用の実行時間は 1ms 単位の wall-clock です
-- `/usr/bin/time` が使える環境では CPU time も内部で取得していますが、強制停止用の timeout は引き続き wall-clock ベースです
 
 ## DB セットアップ (Prisma / PostgreSQL)
 
@@ -289,49 +339,22 @@ npm run build
 一覧系 API (`/api/problems`, `/api/contests`, `/api/submissions`, `/api/admin/reports`) は
 `page`, `limit`, `cursor` をサポートします。
 
-## DB-only Persistence Mode
-
-このアプリは object storage なしでも小規模運用できます。
-
-- アプリ状態は Postgres (`AppState`) に JSON スナップショットで保存
-- 提出コードと package 派生データも DB 管理状態に保持
-- `STORE_DB_SYNC=1` (既定) で同期を有効化
-
-注意:
-
-- `web=1` は引き続き推奨
-- `worker` は複数起動可能だが、leader lease により 1 台が active drain を担当
-- 大きなテスト資産は将来的に object storage へ分離した方が安全
-
-## Legacy DB Enum Migration
-
-`npm run db:push` が
-`invalid input value for enum "SubmissionStatus_new": "AC"`
-のような enum エラーで止まる場合は、先に次を一度だけ実行してください。
-
-```bash
-npm run db:migrate:legacy-status
-npm run db:push -- --accept-data-loss
-```
-
 ## Problem ZIP Format
 
 問題作成 / 編集ページでは、次の 2 つの方法で judge package を扱えます。
 
 - ZIP import:
   `statement.md` と `config.json` からフォームを自動入力
-- 既存問題の編集ページでは:
-  stored ZIP を必要な時だけ読み込むため、大きい package でも初期表示は軽量
-  - package manifest だけ先に読み込む
-  - testcase 本文は選択時に遅延取得
-  - 保存 / test run / ZIP export の直前に、未読込 testcase があれば読み込む
-- 保存 / test run:
-  - ZIP はまず object storage へ送信
-  - 重い package apply / preview は worker で実行
-  - client は package job を polling して完了を待つ
 - Manual editor:
   samples / groups / cases / score / checker をページ上で直接編集
-  - special judge の checker フィールドには言語別テンプレートを自動入力
+- 既存問題の編集ページ:
+  - stored ZIP は必要時だけ manifest を読み込み
+  - testcase 本文は選択時に遅延読込
+  - 保存 / test run / ZIP export の直前に未読込 testcase があれば追加で読込
+- 保存 / test run:
+  - R2 が有効なら ZIP を object storage にアップロードして worker job を実行
+  - client は package job を polling して完了を待つ
+  - R2 無効時は一部処理が direct fallback になります
 
 ### 期待される構成
 
@@ -397,12 +420,6 @@ problem-package.zip
   - `1` = WA
   - その他 = judge error (`internal_error`)
 
-## Problem Detail Samples
-
-- 問題詳細ページは `Problem.sampleCases` を優先して表示
-- 既存問題で `sampleCases` が未保存の場合のみ `/api/problems/:problemId/samples` から遅延取得
-- これにより problem detail の初期表示で package 全体を server-side 展開しません
-
 ### 検証ルール
 
 - `samples/` と `tests/<group>/` の `.in/.out` ペアが必須
@@ -417,15 +434,21 @@ npm run template:problem-zip -- --mode partial --output ./my-problem.zip
 npm run template:problem-zip -- --mode binary --groups 3 --tests-per-group 4
 ```
 
+## Problem Detail Samples
+
+- 問題詳細ページは `Problem.sampleCases` を優先して表示
+- 既存問題で `sampleCases` が未保存の場合のみ `/api/problems/:problemId/samples` から遅延取得
+- このため problem detail の初期表示で package 全体を server-side 展開しません
+
 ## Problem Difficulty
 
 - 各問題に整数 difficulty を設定可能
 - AtCoder 風のレーティング値を想定
   - 例: `400 / 800 / 1200`
 
-## Site Header Links
+## Site Header / Footer Links
 
-ヘッダーの外部リンク URL は次で設定します。
+外部リンク URL は次で設定します。
 
 - `lib/site-links.ts`
 
@@ -461,24 +484,30 @@ R2_SECRET_ACCESS_KEY="your-r2-secret-access-key"
 補足:
 
 - 新しく登録・更新した問題 package は自動で R2 に保存されます
-- package の展開結果はメモリ cache に保持され、DB スナップショットには object ref のみ保存されます
-- 既存の埋め込み package は migration 実行で zip 再構築して R2 へ移行できます
+- package の展開結果はメモリ cache に一部保持されますが、大きい package はサーバーメモリに常駐させない設計です
+- save / preview は object storage + worker job 経由で進めます
 
-## Judge Worker Dyno
+## DB-only Persistence Mode
 
-Heroku container では judge を `worker` dyno に分離できます。
+object storage なしでも小規模運用できます。
 
-- `web`: `JUDGE_PROCESS_MODE=web`
-- `worker`: `JUDGE_PROCESS_MODE=worker`
-
-`heroku.yml` には両 process を定義済みです。デプロイ後に次を実行してください。
-
-```bash
-heroku ps:scale web=1 worker=1 -a <your-app-name>
-```
+- アプリ状態は Postgres (`AppState`) に JSON snapshot として保存
+- 問題 package や preview は一部 direct fallback で動作
+- `STORE_DB_SYNC=1` (既定) で DB 同期を有効化
 
 補足:
 
-- local / 単一プロセス運用では `JUDGE_PROCESS_MODE` 未設定時に `inline` で従来どおり動きます
-- worker は DB snapshot をポーリングして queue を拾います
-- queue 追加と rejudge は即時 persist するようにしてあるので、worker 側へ比較的早く伝播します
+- `web=1` は引き続き推奨です
+- `worker` は複数起動可能ですが、AppState を書き換える処理は部分的に lease で直列化されます
+- 大きなテスト資産は R2 の利用を前提にした方が安全です
+
+## Legacy DB Enum Migration
+
+`npm run db:push` が
+`invalid input value for enum "SubmissionStatus_new": "AC"`
+のような enum エラーで止まる場合は、先に次を一度だけ実行してください。
+
+```bash
+npm run db:migrate:legacy-status
+npm run db:push -- --accept-data-loss
+```
