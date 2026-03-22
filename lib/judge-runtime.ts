@@ -21,6 +21,7 @@ interface CommandResult {
   exitCode: number | null;
   timedOut: boolean;
   durationMs: number;
+  cpuDurationMs: number;
   wallDurationMs: number;
   memoryKb: number;
   spawnErrorCode?: string;
@@ -180,7 +181,8 @@ async function runCommand(
         stderr,
         exitCode,
         timedOut,
-        durationMs: cpuDurationMs,
+        durationMs: wallDurationMs,
+        cpuDurationMs,
         wallDurationMs,
         memoryKb,
         spawnErrorCode,
@@ -218,6 +220,7 @@ async function runWithFallback(
         exitCode: null,
         timedOut: false,
         durationMs: 0,
+        cpuDurationMs: 0,
         wallDurationMs: 0,
         memoryKb: 0,
         spawnErrorCode: "ENOENT",
