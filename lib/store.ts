@@ -1239,13 +1239,23 @@ async function replaceSubmissionRuntimeTestResults(
   submissionId: string,
   results: Submission["testResults"],
 ): Promise<void> {
+  const canonicalResults: Submission["testResults"] = [];
+  const seenKeys = new Set<string>();
+  for (const result of results) {
+    const key = `${result.groupName}::${result.testCaseName}`;
+    if (seenKeys.has(key)) {
+      continue;
+    }
+    seenKeys.add(key);
+    canonicalResults.push(result);
+  }
   await prisma.$transaction(async (tx) => {
     await tx.submissionRuntimeTestResult.deleteMany({
       where: { submissionId },
     });
-    if (results.length > 0) {
+    if (canonicalResults.length > 0) {
       await tx.submissionRuntimeTestResult.createMany({
-        data: results.map((result, index) => ({
+        data: canonicalResults.map((result, index) => ({
           id: result.id,
           submissionId,
           orderIndex: index,
@@ -1266,18 +1276,32 @@ async function appendSubmissionRuntimeTestResult(
   result: Submission["testResults"][number],
   orderIndex: number,
 ): Promise<void> {
-  await prisma.submissionRuntimeTestResult.create({
-    data: {
-      id: result.id,
-      submissionId,
-      orderIndex,
-      groupName: result.groupName,
-      testCaseName: result.testCaseName,
-      verdict: result.verdict,
-      timeMs: result.timeMs,
-      memoryKb: result.memoryKb,
-      message: result.message,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.submissionRuntimeTestResult.deleteMany({
+      where: {
+        submissionId,
+        OR: [
+          { orderIndex },
+          {
+            groupName: result.groupName,
+            testCaseName: result.testCaseName,
+          },
+        ],
+      },
+    });
+    await tx.submissionRuntimeTestResult.create({
+      data: {
+        id: result.id,
+        submissionId,
+        orderIndex,
+        groupName: result.groupName,
+        testCaseName: result.testCaseName,
+        verdict: result.verdict,
+        timeMs: result.timeMs,
+        memoryKb: result.memoryKb,
+        message: result.message,
+      },
+    });
   });
 }
 
@@ -1289,15 +1313,25 @@ async function listSubmissionRuntimeTestResults(
       where: { submissionId },
       orderBy: { orderIndex: "asc" },
     });
-    return rows.map((row) => ({
-      id: row.id,
-      groupName: row.groupName,
-      testCaseName: row.testCaseName,
-      verdict: normalizeSubmissionStatus(row.verdict) ?? "internal_error",
-      timeMs: row.timeMs,
-      memoryKb: row.memoryKb,
-      message: row.message,
-    }));
+    const results: Submission["testResults"] = [];
+    const seenKeys = new Set<string>();
+    for (const row of rows) {
+      const key = `${row.groupName}::${row.testCaseName}`;
+      if (seenKeys.has(key)) {
+        continue;
+      }
+      seenKeys.add(key);
+      results.push({
+        id: row.id,
+        groupName: row.groupName,
+        testCaseName: row.testCaseName,
+        verdict: normalizeSubmissionStatus(row.verdict) ?? "internal_error",
+        timeMs: row.timeMs,
+        memoryKb: row.memoryKb,
+        message: row.message,
+      });
+    }
+    return results;
   } catch (error) {
     if (isMissingTableError(error, "SubmissionRuntimeTestResult")) {
       return [];

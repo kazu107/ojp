@@ -161,7 +161,15 @@ function pushToSetMap(target: Map<string, Set<string>>, key: string, value: stri
 }
 
 function diffSet(left: ReadonlySet<string>, right: ReadonlySet<string>): string[] {
-  return [...left].filter((item) => !right.has(item)).sort((a, b) => a.localeCompare(b));
+  return [...left].filter((item) => !right.has(item)).sort(naturalNameCompare);
+}
+
+function naturalNameCompare(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function stripUtf8Bom(text: string): string {
+  return text.replace(/^\uFEFF/, "");
 }
 
 export function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string): void {
@@ -487,7 +495,7 @@ function parseConfigFromEntry(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(configEntry.getData().toString("utf8"));
+    parsed = JSON.parse(stripUtf8Bom(configEntry.getData().toString("utf8")));
   } catch {
     throw new Error("config.json must be valid UTF-8 JSON");
   }
@@ -506,7 +514,7 @@ function parseConfigFromEntry(
 
   return {
     ...config,
-    checkerSourceCode: checkerEntry.getData().toString("utf8"),
+    checkerSourceCode: stripUtf8Bom(checkerEntry.getData().toString("utf8")),
   };
 }
 
@@ -528,7 +536,7 @@ function buildSampleCases(
     ...configSamples.map((sample) => sample.name),
     ...[...sampleIn]
       .filter((name) => !configuredByName.has(name))
-      .sort((a, b) => a.localeCompare(b)),
+      .sort(naturalNameCompare),
   ];
 
   return orderedNames
@@ -544,8 +552,8 @@ function buildSampleCases(
       return {
         name: caseName,
         description: configuredByName.get(caseName)?.description ?? "",
-        input: inEntry.getData().toString("utf8"),
-        output: outEntry.getData().toString("utf8"),
+        input: stripUtf8Bom(inEntry.getData().toString("utf8")),
+        output: stripUtf8Bom(outEntry.getData().toString("utf8")),
       };
     });
 }
@@ -577,7 +585,7 @@ function buildTestGroups(
   const configByName = new Map(config.groups.map((group) => [group.name, group]));
   const orderedGroupNames = [
     ...config.groups.map((group) => group.name),
-    ...[...allGroupNames].filter((name) => !configByName.has(name)).sort((a, b) => a.localeCompare(b)),
+    ...[...allGroupNames].filter((name) => !configByName.has(name)).sort(naturalNameCompare),
   ];
 
   const groups: ProblemPackageTestGroup[] = [];
@@ -587,7 +595,7 @@ function buildTestGroups(
     validatePairs(inSet, outSet, `tests/${groupName}`);
 
     const configured = configByName.get(groupName);
-    const discoveredCases = [...inSet].sort((a, b) => a.localeCompare(b));
+    const discoveredCases = [...inSet].sort(naturalNameCompare);
     const caseNames = configured && configured.tests.length > 0 ? configured.tests : discoveredCases;
 
     const tests = caseNames.map((caseName) => {
@@ -598,8 +606,8 @@ function buildTestGroups(
       }
       return {
         name: caseName,
-        input: inEntry.getData().toString("utf8"),
-        output: outEntry.getData().toString("utf8"),
+        input: stripUtf8Bom(inEntry.getData().toString("utf8")),
+        output: stripUtf8Bom(outEntry.getData().toString("utf8")),
       };
     });
 
@@ -915,7 +923,7 @@ function buildTestGroupDraftManifest(
   const configByName = new Map(config.groups.map((group) => [group.name, group]));
   const orderedGroupNames = [
     ...config.groups.map((group) => group.name),
-    ...[...allGroupNames].filter((name) => !configByName.has(name)).sort((a, b) => a.localeCompare(b)),
+    ...[...allGroupNames].filter((name) => !configByName.has(name)).sort(naturalNameCompare),
   ];
 
   const groups: ProblemPackageEditorGroup[] = [];
@@ -925,7 +933,7 @@ function buildTestGroupDraftManifest(
     validatePairs(inSet, outSet, `tests/${groupName}`);
 
     const configured = configByName.get(groupName);
-    const discoveredCases = [...inSet].sort((a, b) => a.localeCompare(b));
+    const discoveredCases = [...inSet].sort(naturalNameCompare);
     const caseNames = configured && configured.tests.length > 0 ? configured.tests : discoveredCases;
 
     groups.push({
@@ -1067,8 +1075,8 @@ export function readProblemPackageTestCaseFromZip(
 
   return {
     name: normalizedCaseName,
-    input: inEntry.getData().toString("utf8"),
-    output: outEntry.getData().toString("utf8"),
+    input: stripUtf8Bom(inEntry.getData().toString("utf8")),
+    output: stripUtf8Bom(outEntry.getData().toString("utf8")),
   };
 }
 
@@ -1187,7 +1195,7 @@ function readStatementMarkdown(zipBuffer: Buffer): string {
   if (!entry) {
     throw new Error("statement.md is required");
   }
-  return entry.getData().toString("utf8");
+  return stripUtf8Bom(entry.getData().toString("utf8"));
 }
 
 function sanitizeGroupName(name: string, fieldName: string): string {

@@ -30,6 +30,14 @@ interface LazyGroupInfo {
   caseNames: string[];
 }
 
+function naturalNameCompare(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function stripUtf8Bom(text: string): string {
+  return text.replace(/^\uFEFF/, "");
+}
+
 export interface LazyProblemPackageSource {
   manifest: ProblemPackageManifest;
   checkerSourceCode: string | null;
@@ -60,7 +68,7 @@ function readEntryString(
         text += chunk.toString();
       });
       stream.on("error", reject);
-      stream.on("end", () => resolve(text));
+      stream.on("end", () => resolve(stripUtf8Bom(text)));
     });
   });
 }
@@ -219,7 +227,7 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
     const configuredSampleByName = new Map(config.samples.map((sample) => [sample.name, sample]));
     const orderedSampleNames = [
       ...config.samples.map((sample) => sample.name),
-      ...[...sampleIn].filter((name) => !configuredSampleByName.has(name)).sort((a, b) => a.localeCompare(b)),
+      ...[...sampleIn].filter((name) => !configuredSampleByName.has(name)).sort(naturalNameCompare),
     ];
     const sampleCases: ProblemPackageSampleCase[] = [];
     for (const caseName of orderedSampleNames) {
@@ -255,7 +263,7 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
     const configByName = new Map(config.groups.map((group) => [group.name, group]));
     const orderedGroupNames = [
       ...config.groups.map((group) => group.name),
-      ...[...allGroupNames].filter((name) => !configByName.has(name)).sort((a, b) => a.localeCompare(b)),
+      ...[...allGroupNames].filter((name) => !configByName.has(name)).sort(naturalNameCompare),
     ];
 
     const groups: LazyGroupInfo[] = [];
@@ -264,7 +272,7 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
       const outSet = testOut.get(groupName) ?? new Set<string>();
       validatePairs(inSet, outSet, `tests/${groupName}`);
       const configured = configByName.get(groupName);
-      const discoveredCases = [...inSet].sort((a, b) => a.localeCompare(b));
+      const discoveredCases = [...inSet].sort(naturalNameCompare);
       const caseNames = configured && configured.tests.length > 0 ? configured.tests : discoveredCases;
       groups.push({
         name: groupName,

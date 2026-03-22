@@ -37,6 +37,14 @@ function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string): 
   }
 }
 
+function naturalNameCompare(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function stripUtf8Bom(text: string): string {
+  return text.replace(/^\uFEFF/, "");
+}
+
 function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
   if (raw === "ignore_trailing_spaces" || raw === "ignore-trailing-spaces") {
     return "ignore_trailing_spaces";
@@ -219,7 +227,7 @@ export async function inspectProblemPackageClient(
       total,
       message: `Reading ${normalizedPath}`,
     });
-    textByPath.set(normalizedPath, await entry.async("string"));
+    textByPath.set(normalizedPath, stripUtf8Bom(await entry.async("string")));
   }
 
   const statementMarkdown = textByPath.get("statement.md");
@@ -342,7 +350,7 @@ export async function inspectProblemPackageClient(
   );
 
   const discoveredGroupNames = [...new Set([...testIn.keys(), ...testOut.keys()])].sort((a, b) =>
-    a.localeCompare(b),
+    naturalNameCompare(a, b),
   );
   const groupNames = [
     ...orderedGroupNames,
@@ -353,7 +361,7 @@ export async function inspectProblemPackageClient(
     const inSet = testIn.get(groupName) ?? new Set<string>();
     const outSet = testOut.get(groupName) ?? new Set<string>();
     validatePairs(inSet, outSet, `tests/${groupName}`);
-    const caseNames = [...inSet].sort((a, b) => a.localeCompare(b));
+    const caseNames = [...inSet].sort(naturalNameCompare);
     return {
       id: `group-${groupIndex + 1}`,
       name: groupName,
