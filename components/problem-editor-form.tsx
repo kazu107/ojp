@@ -258,26 +258,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const hasExistingStoredPackage =
     props.mode === "edit" && Boolean(props.initialProblem.latestPackageSummary);
 
-  useEffect(() => {
-    if (
-      props.mode !== "edit" ||
-      !hasExistingStoredPackage ||
-      packageDraft ||
-      isLoadingExistingPackage ||
-      isInspectingPackage
-    ) {
-      return;
-    }
-    void loadExistingPackage();
-  }, [
-    hasExistingStoredPackage,
-    isInspectingPackage,
-    isLoadingExistingPackage,
-    loadExistingPackage,
-    packageDraft,
-    props.mode,
-  ]);
-
   async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
     try {
       const body = (await response.json()) as { error?: string };
@@ -433,6 +413,26 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       setIsLoadingExistingPackage(false);
     }
   }, [props]);
+
+  useEffect(() => {
+    if (
+      props.mode !== "edit" ||
+      !hasExistingStoredPackage ||
+      packageDraft ||
+      isLoadingExistingPackage ||
+      isInspectingPackage
+    ) {
+      return;
+    }
+    void loadExistingPackage();
+  }, [
+    hasExistingStoredPackage,
+    isInspectingPackage,
+    isLoadingExistingPackage,
+    loadExistingPackage,
+    packageDraft,
+    props.mode,
+  ]);
 
   async function loadExistingTestCase(params: {
     groupId: string;
