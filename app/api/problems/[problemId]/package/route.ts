@@ -130,7 +130,7 @@ export async function PUT(request: Request, { params }: ProblemPackageRouteConte
     }
 
     const storageRef = await putProblemPackageZipStream({
-      keyPrefix: `problem-packages/${problemId}/pending`,
+      keyPrefix: `problem-packages/${problemId}`,
       fileName,
       body: Readable.fromWeb(request.body as unknown as NodeReadableStream<Uint8Array>),
       sizeBytes,
