@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CodeEditor } from "@/components/code-editor";
 import { MarkdownBlock } from "@/components/markdown-block";
@@ -258,6 +258,26 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const hasExistingStoredPackage =
     props.mode === "edit" && Boolean(props.initialProblem.latestPackageSummary);
 
+  useEffect(() => {
+    if (
+      props.mode !== "edit" ||
+      !hasExistingStoredPackage ||
+      packageDraft ||
+      isLoadingExistingPackage ||
+      isInspectingPackage
+    ) {
+      return;
+    }
+    void loadExistingPackage();
+  }, [
+    hasExistingStoredPackage,
+    isInspectingPackage,
+    isLoadingExistingPackage,
+    loadExistingPackage,
+    packageDraft,
+    props.mode,
+  ]);
+
   async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
     try {
       const body = (await response.json()) as { error?: string };
@@ -376,7 +396,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     };
   }
 
-  async function loadExistingPackage() {
+  const loadExistingPackage = useCallback(async () => {
     if (props.mode !== "edit") {
       return;
     }
@@ -412,7 +432,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       setInspectProgressText("");
       setIsLoadingExistingPackage(false);
     }
-  }
+  }, [props]);
 
   async function loadExistingTestCase(params: {
     groupId: string;

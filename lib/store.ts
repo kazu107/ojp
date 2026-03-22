@@ -3088,6 +3088,9 @@ export async function getPackageJobForViewer(jobId: string): Promise<PackageJobR
   if (actor.role !== "admin" && job.requestedBy !== actor.id) {
     throw new HttpError("you cannot access this package job", 403);
   }
+  if (JUDGE_PROCESS_MODE === "web" && job.type === "apply" && job.status === "completed") {
+    await refreshStoreFromDbNow();
+  }
   return job;
 }
 
