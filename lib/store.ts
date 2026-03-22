@@ -4419,6 +4419,22 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
     if (requeued > 0) {
       await persistStoreSnapshotNow();
     }
+    const packageJob = await claimNextPackageJobDb();
+    if (packageJob) {
+      store.packageJobWorkerRunning = true;
+      const heartbeat = setInterval(() => {
+        void heartbeatPackageJobDb(packageJob.id);
+      }, JOB_HEARTBEAT_INTERVAL_MS);
+      heartbeat.unref?.();
+      try {
+        await runPackageJobInternal(packageJob);
+      } finally {
+        clearInterval(heartbeat);
+        store.packageJobWorkerRunning = false;
+      }
+      return;
+    }
+
     const judgeJob = await claimNextJudgeJobDb();
     if (judgeJob) {
       store.judgeWorkerRunning = true;
@@ -4441,22 +4457,6 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
       } finally {
         clearInterval(heartbeat);
         store.judgeWorkerRunning = false;
-      }
-      return;
-    }
-
-    const packageJob = await claimNextPackageJobDb();
-    if (packageJob) {
-      store.packageJobWorkerRunning = true;
-      const heartbeat = setInterval(() => {
-        void heartbeatPackageJobDb(packageJob.id);
-      }, JOB_HEARTBEAT_INTERVAL_MS);
-      heartbeat.unref?.();
-      try {
-        await runPackageJobInternal(packageJob);
-      } finally {
-        clearInterval(heartbeat);
-        store.packageJobWorkerRunning = false;
       }
     }
   };
