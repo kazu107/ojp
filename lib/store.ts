@@ -1362,6 +1362,18 @@ async function resetSubmissionRuntime(
   });
 }
 
+async function deleteSubmissionRuntimeState(submissionId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await tx.submissionRuntimeTestResult.deleteMany({
+      where: { submissionId },
+    });
+    await tx.submissionRuntimeState.deleteMany({
+      where: { submissionId },
+    });
+  });
+  delete getSubmissionRuntimeCache()[submissionId];
+}
+
 const store = globalStore.__ojpStore ?? createInitialStore();
 
 if (!globalStore.__ojpStore) {
@@ -1643,10 +1655,14 @@ async function enqueueMissingJudgeJobsDb(): Promise<number> {
   let requeued = 0;
   for (const row of rows) {
     const submissionId = row.submissionId;
+    const waitingSubmission = findSubmissionByIdInternal(submissionId);
+    if (!waitingSubmission) {
+      await deleteSubmissionRuntimeState(submissionId);
+      continue;
+    }
     if (activeIds.has(submissionId)) {
       continue;
     }
-    const waitingSubmission = findSubmissionByIdInternal(submissionId);
     if (waitingSubmission?.status === "pending") {
       waitingSubmission.status = "queued";
     }
@@ -1873,6 +1889,7 @@ function repairJudgeQueueInternal(): number {
 async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReason): Promise<void> {
   const submission = findSubmissionByIdInternal(submissionId);
   if (!submission) {
+    await deleteSubmissionRuntimeState(submissionId);
     return;
   }
   const currentRuntime = (await getSubmissionRuntimeState(submissionId)) ?? defaultSubmissionRuntimeSummary(submission);
