@@ -38,6 +38,10 @@ function stripUtf8Bom(text: string): string {
   return text.replace(/^\uFEFF/, "");
 }
 
+function normalizePackageText(text: string): string {
+  return stripUtf8Bom(text).replace(/\r\n?/g, "\n");
+}
+
 export interface LazyProblemPackageSource {
   manifest: ProblemPackageManifest;
   checkerSourceCode: string | null;
@@ -68,7 +72,7 @@ function readEntryString(
         text += chunk.toString();
       });
       stream.on("error", reject);
-      stream.on("end", () => resolve(stripUtf8Bom(text)));
+      stream.on("end", () => resolve(normalizePackageText(text)));
     });
   });
 }

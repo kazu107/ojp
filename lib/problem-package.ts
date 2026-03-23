@@ -172,6 +172,10 @@ function stripUtf8Bom(text: string): string {
   return text.replace(/^\uFEFF/, "");
 }
 
+function normalizePackageText(text: string): string {
+  return stripUtf8Bom(text).replace(/\r\n?/g, "\n");
+}
+
 export function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string): void {
   if (inSet.size === 0 || outSet.size === 0) {
     throw new Error(`${scope} must include both .in and .out files`);
@@ -495,7 +499,7 @@ function parseConfigFromEntry(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripUtf8Bom(configEntry.getData().toString("utf8")));
+    parsed = JSON.parse(normalizePackageText(configEntry.getData().toString("utf8")));
   } catch {
     throw new Error("config.json must be valid UTF-8 JSON");
   }
@@ -514,7 +518,7 @@ function parseConfigFromEntry(
 
   return {
     ...config,
-    checkerSourceCode: stripUtf8Bom(checkerEntry.getData().toString("utf8")),
+    checkerSourceCode: normalizePackageText(checkerEntry.getData().toString("utf8")),
   };
 }
 
@@ -552,8 +556,8 @@ function buildSampleCases(
       return {
         name: caseName,
         description: configuredByName.get(caseName)?.description ?? "",
-        input: stripUtf8Bom(inEntry.getData().toString("utf8")),
-        output: stripUtf8Bom(outEntry.getData().toString("utf8")),
+        input: normalizePackageText(inEntry.getData().toString("utf8")),
+        output: normalizePackageText(outEntry.getData().toString("utf8")),
       };
     });
 }
@@ -606,8 +610,8 @@ function buildTestGroups(
       }
       return {
         name: caseName,
-        input: stripUtf8Bom(inEntry.getData().toString("utf8")),
-        output: stripUtf8Bom(outEntry.getData().toString("utf8")),
+        input: normalizePackageText(inEntry.getData().toString("utf8")),
+        output: normalizePackageText(outEntry.getData().toString("utf8")),
       };
     });
 
@@ -1075,8 +1079,8 @@ export function readProblemPackageTestCaseFromZip(
 
   return {
     name: normalizedCaseName,
-    input: stripUtf8Bom(inEntry.getData().toString("utf8")),
-    output: stripUtf8Bom(outEntry.getData().toString("utf8")),
+    input: normalizePackageText(inEntry.getData().toString("utf8")),
+    output: normalizePackageText(outEntry.getData().toString("utf8")),
   };
 }
 
@@ -1195,7 +1199,7 @@ function readStatementMarkdown(zipBuffer: Buffer): string {
   if (!entry) {
     throw new Error("statement.md is required");
   }
-  return stripUtf8Bom(entry.getData().toString("utf8"));
+  return normalizePackageText(entry.getData().toString("utf8"));
 }
 
 function sanitizeGroupName(name: string, fieldName: string): string {
@@ -1320,8 +1324,8 @@ export function buildProblemPackageFromEditorDraft(input: {
 
       return {
         name: caseName,
-        input: test.input,
-        output: test.output,
+        input: normalizePackageText(test.input),
+        output: normalizePackageText(test.output),
       };
     });
 
@@ -1337,7 +1341,9 @@ export function buildProblemPackageFromEditorDraft(input: {
   const checkerType = input.checkerType ?? "exact";
   const checkerLanguage = checkerType === "special_judge" ? input.checkerLanguage ?? "python" : null;
   const checkerSourceCode =
-    checkerType === "special_judge" ? (input.checkerSourceCode ?? "").trim() : null;
+    checkerType === "special_judge"
+      ? normalizePackageText((input.checkerSourceCode ?? "").trim())
+      : null;
   if (checkerType === "special_judge" && !checkerSourceCode) {
     throw new Error("checker source code is required for special judge");
   }
@@ -1354,9 +1360,12 @@ export function buildProblemPackageFromEditorDraft(input: {
         }
         return {
           name: caseName,
-          description: typeof sample.description === "string" ? sample.description : "",
-          input: sample.input,
-          output: sample.output,
+          description:
+            typeof sample.description === "string"
+              ? normalizePackageText(sample.description)
+              : "",
+          input: normalizePackageText(sample.input),
+          output: normalizePackageText(sample.output),
         };
       })
     : [];

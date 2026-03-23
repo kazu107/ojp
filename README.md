@@ -425,6 +425,7 @@ problem-package.zip
 - `samples/` と `tests/<group>/` の `.in/.out` ペアが必須
 - `tests[]` は省略可能で、未指定時はディレクトリから自動検出
 - path traversal と oversized ZIP/file payload は拒否
+- `statement.md`, `samples/*.in/.out`, `tests/*/*.in/.out`, checker source は読込時に改行を `LF` に正規化
 
 ### テンプレート生成
 

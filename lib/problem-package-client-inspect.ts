@@ -45,6 +45,10 @@ function stripUtf8Bom(text: string): string {
   return text.replace(/^\uFEFF/, "");
 }
 
+function normalizePackageText(text: string): string {
+  return stripUtf8Bom(text).replace(/\r\n?/g, "\n");
+}
+
 function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
   if (raw === "ignore_trailing_spaces" || raw === "ignore-trailing-spaces") {
     return "ignore_trailing_spaces";
@@ -227,7 +231,7 @@ export async function inspectProblemPackageClient(
       total,
       message: `Reading ${normalizedPath}`,
     });
-    textByPath.set(normalizedPath, stripUtf8Bom(await entry.async("string")));
+    textByPath.set(normalizedPath, normalizePackageText(await entry.async("string")));
   }
 
   const statementMarkdown = textByPath.get("statement.md");
