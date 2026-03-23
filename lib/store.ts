@@ -936,39 +936,6 @@ function rememberProblemPackageData(
   globalStore.__ojpProblemPackageCacheOrder = order;
 }
 
-function trimWorkerStoreForJudge(submissionId: string): void {
-  if (JUDGE_PROCESS_MODE !== "worker") {
-    return;
-  }
-
-  const submission = findSubmissionByIdInternal(submissionId);
-  if (!submission) {
-    store.submissions = [];
-    store.problems = [];
-    store.problemPackages = {};
-    store.problemPackageRefs = {};
-    globalStore.__ojpProblemPackageCacheOrder = [];
-    return;
-  }
-
-  const problemId = submission.problemId;
-  const problem = store.problems.find((item) => item.id === problemId) ?? null;
-  const packageData = store.problemPackages[problemId];
-  const packageRef = store.problemPackageRefs[problemId];
-
-  store.submissions = [submission];
-  store.problems = problem ? [problem] : [];
-  store.problemPackages = packageData ? { [problemId]: packageData } : {};
-  store.problemPackageRefs = packageRef ? { [problemId]: packageRef } : {};
-  store.users = [];
-  store.contests = [];
-  store.announcements = [];
-  store.reports = [];
-  store.auditLogs = [];
-  store.rejudgeRequests = [];
-  globalStore.__ojpProblemPackageCacheOrder = packageData ? [problemId] : [];
-}
-
 async function persistStoreSnapshotNow(): Promise<void> {
   if (!STORE_DB_SYNC_ENABLED) {
     return;
@@ -1077,6 +1044,9 @@ async function refreshStoreFromDbNow(): Promise<void> {
 
 function startStorePersistenceLoop(): void {
   if (!STORE_DB_SYNC_ENABLED || globalStore.__ojpStorePersistIntervalStarted) {
+    return;
+  }
+  if (JUDGE_PROCESS_MODE === "worker") {
     return;
   }
   globalStore.__ojpStorePersistIntervalStarted = true;
@@ -4465,7 +4435,7 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
     }
     await refreshStoreFromDbNow();
     const requeued = await enqueueMissingJudgeJobsDb();
-    if (requeued > 0) {
+    if (requeued > 0 && JUDGE_PROCESS_MODE !== "worker") {
       await persistStoreSnapshotNow();
     }
     const packageJob = await claimNextPackageJobDb();
@@ -4492,7 +4462,6 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
       }, JOB_HEARTBEAT_INTERVAL_MS);
       heartbeat.unref?.();
       try {
-        trimWorkerStoreForJudge(judgeJob.submissionId);
         await runJudgeForSubmission(judgeJob.submissionId, judgeJob.reason);
         await finishJudgeJobDb({
           id: judgeJob.id,
