@@ -26,6 +26,7 @@ import {
   Visibility,
 } from "@/lib/types";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import {
   buildEditorDraftFromExtracted,
   buildProblemPackageZip,
@@ -1463,15 +1464,11 @@ function nextRejudgeId(): string {
 }
 
 function nextJudgeJobId(): string {
-  const id = `jq${store.counters.judgeJob}`;
-  store.counters.judgeJob += 1;
-  return id;
+  return `jq-${randomUUID()}`;
 }
 
 function nextPackageJobId(): string {
-  const id = `pj${store.counters.packageJob}`;
-  store.counters.packageJob += 1;
-  return id;
+  return `pj-${randomUUID()}`;
 }
 
 function toPackageJobRecord(row: {
