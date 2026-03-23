@@ -507,6 +507,12 @@ a {
   color: var(--text-soft);
 }
 
+.field-help {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
 .input,
 .textarea,
 .select {
