@@ -1,8 +1,9 @@
-import { closeSync, existsSync, openSync } from "node:fs";
+import { closeSync, createReadStream, existsSync, openSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
 import type {
   ProblemPackageExtracted,
   ProblemPackageScoringType,
@@ -56,31 +57,6 @@ function resolveTimeWrapperCommand(): string | null {
     }
   }
   return null;
-}
-
-function normalizeNewlines(text: string): string {
-  return text.replace(/\r\n/g, "\n");
-}
-
-function normalizeForTrailingSpacesCompare(text: string): string {
-  const lines = normalizeNewlines(text)
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+$/g, ""));
-  while (lines.length > 0 && lines[lines.length - 1] === "") {
-    lines.pop();
-  }
-  return lines.join("\n");
-}
-
-function isOutputAccepted(
-  actual: string,
-  expected: string,
-  compareMode: ProblemPackageCompareMode,
-): boolean {
-  if (compareMode === "ignore_trailing_spaces") {
-    return normalizeForTrailingSpacesCompare(actual) === normalizeForTrailingSpacesCompare(expected);
-  }
-  return normalizeNewlines(actual) === normalizeNewlines(expected);
 }
 
 function appendChunkCapped(
@@ -137,6 +113,7 @@ async function runCommand(
   options: {
     cwd: string;
     stdin: string;
+    stdinFilePath?: string | null;
     timeoutMs: number;
     captureMemory: boolean;
     stdoutFilePath?: string | null;
@@ -160,13 +137,17 @@ async function runCommand(
 
   return new Promise<CommandResult>((resolve) => {
     let stdoutFileDescriptor: number | null = null;
+    let stdinFileDescriptor: number | null = null;
     if (options.stdoutFilePath) {
       stdoutFileDescriptor = openSync(options.stdoutFilePath, "w");
+    }
+    if (options.stdinFilePath) {
+      stdinFileDescriptor = openSync(options.stdinFilePath, "r");
     }
 
     const child = spawn(wrappedCommand, wrappedArgs, {
       cwd: options.cwd,
-      stdio: ["pipe", stdoutFileDescriptor ?? "pipe", "pipe"],
+      stdio: [stdinFileDescriptor ?? "pipe", stdoutFileDescriptor ?? "pipe", "pipe"],
     });
 
     let stdout = "";
@@ -220,6 +201,13 @@ async function runCommand(
       if (stdoutFileDescriptor !== null) {
         try {
           closeSync(stdoutFileDescriptor);
+        } catch {
+          // noop
+        }
+      }
+      if (stdinFileDescriptor !== null) {
+        try {
+          closeSync(stdinFileDescriptor);
         } catch {
           // noop
         }
@@ -278,7 +266,7 @@ async function runCommand(
       });
     });
 
-    if (child.stdin) {
+    if (!options.stdinFilePath && child.stdin) {
       child.stdin.write(options.stdin);
       child.stdin.end();
     }
@@ -290,6 +278,7 @@ async function runWithFallback(
   options: {
     cwd: string;
     stdin: string;
+    stdinFilePath?: string | null;
     timeoutMs: number;
     captureMemory: boolean;
     stdoutFilePath?: string | null;
@@ -461,28 +450,17 @@ async function compileProgram(
 async function runSpecialJudgeCase(input: {
   checkerWorkspace: string;
   checkerRuntime: CommandTemplate;
-  inputText: string;
-  expectedText: string;
+  inputPath: string;
+  answerPath: string;
   contestantOutputPath: string;
 }): Promise<{
   verdict: SubmissionStatus;
   message: string;
 }> {
-  const caseDir = path.join(
-    input.checkerWorkspace,
-    `checker-case-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  );
-  await mkdir(caseDir, { recursive: true });
-
-  const inputPath = path.join(caseDir, "input.txt");
-  const answerPath = path.join(caseDir, "answer.txt");
-  await writeFile(inputPath, input.inputText, "utf8");
-  await writeFile(answerPath, input.expectedText, "utf8");
-
   const checked = await runWithFallback(
     {
       commands: input.checkerRuntime.commands,
-      args: [...input.checkerRuntime.args, inputPath, answerPath, input.contestantOutputPath],
+      args: [...input.checkerRuntime.args, input.inputPath, input.answerPath, input.contestantOutputPath],
     },
     {
       cwd: input.checkerWorkspace,
@@ -522,6 +500,119 @@ async function runSpecialJudgeCase(input: {
     verdict: "internal_error",
     message: detail || `special judge failed with exit code ${String(checkResult.exitCode)}`,
   };
+}
+
+async function materializeInlineTestCaseFiles(input: {
+  testCase: { name: string; input: string; output: string };
+  targetDir: string;
+}): Promise<{
+  name: string;
+  inputPath: string;
+  outputPath: string;
+}> {
+  await mkdir(input.targetDir, { recursive: true });
+  const inputPath = path.join(input.targetDir, "input.txt");
+  const outputPath = path.join(input.targetDir, "answer.txt");
+  await writeFile(inputPath, input.testCase.input, "utf8");
+  await writeFile(outputPath, input.testCase.output, "utf8");
+  return {
+    name: input.testCase.name,
+    inputPath,
+    outputPath,
+  };
+}
+
+async function filesEqualExact(leftPath: string, rightPath: string): Promise<boolean> {
+  const left = createReadStream(leftPath);
+  const right = createReadStream(rightPath);
+  const leftIterator = left[Symbol.asyncIterator]();
+  const rightIterator = right[Symbol.asyncIterator]();
+
+  let leftBuffer = Buffer.alloc(0);
+  let rightBuffer = Buffer.alloc(0);
+  let leftDone = false;
+  let rightDone = false;
+
+  try {
+    while (true) {
+      if (!leftDone && leftBuffer.length === 0) {
+        const next = await leftIterator.next();
+        leftDone = Boolean(next.done);
+        leftBuffer = next.done ? Buffer.alloc(0) : Buffer.from(next.value);
+      }
+      if (!rightDone && rightBuffer.length === 0) {
+        const next = await rightIterator.next();
+        rightDone = Boolean(next.done);
+        rightBuffer = next.done ? Buffer.alloc(0) : Buffer.from(next.value);
+      }
+
+      if (leftDone && rightDone) {
+        return leftBuffer.length === 0 && rightBuffer.length === 0;
+      }
+
+      const compareLength = Math.min(leftBuffer.length, rightBuffer.length);
+      if (compareLength === 0) {
+        return false;
+      }
+
+      if (!leftBuffer.subarray(0, compareLength).equals(rightBuffer.subarray(0, compareLength))) {
+        return false;
+      }
+
+      leftBuffer = leftBuffer.subarray(compareLength);
+      rightBuffer = rightBuffer.subarray(compareLength);
+    }
+  } finally {
+    left.destroy();
+    right.destroy();
+  }
+}
+
+async function* normalizedLines(filePath: string): AsyncGenerator<string> {
+  const reader = createInterface({
+    input: createReadStream(filePath, { encoding: "utf8" }),
+    crlfDelay: Infinity,
+  });
+
+  let trailingBlankCount = 0;
+  try {
+    for await (const rawLine of reader) {
+      const line = rawLine.replace(/[ \t]+$/g, "");
+      if (line === "") {
+        trailingBlankCount += 1;
+        continue;
+      }
+      while (trailingBlankCount > 0) {
+        yield "";
+        trailingBlankCount -= 1;
+      }
+      yield line;
+    }
+  } finally {
+    reader.close();
+  }
+}
+
+async function isOutputAcceptedFiles(
+  actualPath: string,
+  expectedPath: string,
+  compareMode: ProblemPackageCompareMode,
+): Promise<boolean> {
+  if (compareMode === "exact") {
+    return filesEqualExact(actualPath, expectedPath);
+  }
+
+  const actual = normalizedLines(actualPath)[Symbol.asyncIterator]();
+  const expected = normalizedLines(expectedPath)[Symbol.asyncIterator]();
+  while (true) {
+    const [left, right] = await Promise.all([actual.next(), expected.next()]);
+    if (left.done || right.done) {
+      return Boolean(left.done) && Boolean(right.done);
+    }
+    if (left.value !== right.value) {
+      return false;
+    }
+  }
 }
 
 export async function executePackageJudge(input: {
@@ -683,96 +774,108 @@ export async function executePackageJudge(input: {
           peakMemoryKb = Math.max(peakMemoryKb, existing.memoryKb);
           continue;
         }
-        const testCase = input.packageSource
-          ? await input.packageSource.readTestCase(group.name, caseName)
-          : input.packageData!.groups
-              .find((candidate) => candidate.name === group.name)
-              ?.tests.find((candidate) => candidate.name === caseName);
-        if (!testCase) {
-          throw new Error(`test case not found: ${group.name}/${caseName}`);
-        }
-        await input.onPhaseChange?.("running");
-        const contestantOutputPath = path.join(
-          submissionWorkspace,
-          `stdout-${group.orderIndex}-${caseName}.txt`,
+        const caseWorkspace = path.join(
+          workspace,
+          `case-${group.orderIndex}-${caseName}-${Math.random().toString(16).slice(2)}`,
         );
-        const executed = await runWithFallback(runtimeTemplate, {
-          cwd: submissionWorkspace,
-          stdin: testCase.input,
-          timeoutMs: input.timeLimitMs,
-          captureMemory: true,
-          stdoutFilePath: contestantOutputPath,
-        });
-        const runResult = executed.result;
-
-        totalTimeMs = Math.max(totalTimeMs, runResult.durationMs);
-        peakMemoryKb = Math.max(peakMemoryKb, runResult.memoryKb);
-
-        let verdict: SubmissionStatus = "accepted";
-        let message = "Accepted";
-
-        if (runResult.spawnErrorCode === "ENOENT") {
-          verdict = "internal_error";
-          message = `runtime not found: ${submissionCommands.execute.commands.join(" / ")}`;
-        } else if (runResult.timedOut) {
-          verdict = "time_limit_exceeded";
-          message = "Time limit exceeded.";
-        } else if (runResult.memoryKb > input.memoryLimitMb * 1024) {
-          verdict = "memory_limit_exceeded";
-          message = "Memory limit exceeded.";
-        } else if (runResult.exitCode !== 0) {
-          verdict = "runtime_error";
-          message = runResult.stderr || "Runtime error.";
-        } else if (packageMeta.checkerType === "special_judge") {
-          const checked =
-            checkerRuntime && checkerWorkspace
-              ? await runSpecialJudgeCase({
-                  checkerWorkspace,
-                  checkerRuntime,
-                  inputText: testCase.input,
-                  expectedText: testCase.output,
-                  contestantOutputPath,
-                })
-              : {
-                  verdict: "internal_error" as SubmissionStatus,
-                  message: "special judge runtime is not prepared",
-                };
-          verdict = checked.verdict;
-          message = checked.message;
-        } else if (
-          !isOutputAccepted(
-            await readFile(contestantOutputPath, "utf8"),
-            testCase.output,
-            packageMeta.compareMode,
-          )
-        ) {
-          verdict = "wrong_answer";
-          message = "Expected output differs.";
-        }
-
-        if (!isAcceptedSubmissionStatus(verdict)) {
-          groupAccepted = false;
-        }
-
-        const nextResult = {
-          id: input.nextTestResultId(),
-          groupName: group.name,
-          testCaseName: testCase.name,
-          verdict,
-          timeMs: runResult.durationMs,
-          memoryKb: runResult.memoryKb,
-          message,
-        };
-        results.push(nextResult);
-        await input.onTestResult?.({
-          result: nextResult,
-          totalTimeMs,
-          peakMemoryKb,
-        });
+        await mkdir(caseWorkspace, { recursive: true });
         try {
-          await rm(contestantOutputPath, { force: true });
-        } catch {
-          // noop
+          const testCaseFiles = input.packageSource
+            ? await input.packageSource.materializeTestCaseFiles(group.name, caseName, caseWorkspace)
+            : await (async () => {
+                const testCase = input.packageData!.groups
+                  .find((candidate) => candidate.name === group.name)
+                  ?.tests.find((candidate) => candidate.name === caseName);
+                if (!testCase) {
+                  throw new Error(`test case not found: ${group.name}/${caseName}`);
+                }
+                return materializeInlineTestCaseFiles({
+                  testCase,
+                  targetDir: caseWorkspace,
+                });
+              })();
+          await input.onPhaseChange?.("running");
+          const contestantOutputPath = path.join(caseWorkspace, "stdout.txt");
+          const executed = await runWithFallback(runtimeTemplate, {
+            cwd: submissionWorkspace,
+            stdin: "",
+            stdinFilePath: testCaseFiles.inputPath,
+            timeoutMs: input.timeLimitMs,
+            captureMemory: true,
+            stdoutFilePath: contestantOutputPath,
+          });
+          const runResult = executed.result;
+
+          totalTimeMs = Math.max(totalTimeMs, runResult.durationMs);
+          peakMemoryKb = Math.max(peakMemoryKb, runResult.memoryKb);
+
+          let verdict: SubmissionStatus = "accepted";
+          let message = "Accepted";
+
+          if (runResult.spawnErrorCode === "ENOENT") {
+            verdict = "internal_error";
+            message = `runtime not found: ${submissionCommands.execute.commands.join(" / ")}`;
+          } else if (runResult.timedOut) {
+            verdict = "time_limit_exceeded";
+            message = "Time limit exceeded.";
+          } else if (runResult.memoryKb > input.memoryLimitMb * 1024) {
+            verdict = "memory_limit_exceeded";
+            message = "Memory limit exceeded.";
+          } else if (runResult.exitCode !== 0) {
+            verdict = "runtime_error";
+            message = runResult.stderr || "Runtime error.";
+          } else if (packageMeta.checkerType === "special_judge") {
+            const checked =
+              checkerRuntime && checkerWorkspace
+                ? await runSpecialJudgeCase({
+                    checkerWorkspace,
+                    checkerRuntime,
+                    inputPath: testCaseFiles.inputPath,
+                    answerPath: testCaseFiles.outputPath,
+                    contestantOutputPath,
+                  })
+                : {
+                    verdict: "internal_error" as SubmissionStatus,
+                    message: "special judge runtime is not prepared",
+                  };
+            verdict = checked.verdict;
+            message = checked.message;
+          } else if (
+            !(await isOutputAcceptedFiles(
+              contestantOutputPath,
+              testCaseFiles.outputPath,
+              packageMeta.compareMode,
+            ))
+          ) {
+            verdict = "wrong_answer";
+            message = "Expected output differs.";
+          }
+
+          if (!isAcceptedSubmissionStatus(verdict)) {
+            groupAccepted = false;
+          }
+
+          const nextResult = {
+            id: input.nextTestResultId(),
+            groupName: group.name,
+            testCaseName: testCaseFiles.name,
+            verdict,
+            timeMs: runResult.durationMs,
+            memoryKb: runResult.memoryKb,
+            message,
+          };
+          results.push(nextResult);
+          await input.onTestResult?.({
+            result: nextResult,
+            totalTimeMs,
+            peakMemoryKb,
+          });
+        } finally {
+          try {
+            await rm(caseWorkspace, { recursive: true, force: true });
+          } catch {
+            // noop
+          }
         }
       }
 

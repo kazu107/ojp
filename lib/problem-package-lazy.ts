@@ -47,6 +47,15 @@ export interface LazyProblemPackageSource {
   checkerSourceCode: string | null;
   groups: LazyGroupInfo[];
   readTestCase: (groupName: string, caseName: string) => Promise<ProblemPackageTestCase>;
+  materializeTestCaseFiles: (
+    groupName: string,
+    caseName: string,
+    targetDir: string,
+  ) => Promise<{
+    name: string;
+    inputPath: string;
+    outputPath: string;
+  }>;
   cleanup: () => Promise<void>;
 }
 
@@ -73,6 +82,23 @@ function readEntryString(
       });
       stream.on("error", reject);
       stream.on("end", () => resolve(normalizePackageText(text)));
+    });
+  });
+}
+
+function writeEntryToFile(
+  zipFile: yauzl.ZipFile,
+  entry: yauzl.Entry,
+  filePath: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    zipFile.openReadStream(entry, (error, stream) => {
+      if (error || !stream) {
+        reject(error ?? new Error(`failed to open ${entry.fileName}`));
+        return;
+      }
+
+      pipeline(stream, createWriteStream(filePath)).then(() => resolve(), reject);
     });
   });
 }
@@ -352,6 +378,25 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
           name: caseName,
           input: await readEntryString(zipFile, inEntry),
           output: await readEntryString(zipFile, outEntry),
+        };
+      },
+      materializeTestCaseFiles: async (groupName: string, caseName: string, targetDir: string) => {
+        const inEntry = entryByPath.get(`tests/${groupName}/${caseName}.in`);
+        const outEntry = entryByPath.get(`tests/${groupName}/${caseName}.out`);
+        if (!inEntry || !outEntry) {
+          throw new Error(`tests/${groupName}/${caseName}.in/.out is required`);
+        }
+
+        await mkdir(targetDir, { recursive: true });
+        const inputPath = path.join(targetDir, "input.txt");
+        const outputPath = path.join(targetDir, "answer.txt");
+        await writeEntryToFile(zipFile, inEntry, inputPath);
+        await writeEntryToFile(zipFile, outEntry, outputPath);
+
+        return {
+          name: caseName,
+          inputPath,
+          outputPath,
         };
       },
       cleanup: async () => {
