@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { closeSync, existsSync, openSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -18,6 +18,7 @@ import {
 interface CommandResult {
   stdout: string;
   stderr: string;
+  stdoutFilePath: string | null;
   exitCode: number | null;
   timedOut: boolean;
   durationMs: number;
@@ -39,6 +40,9 @@ interface JudgeResult {
   peakMemoryKb: number;
   testResults: Submission["testResults"];
 }
+
+const STDERR_CAPTURE_LIMIT_BYTES = 64 * 1024;
+const STDOUT_CAPTURE_LIMIT_BYTES = 256 * 1024;
 
 function resolveTimeWrapperCommand(): string | null {
   if (process.platform === "win32") {
@@ -79,6 +83,54 @@ function isOutputAccepted(
   return normalizeNewlines(actual) === normalizeNewlines(expected);
 }
 
+function appendChunkCapped(
+  current: string,
+  chunk: Buffer,
+  state: { bytes: number; truncated: boolean },
+  limitBytes: number,
+): string {
+  if (state.bytes >= limitBytes) {
+    state.truncated = true;
+    return current;
+  }
+
+  const remainingBytes = limitBytes - state.bytes;
+  const slice = chunk.subarray(0, remainingBytes);
+  const next = current + slice.toString("utf8");
+  state.bytes = Math.min(limitBytes, state.bytes + slice.byteLength);
+  if (slice.byteLength < chunk.byteLength || state.bytes >= limitBytes) {
+    state.truncated = true;
+  }
+  return next;
+}
+
+function finalizeCapturedText(
+  text: string,
+  state: { truncated: boolean },
+  label: string,
+): string {
+  if (!state.truncated) {
+    return text;
+  }
+  return `${text}\n[${label} truncated]`.trim();
+}
+
+function chooseDisplayDurationMs(cpuDurationMs: number, wallDurationMs: number): number {
+  if (!Number.isFinite(wallDurationMs) || wallDurationMs <= 0) {
+    return Math.max(1, cpuDurationMs || 0);
+  }
+  if (!Number.isFinite(cpuDurationMs) || cpuDurationMs <= 0) {
+    return wallDurationMs;
+  }
+  if (wallDurationMs <= 20) {
+    return wallDurationMs;
+  }
+  if (cpuDurationMs < wallDurationMs - 20) {
+    return cpuDurationMs;
+  }
+  return wallDurationMs;
+}
+
 async function runCommand(
   command: string,
   args: string[],
@@ -87,11 +139,15 @@ async function runCommand(
     stdin: string;
     timeoutMs: number;
     captureMemory: boolean;
+    stdoutFilePath?: string | null;
+    maxStdoutCaptureBytes?: number;
+    maxStderrCaptureBytes?: number;
   },
 ): Promise<CommandResult> {
-  const startedAt = Date.now();
+  const startedAt = process.hrtime.bigint();
   const timeWrapperCommand = options.captureMemory ? resolveTimeWrapperCommand() : null;
   const useTimeWrapper = Boolean(timeWrapperCommand);
+  const captureStdout = !options.stdoutFilePath;
   const metricsPath = path.join(
     options.cwd,
     `metrics-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`,
@@ -103,9 +159,14 @@ async function runCommand(
     : args;
 
   return new Promise<CommandResult>((resolve) => {
+    let stdoutFileDescriptor: number | null = null;
+    if (options.stdoutFilePath) {
+      stdoutFileDescriptor = openSync(options.stdoutFilePath, "w");
+    }
+
     const child = spawn(wrappedCommand, wrappedArgs, {
       cwd: options.cwd,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ["pipe", stdoutFileDescriptor ?? "pipe", "pipe"],
     });
 
     let stdout = "";
@@ -113,6 +174,8 @@ async function runCommand(
     let timedOut = false;
     let spawnErrorCode: string | undefined;
     let settled = false;
+    const stdoutState = { bytes: 0, truncated: false };
+    const stderrState = { bytes: 0, truncated: false };
 
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -123,12 +186,26 @@ async function runCommand(
       }
     }, Math.max(1, options.timeoutMs));
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
-    });
+    if (captureStdout && child.stdout) {
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdout = appendChunkCapped(
+          stdout,
+          chunk,
+          stdoutState,
+          options.maxStdoutCaptureBytes ?? STDOUT_CAPTURE_LIMIT_BYTES,
+        );
+      });
+    }
+    if (child.stderr) {
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr = appendChunkCapped(
+          stderr,
+          chunk,
+          stderrState,
+          options.maxStderrCaptureBytes ?? STDERR_CAPTURE_LIMIT_BYTES,
+        );
+      });
+    }
     child.on("error", (error: NodeJS.ErrnoException) => {
       spawnErrorCode = error.code;
     });
@@ -140,7 +217,18 @@ async function runCommand(
       settled = true;
       clearTimeout(timeout);
 
-      const wallDurationMs = Date.now() - startedAt;
+      if (stdoutFileDescriptor !== null) {
+        try {
+          closeSync(stdoutFileDescriptor);
+        } catch {
+          // noop
+        }
+      }
+
+      const wallDurationMs = Math.max(
+        0,
+        Math.round(Number(process.hrtime.bigint() - startedAt) / 1_000_000),
+      );
       let memoryKb = 0;
       let cpuDurationMs = wallDurationMs;
       if (useTimeWrapper) {
@@ -177,11 +265,12 @@ async function runCommand(
       }
 
       resolve({
-        stdout,
-        stderr,
+        stdout: finalizeCapturedText(stdout, stdoutState, "stdout"),
+        stderr: finalizeCapturedText(stderr, stderrState, "stderr"),
+        stdoutFilePath: options.stdoutFilePath ?? null,
         exitCode,
         timedOut,
-        durationMs: wallDurationMs,
+        durationMs: chooseDisplayDurationMs(cpuDurationMs, wallDurationMs),
         cpuDurationMs,
         wallDurationMs,
         memoryKb,
@@ -189,8 +278,10 @@ async function runCommand(
       });
     });
 
-    child.stdin.write(options.stdin);
-    child.stdin.end();
+    if (child.stdin) {
+      child.stdin.write(options.stdin);
+      child.stdin.end();
+    }
   });
 }
 
@@ -201,6 +292,9 @@ async function runWithFallback(
     stdin: string;
     timeoutMs: number;
     captureMemory: boolean;
+    stdoutFilePath?: string | null;
+    maxStdoutCaptureBytes?: number;
+    maxStderrCaptureBytes?: number;
   },
 ): Promise<{ result: CommandResult; usedCommand: string }> {
   let lastResult: CommandResult | null = null;
@@ -223,6 +317,7 @@ async function runWithFallback(
         cpuDurationMs: 0,
         wallDurationMs: 0,
         memoryKb: 0,
+        stdoutFilePath: options.stdoutFilePath ?? null,
         spawnErrorCode: "ENOENT",
       } as CommandResult),
     usedCommand: template.commands[0] ?? "",
@@ -368,7 +463,7 @@ async function runSpecialJudgeCase(input: {
   checkerRuntime: CommandTemplate;
   inputText: string;
   expectedText: string;
-  actualText: string;
+  contestantOutputPath: string;
 }): Promise<{
   verdict: SubmissionStatus;
   message: string;
@@ -381,15 +476,13 @@ async function runSpecialJudgeCase(input: {
 
   const inputPath = path.join(caseDir, "input.txt");
   const answerPath = path.join(caseDir, "answer.txt");
-  const outputPath = path.join(caseDir, "output.txt");
   await writeFile(inputPath, input.inputText, "utf8");
   await writeFile(answerPath, input.expectedText, "utf8");
-  await writeFile(outputPath, input.actualText, "utf8");
 
   const checked = await runWithFallback(
     {
       commands: input.checkerRuntime.commands,
-      args: [...input.checkerRuntime.args, inputPath, answerPath, outputPath],
+      args: [...input.checkerRuntime.args, inputPath, answerPath, input.contestantOutputPath],
     },
     {
       cwd: input.checkerWorkspace,
@@ -599,11 +692,16 @@ export async function executePackageJudge(input: {
           throw new Error(`test case not found: ${group.name}/${caseName}`);
         }
         await input.onPhaseChange?.("running");
+        const contestantOutputPath = path.join(
+          submissionWorkspace,
+          `stdout-${group.orderIndex}-${caseName}.txt`,
+        );
         const executed = await runWithFallback(runtimeTemplate, {
           cwd: submissionWorkspace,
           stdin: testCase.input,
           timeoutMs: input.timeLimitMs,
           captureMemory: true,
+          stdoutFilePath: contestantOutputPath,
         });
         const runResult = executed.result;
 
@@ -633,7 +731,7 @@ export async function executePackageJudge(input: {
                   checkerRuntime,
                   inputText: testCase.input,
                   expectedText: testCase.output,
-                  actualText: runResult.stdout,
+                  contestantOutputPath,
                 })
               : {
                   verdict: "internal_error" as SubmissionStatus,
@@ -641,7 +739,13 @@ export async function executePackageJudge(input: {
                 };
           verdict = checked.verdict;
           message = checked.message;
-        } else if (!isOutputAccepted(runResult.stdout, testCase.output, packageMeta.compareMode)) {
+        } else if (
+          !isOutputAccepted(
+            await readFile(contestantOutputPath, "utf8"),
+            testCase.output,
+            packageMeta.compareMode,
+          )
+        ) {
           verdict = "wrong_answer";
           message = "Expected output differs.";
         }
@@ -665,6 +769,11 @@ export async function executePackageJudge(input: {
           totalTimeMs,
           peakMemoryKb,
         });
+        try {
+          await rm(contestantOutputPath, { force: true });
+        } catch {
+          // noop
+        }
       }
 
       judgedGroupStates.push({
