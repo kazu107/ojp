@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProblemEditorForm } from "@/components/problem-editor-form";
@@ -15,6 +17,7 @@ interface EditProblemPageProps {
 }
 
 export default async function EditProblemPage({ params }: EditProblemPageProps) {
+  const { t } = await getI18n();
   const { problemId } = await params;
   const me = await getCurrentUser();
   const problem = getProblemForViewer(problemId, me.id);
@@ -28,11 +31,9 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Edit Problem</h1>
+          <h1 className="page-title">{t("Edit Problem")}</h1>
           <p className="page-subtitle">
-            Update statement, limits, and the judge package, including manual test groups and ZIP
-            import.
-          </p>
+            {t("Update statement, limits, and the judge package, including manual test groups and ZIP import.")}</p>
         </div>
       </section>
 
@@ -42,10 +43,9 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
             <ProblemEditorForm mode="edit" initialProblem={problem} />
           </section>
           <section className="panel stack">
-            <h2 className="panel-title">Publish Settings</h2>
+            <h2 className="panel-title">{t("Publish Settings")}</h2>
             <p className="panel-subtitle">
-              Publish makes this problem public. Unpublish makes it private.
-            </p>
+              {t("Publish makes this problem public. Unpublish makes it private.")}</p>
             <VisibilityActionButtons
               resourceType="problem"
               resourceId={problem.id}
@@ -55,11 +55,10 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
         </>
       ) : (
         <section className="panel stack">
-          <p className="badge badge-red">You do not have permission to edit this problem.</p>
+          <p className="badge badge-red">{t("You do not have permission to edit this problem.")}</p>
           <div className="button-row">
             <Link href={`/problems/${problem.id}`} className="button button-secondary">
-              Back to Problem
-            </Link>
+              {t("Back to Problem")}</Link>
           </div>
         </section>
       )}

@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -22,6 +24,7 @@ export function VisibilityActionButtons({
   resourceId,
   visibility,
 }: VisibilityActionButtonsProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<"" | "publish" | "unpublish">("");
   const [error, setError] = useState("");
@@ -59,7 +62,7 @@ export function VisibilityActionButtons({
 
   return (
     <div className="stack">
-      <p className="text-soft">Current visibility: {visibility}</p>
+      <p className="text-soft">{t("Current visibility: ")}{t(visibility)}</p>
       <div className="button-row">
         <button
           className="button"
@@ -67,19 +70,17 @@ export function VisibilityActionButtons({
           disabled={busyAction !== "" || visibility === "public"}
           onClick={() => callAction("publish")}
         >
-          Publish
-        </button>
+          {t("Publish")}</button>
         <button
           className="button button-secondary"
           type="button"
           disabled={busyAction !== "" || visibility === "private"}
           onClick={() => callAction("unpublish")}
         >
-          Unpublish
-        </button>
+          {t("Unpublish")}</button>
       </div>
-      {error ? <p className="badge badge-red">{error}</p> : null}
-      {message ? <p className="badge badge-green">{message}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
+      {message ? <p className="badge badge-green">{t(message)}</p> : null}
     </div>
   );
 }

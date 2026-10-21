@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { useEffect, useState } from "react";
 import {
@@ -12,6 +14,7 @@ import {
   ProblemPackageEditorDraft,
 } from "@/lib/problem-package-types";
 import { Language } from "@/lib/types";
+import type { Translator } from "@/lib/i18n/shared";
 
 interface ProblemPackageDraftEditorProps {
   draft: ProblemPackageEditorDraft;
@@ -41,7 +44,7 @@ function createId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function scoreSummary(draft: ProblemPackageEditorDraft): {
+function scoreSummary(draft: ProblemPackageEditorDraft, t: Translator): {
   label: string;
   badgeClass: string;
 } {
@@ -51,14 +54,14 @@ function scoreSummary(draft: ProblemPackageEditorDraft): {
 
   if (!hasAnyScore) {
     return {
-      label: "Binary scoring (all groups must pass)",
+      label: t("Binary scoring (all groups must pass)"),
       badgeClass: "badge badge-blue",
     };
   }
 
   if (!hasAllScores) {
     return {
-      label: "Invalid scoring: set all group scores or none",
+      label: t("Invalid scoring: set all group scores or none"),
       badgeClass: "badge badge-red",
     };
   }
@@ -66,13 +69,13 @@ function scoreSummary(draft: ProblemPackageEditorDraft): {
   const total = scores.reduce((acc, score) => acc + (score ?? 0), 0);
   if (total !== 100) {
     return {
-      label: `Partial scoring total=${total} (must be 100)`,
+      label: t("Partial scoring total={total} (must be 100)", { total }),
       badgeClass: "badge badge-red",
     };
   }
 
   return {
-    label: "Partial scoring total=100",
+    label: t("Partial scoring total=100"),
     badgeClass: "badge badge-green",
   };
 }
@@ -87,6 +90,7 @@ export function ProblemPackageDraftEditor({
   onLoadTestCase,
   loadingTestCaseId,
 }: ProblemPackageDraftEditorProps) {
+  const { t } = useI18n();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
     draft.groups[0]?.id ?? null,
   );
@@ -94,7 +98,7 @@ export function ProblemPackageDraftEditor({
     draft.groups[0]?.tests[0]?.id ?? null,
   );
 
-  const summary = scoreSummary(draft);
+  const summary = scoreSummary(draft, t);
   const totalCases = draft.groups.reduce((acc, group) => acc + group.tests.length, 0);
   const totalSamples = draft.samples.length;
   const displayedFileCount =
@@ -282,7 +286,7 @@ export function ProblemPackageDraftEditor({
     <div className="stack">
       <div className="form-grid">
         <label className="field">
-          <span className="field-label">Checker Type</span>
+          <span className="field-label">{t("Checker Type")}</span>
           <select
             className="select"
             value={draft.checkerType}
@@ -298,13 +302,13 @@ export function ProblemPackageDraftEditor({
               }))
             }
           >
-            <option value="exact">exact</option>
-            <option value="special_judge">special_judge</option>
+            <option value="exact">{t("exact")}</option>
+            <option value="special_judge">{t("special_judge")}</option>
           </select>
         </label>
         {draft.checkerType === "special_judge" ? (
           <label className="field">
-            <span className="field-label">Checker Language</span>
+            <span className="field-label">{t("Checker Language")}</span>
             <select
               className="select"
               value={draft.checkerLanguage}
@@ -321,26 +325,26 @@ export function ProblemPackageDraftEditor({
                 })
               }
             >
-              <option value="cpp">cpp</option>
-              <option value="python">python</option>
-              <option value="java">java</option>
-              <option value="javascript">javascript</option>
+              <option value="cpp">{t("cpp")}</option>
+              <option value="python">{t("python")}</option>
+              <option value="java">{t("java")}</option>
+              <option value="javascript">{t("javascript")}</option>
             </select>
           </label>
         ) : null}
         <label className="field">
-          <span className="field-label">Source Label</span>
+          <span className="field-label">{t("Source Label")}</span>
           <input
             className="input"
             value={draft.sourceLabel}
             onChange={(event) =>
               patchDraft((current) => ({ ...current, sourceLabel: event.target.value }))
             }
-            placeholder="manual-package"
+            placeholder={t("manual-package")}
           />
         </label>
         <label className="field">
-          <span className="field-label">Compare Mode</span>
+          <span className="field-label">{t("Compare Mode")}</span>
           <select
             className="select"
             value={draft.compareMode}
@@ -352,8 +356,8 @@ export function ProblemPackageDraftEditor({
               }))
             }
           >
-            <option value="exact">exact</option>
-            <option value="ignore_trailing_spaces">ignore_trailing_spaces</option>
+            <option value="exact">{t("exact")}</option>
+            <option value="ignore_trailing_spaces">{t("ignore_trailing_spaces")}</option>
           </select>
         </label>
       </div>
@@ -361,12 +365,9 @@ export function ProblemPackageDraftEditor({
       {draft.checkerType === "special_judge" ? (
         <div className="stack">
           <p className="text-soft">
-            Special judge is called with three arguments: input file path, reference output path,
-            and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge
-            error.
-          </p>
+            {t("Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error.")}</p>
           <div className="field">
-            <span className="field-label">Checker Source Code</span>
+            <span className="field-label">{t("Checker Source Code")}</span>
             <CodeEditor
               language={draft.checkerLanguage}
               minHeight={220}
@@ -384,23 +385,21 @@ export function ProblemPackageDraftEditor({
 
       <div className="meta-inline">
         <span className={summary.badgeClass}>{summary.label}</span>
-        <span className="result-group-meta">Groups: {draft.groups.length}</span>
-        <span className="result-group-meta">Cases: {totalCases}</span>
-        <span className="result-group-meta">Files: {displayedFileCount}</span>
-        <span className="result-group-meta">Samples: {totalSamples}</span>
+        <span className="result-group-meta">{t("Groups: ")}{draft.groups.length}</span>
+        <span className="result-group-meta">{t("Cases: ")}{totalCases}</span>
+        <span className="result-group-meta">{t("Files: ")}{displayedFileCount}</span>
+        <span className="result-group-meta">{t("Samples: ")}{totalSamples}</span>
       </div>
       {draft.isPartial ? (
         <p className="text-soft">
-          Large existing packages are loaded lazily. Test case contents are fetched only when
-          selected, and names stay read-only until all cases are loaded.
-        </p>
+          {t("Large existing packages are loaded lazily. Test case contents are fetched only when selected, and names stay read-only until all cases are loaded.")}</p>
       ) : null}
 
       {draft.warnings.length > 0 ? (
         <div className="package-note-list">
           {draft.warnings.map((warning) => (
-            <p key={warning} className="text-soft">
-              - {warning}
+            <p key={t(warning)} className="text-soft">
+              - {t(warning)}
             </p>
           ))}
         </div>
@@ -408,21 +407,20 @@ export function ProblemPackageDraftEditor({
 
       <section className="package-group-editor stack">
         <div className="package-editor-toolbar">
-          <h3 className="panel-title">Samples</h3>
+          <h3 className="panel-title">{t("Samples")}</h3>
           <div className="button-row">
             <button type="button" className="button" onClick={addSample}>
-              Add Sample
-            </button>
+              {t("Add Sample")}</button>
           </div>
         </div>
 
         {draft.samples.length === 0 ? (
-          <p className="empty">No samples yet. Add at least one sample if you want examples on the problem page.</p>
+          <p className="empty">{t("No samples yet. Add at least one sample if you want examples on the problem page.")}</p>
         ) : (
           draft.samples.map((sample, sampleIndex) => (
             <article key={sample.id} className="package-case-editor stack">
               <div className="package-editor-toolbar">
-                <h4 className="field-label">Sample {sampleIndex + 1}</h4>
+                <h4 className="field-label">{t("Sample ")}{sampleIndex + 1}</h4>
                 <div className="button-row">
                   <button
                     type="button"
@@ -430,29 +428,26 @@ export function ProblemPackageDraftEditor({
                     onClick={() => moveSample(sampleIndex, -1)}
                     disabled={sampleIndex === 0}
                   >
-                    Up
-                  </button>
+                    {t("Up")}</button>
                   <button
                     type="button"
                     className="button button-secondary"
                     onClick={() => moveSample(sampleIndex, 1)}
                     disabled={sampleIndex === draft.samples.length - 1}
                   >
-                    Down
-                  </button>
+                    {t("Down")}</button>
                   <button
                     type="button"
                     className="button button-danger"
                     onClick={() => removeSample(sampleIndex)}
                     disabled={draft.samples.length === 1}
                   >
-                    Remove Sample
-                  </button>
+                    {t("Remove Sample")}</button>
                 </div>
               </div>
 
               <label className="field">
-                <span className="field-label">Sample Name</span>
+                <span className="field-label">{t("Sample Name")}</span>
                 <input
                   className="input"
                   value={sample.name}
@@ -473,7 +468,7 @@ export function ProblemPackageDraftEditor({
               </label>
 
               <label className="field">
-                <span className="field-label">Sample Description</span>
+                <span className="field-label">{t("Sample Description")}</span>
                 <textarea
                   className="textarea"
                   value={sample.description}
@@ -495,7 +490,7 @@ export function ProblemPackageDraftEditor({
 
               <div className="form-grid">
                 <label className="field">
-                  <span className="field-label">Sample Input</span>
+                  <span className="field-label">{t("Sample Input")}</span>
                   <textarea
                     className="textarea"
                     value={sample.input}
@@ -515,7 +510,7 @@ export function ProblemPackageDraftEditor({
                   />
                 </label>
                 <label className="field">
-                  <span className="field-label">Sample Output</span>
+                  <span className="field-label">{t("Sample Output")}</span>
                   <textarea
                     className="textarea"
                     value={sample.output}
@@ -542,20 +537,19 @@ export function ProblemPackageDraftEditor({
 
       <section className="package-group-editor stack">
         <div className="package-editor-toolbar">
-          <h3 className="panel-title">Groups</h3>
+          <h3 className="panel-title">{t("Groups")}</h3>
           <div className="button-row">
             <button type="button" className="button" onClick={addGroup}>
-              Add Group
-            </button>
+              {t("Add Group")}</button>
           </div>
         </div>
 
         {draft.groups.length === 0 ? (
-          <p className="empty">No groups yet.</p>
+          <p className="empty">{t("No groups yet.")}</p>
         ) : (
           <>
             <div className="field">
-              <span className="field-label">Group List</span>
+              <span className="field-label">{t("Group List")}</span>
               <div className="button-row">
                 {draft.groups.map((group) => (
                   <button
@@ -575,7 +569,7 @@ export function ProblemPackageDraftEditor({
             {activeGroup && activeGroupIndex >= 0 ? (
               <>
                 <div className="package-editor-toolbar">
-                  <h4 className="field-label">Selected Group</h4>
+                  <h4 className="field-label">{t("Selected Group")}</h4>
                   <div className="button-row">
                     <button
                       type="button"
@@ -583,30 +577,27 @@ export function ProblemPackageDraftEditor({
                       onClick={() => moveGroup(activeGroupIndex, -1)}
                       disabled={activeGroupIndex === 0}
                     >
-                      Up
-                    </button>
+                      {t("Up")}</button>
                     <button
                       type="button"
                       className="button button-secondary"
                       onClick={() => moveGroup(activeGroupIndex, 1)}
                       disabled={activeGroupIndex === draft.groups.length - 1}
                     >
-                      Down
-                    </button>
+                      {t("Down")}</button>
                     <button
                       type="button"
                       className="button button-danger"
                       onClick={() => removeGroup(activeGroupIndex)}
                       disabled={draft.groups.length === 1}
                     >
-                      Remove Group
-                    </button>
+                      {t("Remove Group")}</button>
                   </div>
                 </div>
 
                 <div className="form-grid">
                   <label className="field">
-                    <span className="field-label">Group Name</span>
+                    <span className="field-label">{t("Group Name")}</span>
                     <input
                       className="input"
                       value={activeGroup.name}
@@ -627,7 +618,7 @@ export function ProblemPackageDraftEditor({
                     />
                   </label>
                   <label className="field">
-                    <span className="field-label">Partial Score</span>
+                    <span className="field-label">{t("Partial Score")}</span>
                     <input
                       className="input"
                       type="number"
@@ -648,13 +639,13 @@ export function ProblemPackageDraftEditor({
                           ),
                         }));
                       }}
-                      placeholder="blank = binary"
+                      placeholder={t("blank = binary")}
                     />
                   </label>
                 </div>
 
                 <div className="field">
-                  <span className="field-label">Case List</span>
+                  <span className="field-label">{t("Case List")}</span>
                   <div className="button-row">
                     {activeGroup.tests.map((testCase) => (
                       <button
@@ -674,7 +665,7 @@ export function ProblemPackageDraftEditor({
                 {activeCase && activeCaseIndex >= 0 ? (
                   <article key={activeCase.id} className="package-case-editor stack">
                     <div className="package-editor-toolbar">
-                      <h4 className="field-label">Selected Case</h4>
+                      <h4 className="field-label">{t("Selected Case")}</h4>
                       <div className="button-row">
                         <button
                           type="button"
@@ -682,44 +673,38 @@ export function ProblemPackageDraftEditor({
                           onClick={() => moveCase(activeGroupIndex, activeCaseIndex, -1)}
                           disabled={activeCaseIndex === 0}
                         >
-                          Up
-                        </button>
+                          {t("Up")}</button>
                         <button
                           type="button"
                           className="button button-secondary"
                           onClick={() => moveCase(activeGroupIndex, activeCaseIndex, 1)}
                           disabled={activeCaseIndex === activeGroup.tests.length - 1}
                         >
-                          Down
-                        </button>
+                          {t("Down")}</button>
                         <button
                           type="button"
                           className="button button-danger"
                           onClick={() => removeCase(activeGroupIndex, activeCaseIndex)}
                           disabled={activeGroup.tests.length === 1}
                         >
-                          Remove Case
-                        </button>
+                          {t("Remove Case")}</button>
                         <button
                           type="button"
                           className="button"
                           onClick={() => addCase(activeGroupIndex)}
                         >
-                          Add Case
-                        </button>
+                          {t("Add Case")}</button>
                       </div>
                     </div>
 
                     {!activeCaseIsLoaded ? (
                       <p className="badge badge-blue">
-                        {loadingTestCaseId === activeCase.id
-                          ? "Loading selected test case..."
-                          : "Loading selected test case on demand..."}
+                        {loadingTestCaseId === activeCase.id ? t("Loading selected test case...") : t("Loading selected test case on demand...")}
                       </p>
                     ) : null}
 
                     <label className="field">
-                      <span className="field-label">Case Name</span>
+                      <span className="field-label">{t("Case Name")}</span>
                       <input
                         className="input"
                         value={activeCase.name}
@@ -749,7 +734,7 @@ export function ProblemPackageDraftEditor({
 
                     <div className="form-grid">
                       <label className="field">
-                        <span className="field-label">Input</span>
+                        <span className="field-label">{t("Input")}</span>
                         <textarea
                           className="textarea"
                           value={activeCase.input}
@@ -777,7 +762,7 @@ export function ProblemPackageDraftEditor({
                         />
                       </label>
                       <label className="field">
-                        <span className="field-label">{outputLabel}</span>
+                        <span className="field-label">{t(outputLabel)}</span>
                         <textarea
                           className="textarea"
                           value={activeCase.output}

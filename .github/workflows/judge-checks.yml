@@ -1,0 +1,120 @@
+name: Judge Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  judge:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sandbox: [basic, bubblewrap]
+    env:
+      JUDGE_SANDBOX: ${{ matrix.sandbox }}
+      STORE_DB_SYNC: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y bubblewrap util-linux g++ python3 default-jdk-headless time
+      - run: npm ci
+      - run: npm run judge:doctor
+      - run: npm run test:judge
+      - run: npm run test:ops
+      - run: npm run lint
+
+  learning:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: learning-test
+          POSTGRES_DB: ojp_learning_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      STORE_DB_SYNC: "0"
+      LEARNING_STORAGE: db
+      DATABASE_URL: postgresql://postgres:learning-test@127.0.0.1:5432/ojp_learning_test?schema=public
+      LEARNING_TEST_DATABASE_URL: postgresql://postgres:learning-test@127.0.0.1:5432/ojp_learning_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run db:push
+      - run: npm run db:learning
+      - run: npm run test:learning
+      - run: npm run test:learning:integration
+
+  contests:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: contest-test
+          POSTGRES_DB: ojp_contest_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:contest-test@127.0.0.1:5432/ojp_contest_test?schema=public
+      CONTEST_TEST_DATABASE_URL: postgresql://postgres:contest-test@127.0.0.1:5432/ojp_contest_test?schema=public
+      CONTEST_HTTP_TEST_ORIGIN: http://127.0.0.1:3100
+      AUTH_SECRET: contest-local-validation-only-not-production
+      AUTH_URL: http://127.0.0.1:3100
+      ADMIN_GITHUB_LOGINS: contest-test
+      STORE_DB_SYNC: "1"
+      JUDGE_SANDBOX: basic
+      LEARNING_STORAGE: db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run db:push
+      - run: npm run db:contest
+      - run: npm run test:contest
+      - run: npm run test:i18n
+      - run: npm run build
+        env:
+          STORE_DB_SYNC: "0"
+      - name: Real worker contest lifecycle
+        run: |
+          JUDGE_PROCESS_MODE=web npm run start -- --hostname 127.0.0.1 --port 3100 >/tmp/ojp-contest-web.log 2>&1 &
+          web=$!
+          JUDGE_PROCESS_MODE=worker npm run worker:judge >/tmp/ojp-contest-worker.log 2>&1 &
+          worker=$!
+          DYNO=validation-worker-2 JUDGE_PROCESS_MODE=worker npm run worker:judge >/tmp/ojp-contest-worker-2.log 2>&1 &
+          worker2=$!
+          trap 'kill "$web" "$worker" "$worker2" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3100/api/health/db >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3100/api/health/db >/dev/null
+          npm run test:contest:integration

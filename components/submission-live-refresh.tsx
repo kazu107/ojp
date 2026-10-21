@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -16,6 +18,7 @@ export function SubmissionLiveRefresh({
   intervalMs = 2000,
   message,
 }: SubmissionLiveRefreshProps) {
+  const { t } = useI18n();
   const router = useRouter();
 
   useEffect(() => {
@@ -36,7 +39,7 @@ export function SubmissionLiveRefresh({
 
   return (
     <p className="badge badge-blue">
-      {message ?? "This submission is waiting for judge. The page refreshes automatically."}
+      {t(message ?? "This submission is waiting for judge. The page refreshes automatically.")}
     </p>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError, errorResponse } from "@/lib/api-response";
-import { getContestById, HttpError, updateContest } from "@/lib/store";
+import { getEditableContestForCurrentUser, HttpError, updateContest } from "@/lib/store";
 import { ContestProblem } from "@/lib/types";
 
 interface DeleteContestProblemRouteContext {
@@ -25,7 +25,7 @@ export async function DELETE(
 ) {
   try {
     const { contestId, contestProblemId } = await params;
-    const contest = getContestById(contestId);
+    const contest = await getEditableContestForCurrentUser(contestId);
     if (!contest) {
       return apiError(404, "contest not found");
     }

@@ -1,0 +1,4074 @@
+{
+  "_No preview yet._": {
+    "ja": "_プレビューはまだありません。_",
+    "en": "_No preview yet._"
+  },
+  "・任意": {
+    "ja": "・任意",
+    "en": " / Optional"
+  },
+  ", and include the checker source at": {
+    "ja": "、checkerのソースコードを次の場所に配置してください：",
+    "en": ", and include the checker source at"
+  },
+  ", each group can be either": {
+    "ja": "の各グループは、次のいずれかで指定できます：",
+    "en": ", each group can be either"
+  },
+  ", set": {
+    "ja": "の場合は、次を設定してください：",
+    "en": ", set"
+  },
+  ". Test files are auto-detected from each": {
+    "ja": "。テストファイルは次の各ディレクトリから自動検出されます：",
+    "en": ". Test files are auto-detected from each"
+  },
+  ".mdファイルを取り込む": {
+    "ja": ".mdファイルを取り込む",
+    "en": "Import .md file"
+  },
+  "(applied for non-owner viewers)": {
+    "ja": "（作成者以外の閲覧者に適用）",
+    "en": "(applied for non-owner viewers)"
+  },
+  "（出力なし）": {
+    "ja": "（出力なし）",
+    "en": "(no output)"
+  },
+  "{ \"name\": \"group1\", \"score\": 50 }": {
+    "ja": "{ \"name\": \"group1\", \"score\": 50 }",
+    "en": "{ \"name\": \"group1\", \"score\": 50 }"
+  },
+  "{field} is required and must be at most {limit} characters.": {
+    "ja": "{field}は必須で、{limit}文字以下にしてください。",
+    "en": "{field} is required and must be at most {limit} characters."
+  },
+  "{field} must be at most {limit} characters.": {
+    "ja": "{field}は{limit}文字以下にしてください。",
+    "en": "{field} must be at most {limit} characters."
+  },
+  "{field} slug already exists.": {
+    "ja": "{field}の識別名は既に使われています。",
+    "en": "{field} slug already exists."
+  },
+  "{value0} / {value1} 完了": {
+    "ja": "{value0} / {value1} 完了",
+    "en": "{value0} / {value1} complete"
+  },
+  "{value0} KB": {
+    "ja": "{value0} KB",
+    "en": "{value0} KB"
+  },
+  "{value0} ms": {
+    "ja": "{value0} ms",
+    "en": "{value0} ms"
+  },
+  "/ End:": {
+    "ja": "/ 終了:",
+    "en": "/ End:"
+  },
+  "/ Joined:": {
+    "ja": "/ 参加者数:",
+    "en": "/ Joined:"
+  },
+  "/ Judge Env:": {
+    "ja": "/ ジャッジ環境:",
+    "en": "/ Judge Env:"
+  },
+  "/ Judged:": {
+    "ja": "/ 判定日時:",
+    "en": "/ Judged:"
+  },
+  "/ Penalty:": {
+    "ja": "/ ペナルティ:",
+    "en": "/ Penalty:"
+  },
+  "/ Submitted:": {
+    "ja": "/ 提出日時:",
+    "en": "/ Submitted:"
+  },
+  "/ Time:": {
+    "ja": "/ 実行時間:",
+    "en": "/ Time:"
+  },
+  "/ 終了:": {
+    "ja": "/ 終了:",
+    "en": "/ End:"
+  },
+  "/ 章一覧": {
+    "ja": "/ 章一覧",
+    "en": "/ Chapters"
+  },
+  "%。採点はサーバー側で行います。": {
+    "ja": "%。採点はサーバー側で行います。",
+    "en": "%. Answers are graded on the server."
+  },
+  "A - Sample Problem": {
+    "ja": "A - サンプル問題",
+    "en": "A - Sample Problem"
+  },
+  "A course can contain at most 200 items.": {
+    "ja": "コース全体の項目は200個までです。",
+    "en": "A course can contain at most 200 items."
+  },
+  "A course document must be at most 2 MiB.": {
+    "ja": "コースデータは2 MiB以下にしてください。",
+    "en": "A course document must be at most 2 MiB."
+  },
+  "A course needs 1-50 chapters.": {
+    "ja": "コースには1〜50章が必要です。",
+    "en": "A course needs 1-50 chapters."
+  },
+  "A lesson can contain at most 20 runnable cells.": {
+    "ja": "教材1つにつき実行欄は20個までです。",
+    "en": "A lesson can contain at most 20 runnable cells."
+  },
+  "A problem_author or admin role is required.": {
+    "ja": "problem_authorまたはadmin権限が必要です。",
+    "en": "A problem_author or admin role is required."
+  },
+  "A quiz needs 1-30 questions.": {
+    "ja": "クイズには1〜30問が必要です。",
+    "en": "A quiz needs 1-30 questions."
+  },
+  "A valid edit version is required.": {
+    "ja": "有効な編集版が必要です。",
+    "en": "A valid edit version is required."
+  },
+  "a-sample-problem": {
+    "ja": "a-sample-problem",
+    "en": "a-sample-problem"
+  },
+  "Acceptance Rate": {
+    "ja": "正解率",
+    "en": "Acceptance Rate"
+  },
+  "Accepted": {
+    "ja": "正解",
+    "en": "Accepted"
+  },
+  "Accepted (group summary)": {
+    "ja": "正解（グループ集計）",
+    "en": "Accepted (group summary)"
+  },
+  "Action": {
+    "ja": "操作",
+    "en": "Action"
+  },
+  "Actions": {
+    "ja": "操作",
+    "en": "Actions"
+  },
+  "active": {
+    "ja": "有効",
+    "en": "Active"
+  },
+  "ACを確認して完了にする": {
+    "ja": "ACを確認して完了にする",
+    "en": "Verify AC and mark complete"
+  },
+  "AC提出を確認できませんでした。": {
+    "ja": "AC提出を確認できませんでした。",
+    "en": "Could not verify an accepted submission."
+  },
+  "Add {label}": {
+    "ja": "{label}を追加",
+    "en": "Add {label}"
+  },
+  "Add Case": {
+    "ja": "ケースを追加",
+    "en": "Add Case"
+  },
+  "Add Group": {
+    "ja": "グループを追加",
+    "en": "Add Group"
+  },
+  "Add Sample": {
+    "ja": "サンプルを追加",
+    "en": "Add Sample"
+  },
+  "Additional detail": {
+    "ja": "詳細",
+    "en": "Additional detail"
+  },
+  "admin": {
+    "ja": "管理者",
+    "en": "Administrator"
+  },
+  "Admin": {
+    "ja": "管理",
+    "en": "Admin"
+  },
+  "admin only": {
+    "ja": "管理者のみ操作できます。",
+    "en": "admin only"
+  },
+  "After Contest End": {
+    "ja": "コンテスト終了後",
+    "en": "After Contest End"
+  },
+  "all": {
+    "ja": "すべて",
+    "en": "all"
+  },
+  "All": {
+    "ja": "すべて",
+    "en": "All"
+  },
+  "always": {
+    "ja": "常に公開",
+    "en": "Always"
+  },
+  "Always": {
+    "ja": "常に公開",
+    "en": "Always"
+  },
+  "announcement not found": {
+    "ja": "お知らせが見つかりません。",
+    "en": "announcement not found"
+  },
+  "announcement title is required": {
+    "ja": "お知らせのタイトルを入力してください。",
+    "en": "announcement title is required"
+  },
+  "Announcements": {
+    "ja": "お知らせ",
+    "en": "Announcements"
+  },
+  "Another edit was saved while publishing. Reload and try again.": {
+    "ja": "公開中に別の編集が保存されました。再読み込みしてお試しください。",
+    "en": "Another edit was saved while publishing. Reload and try again."
+  },
+  "Another edit was saved. Reload before saving again.": {
+    "ja": "別の編集が保存されました。再読み込みしてから保存してください。",
+    "en": "Another edit was saved. Reload before saving again."
+  },
+  "Another edit was saved. Reload first.": {
+    "ja": "別の編集が保存されました。再読み込みしてください。",
+    "en": "Another edit was saved. Reload first."
+  },
+  "Answer every question before submitting.": {
+    "ja": "すべての設問に回答してください。",
+    "en": "Answer every question before submitting."
+  },
+  "Apply": {
+    "ja": "適用",
+    "en": "Apply"
+  },
+  "AtCoder-like Platform": {
+    "ja": "競技プログラミングプラットフォーム",
+    "en": "AtCoder-like Platform"
+  },
+  "AtCoder-like Platform MVP": {
+    "ja": "競技プログラミングプラットフォーム",
+    "en": "AtCoder-like Platform MVP"
+  },
+  "Audit Logs": {
+    "ja": "監査ログ",
+    "en": "Audit Logs"
+  },
+  "authentication required": {
+    "ja": "ログインしてください。",
+    "en": "authentication required"
+  },
+  "Author": {
+    "ja": "作成者",
+    "en": "Author"
+  },
+  "Authored Problems": {
+    "ja": "作成した問題",
+    "en": "Authored Problems"
+  },
+  "Automatic state: scheduled / running / ended": {
+    "ja": "状態は自動で更新されます：開催前 / 開催中 / 終了",
+    "en": "Automatic state: scheduled / running / ended"
+  },
+  "Average Score": {
+    "ja": "平均得点",
+    "en": "Average Score"
+  },
+  "Average Time": {
+    "ja": "平均実行時間",
+    "en": "Average Time"
+  },
+  "Back to Contest": {
+    "ja": "コンテストに戻る",
+    "en": "Back to Contest"
+  },
+  "Back to Problem": {
+    "ja": "問題に戻る",
+    "en": "Back to Problem"
+  },
+  "Best Score Sum": {
+    "ja": "最高得点の合計",
+    "en": "Best Score Sum"
+  },
+  "binary": {
+    "ja": "全通過で100点",
+    "en": "All or Nothing"
+  },
+  "Binary scoring (all groups must pass)": {
+    "ja": "全グループ通過で100点",
+    "en": "Binary scoring (all groups must pass)"
+  },
+  "Bio": {
+    "ja": "自己紹介",
+    "en": "Bio"
+  },
+  "blank = binary": {
+    "ja": "空欄 = 全通過で100点",
+    "en": "blank = binary"
+  },
+  "Body": {
+    "ja": "本文",
+    "en": "Body"
+  },
+  "Building package ZIP...": {
+    "ja": "パッケージZIPを作成中...",
+    "en": "Building package ZIP..."
+  },
+  "by word": {
+    "ja": "単語単位",
+    "en": "by word"
+  },
+  "bytes / Files:": {
+    "ja": "バイト / ファイル数:",
+    "en": "bytes / Files:"
+  },
+  "c1000 or none": {
+    "ja": "c1000 または空欄",
+    "en": "c1000 or none"
+  },
+  "CANCELLED": {
+    "ja": "キャンセル",
+    "en": "CANCELLED"
+  },
+  "cannot freeze admin user": {
+    "ja": "管理者は凍結できません。",
+    "en": "cannot freeze admin user"
+  },
+  "cannot join an ended contest": {
+    "ja": "終了したコンテストには参加できません。",
+    "en": "cannot join an ended contest"
+  },
+  "cannot unfreeze admin user": {
+    "ja": "管理者の凍結状態は変更できません。",
+    "en": "cannot unfreeze admin user"
+  },
+  "cannot update admin role": {
+    "ja": "管理者の権限は変更できません。",
+    "en": "cannot update admin role"
+  },
+  "Case": {
+    "ja": "ケース",
+    "en": "Case"
+  },
+  "Case Index Only": {
+    "ja": "ケース番号のみ",
+    "en": "Case Index Only"
+  },
+  "Case List": {
+    "ja": "ケース一覧",
+    "en": "Case List"
+  },
+  "Case Name": {
+    "ja": "ケース名",
+    "en": "Case Name"
+  },
+  "Case Name Visible": {
+    "ja": "ケース名も表示",
+    "en": "Case Name Visible"
+  },
+  "case_index_only (default)": {
+    "ja": "ケース番号のみ（標準）",
+    "en": "Case Index Only (Default)"
+  },
+  "case_name_visible": {
+    "ja": "ケース名も表示",
+    "en": "Case Names Visible"
+  },
+  "Cases:": {
+    "ja": "ケース数:",
+    "en": "Cases:"
+  },
+  "Chapter not found.": {
+    "ja": "章が見つかりません。",
+    "en": "Chapter not found."
+  },
+  "Checker Language": {
+    "ja": "checkerの言語",
+    "en": "Checker Language"
+  },
+  "Checker Source Code": {
+    "ja": "checkerのソースコード",
+    "en": "Checker Source Code"
+  },
+  "Checker Type": {
+    "ja": "ジャッジ方式",
+    "en": "Checker Type"
+  },
+  "Clear Package": {
+    "ja": "パッケージを解除",
+    "en": "Clear Package"
+  },
+  "close": {
+    "ja": "閉じる",
+    "en": "close"
+  },
+  "Code block options must be: run id=<unique-id>.": {
+    "ja": "コードブロックの指定はrun id=<unique-id>にしてください。",
+    "en": "Code block options must be: run id=<unique-id>."
+  },
+  "Code Cell {id} Settings": {
+    "ja": "実行欄 {id} の設定",
+    "en": "Code Cell {id} Settings"
+  },
+  "Compare Mode": {
+    "ja": "比較方式",
+    "en": "Compare Mode"
+  },
+  "compile failed": {
+    "ja": "コンパイルに失敗しました。",
+    "en": "compile failed"
+  },
+  "compile timeout": {
+    "ja": "コンパイルがタイムアウトしました。",
+    "en": "compile timeout"
+  },
+  "compiler memory limit exceeded": {
+    "ja": "コンパイラのメモリ制限を超えました。",
+    "en": "compiler memory limit exceeded"
+  },
+  "compiler resource limit exceeded": {
+    "ja": "コンパイラのリソース制限を超えました。",
+    "en": "compiler resource limit exceeded"
+  },
+  "COMPILING": {
+    "ja": "コンパイル中",
+    "en": "COMPILING"
+  },
+  "Completions": {
+    "ja": "入力候補",
+    "en": "Completions"
+  },
+  "Config: TL": {
+    "ja": "設定: 制限時間",
+    "en": "Config: TL"
+  },
+  "config.groups[*].score is omitted, so scoringType is treated as binary (all groups must pass for 100 points).": {
+    "ja": "部分点が未設定のため、全グループ通過で100点として採点します。",
+    "en": "config.groups[*].score is omitted, so scoringType is treated as binary (all groups must pass for 100 points)."
+  },
+  "config.groups[*].score is set, so scoringType is treated as sum_of_groups.": {
+    "ja": "部分点が設定されているため、グループ別部分点として採点します。",
+    "en": "config.groups[*].score is set, so scoringType is treated as sum_of_groups."
+  },
+  "config.groups[*].score must be either set for all groups or omitted for all groups": {
+    "ja": "部分点は全グループに設定するか、全グループで省略してください。",
+    "en": "config.groups[*].score must be either set for all groups or omitted for all groups"
+  },
+  "Constraints": {
+    "ja": "制約",
+    "en": "Constraints"
+  },
+  "contest": {
+    "ja": "コンテスト",
+    "en": "Contest"
+  },
+  "Contest Controls": {
+    "ja": "コンテスト管理",
+    "en": "Contest Controls"
+  },
+  "contest creation failed": {
+    "ja": "コンテストの作成に失敗しました。",
+    "en": "contest creation failed"
+  },
+  "contest creation requires contest_organizer role": {
+    "ja": "コンテストの作成にはcontest_organizer権限が必要です。",
+    "en": "contest creation requires contest_organizer role"
+  },
+  "Contest ID": {
+    "ja": "コンテストID",
+    "en": "Contest ID"
+  },
+  "contest join failed": {
+    "ja": "コンテストへの参加に失敗しました。",
+    "en": "contest join failed"
+  },
+  "contest not found": {
+    "ja": "コンテストが見つかりません。",
+    "en": "contest not found"
+  },
+  "contest problem not found": {
+    "ja": "コンテストの問題が見つかりません。",
+    "en": "contest problem not found"
+  },
+  "Contest State": {
+    "ja": "コンテストの状態",
+    "en": "Contest State"
+  },
+  "Contest submission mode: contestId=": {
+    "ja": "コンテスト提出モード: contestId=",
+    "en": "Contest submission mode: contestId="
+  },
+  "Contest Submissions": {
+    "ja": "コンテストでの提出数",
+    "en": "Contest Submissions"
+  },
+  "contest submissions are allowed only while running": {
+    "ja": "コンテストへの提出は開催中のみ可能です。",
+    "en": "contest submissions are allowed only while running"
+  },
+  "contest update failed": {
+    "ja": "コンテストの更新に失敗しました。",
+    "en": "contest update failed"
+  },
+  "contest_end": {
+    "ja": "コンテスト終了後",
+    "en": "After Contest End"
+  },
+  "contest_organizer": {
+    "ja": "コンテスト主催者",
+    "en": "Contest Organizer"
+  },
+  "Contests": {
+    "ja": "コンテスト",
+    "en": "Contests"
+  },
+  "Control character": {
+    "ja": "制御文字",
+    "en": "Control character"
+  },
+  "Correct answer must reference an option.": {
+    "ja": "正解には既存の選択肢を指定してください。",
+    "en": "Correct answer must reference an option."
+  },
+  "Count": {
+    "ja": "件数",
+    "en": "Count"
+  },
+  "Course not found or not editable.": {
+    "ja": "コースが存在しないか、編集できません。",
+    "en": "Course not found or not editable."
+  },
+  "Course not found.": {
+    "ja": "コースが見つかりません。",
+    "en": "Course not found."
+  },
+  "Course version not found.": {
+    "ja": "コースの指定された版が見つかりません。",
+    "en": "Course version not found."
+  },
+  "cpp": {
+    "ja": "C++",
+    "en": "C++"
+  },
+  "Create": {
+    "ja": "作成",
+    "en": "Create"
+  },
+  "Create a new problem, import a ZIP to auto-fill fields, or build test groups and cases manually on the page.": {
+    "ja": "新しい問題を作成します。ZIPから項目を自動入力したり、グループやケースを手動で作成できます。",
+    "en": "Create a new problem, import a ZIP to auto-fill fields, or build test groups and cases manually on the page."
+  },
+  "Create Contest": {
+    "ja": "コンテストを作成",
+    "en": "Create Contest"
+  },
+  "Create Problem": {
+    "ja": "問題を作成",
+    "en": "Create Problem"
+  },
+  "Create Report": {
+    "ja": "通報を作成",
+    "en": "Create Report"
+  },
+  "Created": {
+    "ja": "作成日時",
+    "en": "Created"
+  },
+  "Created:": {
+    "ja": "作成日時:",
+    "en": "Created:"
+  },
+  "current match": {
+    "ja": "現在の一致",
+    "en": "current match"
+  },
+  "Current visibility:": {
+    "ja": "現在の公開範囲:",
+    "en": "Current visibility:"
+  },
+  "Dashboard": {
+    "ja": "ダッシュボード",
+    "en": "Dashboard"
+  },
+  "Dashboardへ戻る": {
+    "ja": "Dashboardへ戻る",
+    "en": "Back to Dashboard"
+  },
+  "Date and Time": {
+    "ja": "日時",
+    "en": "Date and Time"
+  },
+  "Delete": {
+    "ja": "削除",
+    "en": "Delete"
+  },
+  "Delete contest {title}? Contest reports will be removed and contest submissions will be detached from the contest.": {
+    "ja": "コンテスト「{title}」を削除しますか？通報は削除され、提出はコンテストから切り離されます。",
+    "en": "Delete contest {title}? Contest reports will be removed and contest submissions will be detached from the contest."
+  },
+  "Delete Problem": {
+    "ja": "問題を削除",
+    "en": "Delete Problem"
+  },
+  "Delete problem {title}? Related submissions and reports will also be removed.": {
+    "ja": "問題「{title}」を削除しますか？関連する提出と通報も削除されます。",
+    "en": "Delete problem {title}? Related submissions and reports will also be removed."
+  },
+  "Describe what should be checked by moderators.": {
+    "ja": "管理者に確認してほしい内容を入力してください。",
+    "en": "Describe what should be checked by moderators."
+  },
+  "Detail": {
+    "ja": "詳細",
+    "en": "Detail"
+  },
+  "Difficulty": {
+    "ja": "難易度",
+    "en": "Difficulty"
+  },
+  "Difficulty (AtCoder rating)": {
+    "ja": "難易度（AtCoderレーティング）",
+    "en": "Difficulty (AtCoder rating)"
+  },
+  "Difficulty must be an integer.": {
+    "ja": "難易度は整数で入力してください。",
+    "en": "Difficulty must be an integer."
+  },
+  "Difficulty:": {
+    "ja": "難易度:",
+    "en": "Difficulty:"
+  },
+  "directory.": {
+    "ja": "ディレクトリ内です。",
+    "en": "directory."
+  },
+  "Display language": {
+    "ja": "表示言語",
+    "en": "Display language"
+  },
+  "Display Name": {
+    "ja": "表示名",
+    "en": "Display Name"
+  },
+  "Display Name can be changed once every 30 days (next: {date}).": {
+    "ja": "表示名は30日に1回変更できます（次回: {date}）。",
+    "en": "Display Name can be changed once every 30 days (next: {date})."
+  },
+  "Display Name:": {
+    "ja": "表示名:",
+    "en": "Display Name:"
+  },
+  "displayName must be unique": {
+    "ja": "この表示名は既に使われています。",
+    "en": "displayName must be unique"
+  },
+  "Down": {
+    "ja": "下へ",
+    "en": "Down"
+  },
+  "Download Stored ZIP": {
+    "ja": "保存済みZIPをダウンロード",
+    "en": "Download Stored ZIP"
+  },
+  "Download ZIP": {
+    "ja": "ZIPをダウンロード",
+    "en": "Download ZIP"
+  },
+  "draft is required": {
+    "ja": "下書きが必要です。",
+    "en": "draft is required"
+  },
+  "Duplicate chapter/item ID: {id}": {
+    "ja": "章または項目のIDが重複しています: {id}",
+    "en": "Duplicate chapter/item ID: {id}"
+  },
+  "Duplicate code cell ID: {id}": {
+    "ja": "実行欄IDが重複しています: {id}",
+    "en": "Duplicate code cell ID: {id}"
+  },
+  "Duplicate option ID.": {
+    "ja": "選択肢IDが重複しています。",
+    "en": "Duplicate option ID."
+  },
+  "Duplicate question ID.": {
+    "ja": "設問IDが重複しています。",
+    "en": "Duplicate question ID."
+  },
+  "Each chapter needs 1-50 items.": {
+    "ja": "各章には1〜50項目が必要です。",
+    "en": "Each chapter needs 1-50 items."
+  },
+  "Edit": {
+    "ja": "編集",
+    "en": "Edit"
+  },
+  "Edit Contest": {
+    "ja": "コンテストを編集",
+    "en": "Edit Contest"
+  },
+  "Edit Problem": {
+    "ja": "問題を編集",
+    "en": "Edit Problem"
+  },
+  "Embedded problem packages can be reconstructed as ZIP and uploaded to R2.": {
+    "ja": "DB内の問題パッケージをZIPに再構成してR2にアップロードできます。",
+    "en": "Embedded problem packages can be reconstructed as ZIP and uploaded to R2."
+  },
+  "Ended": {
+    "ja": "終了",
+    "en": "Ended"
+  },
+  "Every runnable code block needs a stable id, e.g. python run id=hello.": {
+    "ja": "各実行コードに固定IDが必要です（例: python run id=hello）。",
+    "en": "Every runnable code block needs a stable id, e.g. python run id=hello."
+  },
+  "exact": {
+    "ja": "完全一致",
+    "en": "Exact Match"
+  },
+  "Expanded ZIP exceeds 2 MiB.": {
+    "ja": "展開後のZIPが2 MiBを超えています。",
+    "en": "Expanded ZIP exceeds 2 MiB."
+  },
+  "Expected an object.": {
+    "ja": "オブジェクト形式のデータが必要です。",
+    "en": "Expected an object."
+  },
+  "Expected Output": {
+    "ja": "期待する出力",
+    "en": "Expected Output"
+  },
+  "Expected output differs.": {
+    "ja": "期待する出力と一致しません。",
+    "en": "Expected output differs."
+  },
+  "Explanation": {
+    "ja": "解説",
+    "en": "Explanation"
+  },
+  "Explanation Visibility": {
+    "ja": "解説の公開条件",
+    "en": "Explanation Visibility"
+  },
+  "Explanation Visibility:": {
+    "ja": "解説の公開条件:",
+    "en": "Explanation Visibility:"
+  },
+  "Explanation:": {
+    "ja": "解説:",
+    "en": "Explanation:"
+  },
+  "explanationMarkdown is required": {
+    "ja": "解説を入力してください。",
+    "en": "explanationMarkdown is required"
+  },
+  "Exporting...": {
+    "ja": "書き出し中...",
+    "en": "Exporting..."
+  },
+  "Fail:": {
+    "ja": "失敗:",
+    "en": "Fail:"
+  },
+  "failed to add contest problem": {
+    "ja": "コンテストへの問題追加に失敗しました。",
+    "en": "failed to add contest problem"
+  },
+  "failed to create announcement": {
+    "ja": "お知らせの作成に失敗しました。",
+    "en": "failed to create announcement"
+  },
+  "failed to delete contest": {
+    "ja": "コンテストの削除に失敗しました。",
+    "en": "failed to delete contest"
+  },
+  "failed to delete problem": {
+    "ja": "問題の削除に失敗しました。",
+    "en": "failed to delete problem"
+  },
+  "failed to download problem package": {
+    "ja": "問題パッケージのダウンロードに失敗しました。",
+    "en": "failed to download problem package"
+  },
+  "failed to enqueue problem package validation": {
+    "ja": "パッケージ検証のキュー登録に失敗しました。",
+    "en": "failed to enqueue problem package validation"
+  },
+  "failed to export problem package": {
+    "ja": "問題パッケージの書き出しに失敗しました。",
+    "en": "failed to export problem package"
+  },
+  "failed to fetch announcements": {
+    "ja": "お知らせの取得に失敗しました。",
+    "en": "failed to fetch announcements"
+  },
+  "failed to fetch contest": {
+    "ja": "コンテストの取得に失敗しました。",
+    "en": "failed to fetch contest"
+  },
+  "failed to fetch contests": {
+    "ja": "コンテスト一覧の取得に失敗しました。",
+    "en": "failed to fetch contests"
+  },
+  "failed to fetch current user": {
+    "ja": "ユーザー情報の取得に失敗しました。",
+    "en": "failed to fetch current user"
+  },
+  "failed to fetch judge queue stats": {
+    "ja": "ジャッジキューの情報取得に失敗しました。",
+    "en": "failed to fetch judge queue stats"
+  },
+  "failed to fetch package job": {
+    "ja": "パッケージジョブの取得に失敗しました。",
+    "en": "failed to fetch package job"
+  },
+  "failed to fetch problem": {
+    "ja": "問題の取得に失敗しました。",
+    "en": "failed to fetch problem"
+  },
+  "failed to fetch problem explanation": {
+    "ja": "解説の取得に失敗しました。",
+    "en": "failed to fetch problem explanation"
+  },
+  "failed to fetch problems": {
+    "ja": "問題一覧の取得に失敗しました。",
+    "en": "failed to fetch problems"
+  },
+  "failed to fetch reports": {
+    "ja": "通報の取得に失敗しました。",
+    "en": "failed to fetch reports"
+  },
+  "failed to fetch scoreboard": {
+    "ja": "順位表の取得に失敗しました。",
+    "en": "failed to fetch scoreboard"
+  },
+  "failed to fetch submission": {
+    "ja": "提出の取得に失敗しました。",
+    "en": "failed to fetch submission"
+  },
+  "failed to fetch submissions": {
+    "ja": "提出一覧の取得に失敗しました。",
+    "en": "failed to fetch submissions"
+  },
+  "failed to freeze user": {
+    "ja": "ユーザーの凍結に失敗しました。",
+    "en": "failed to freeze user"
+  },
+  "failed to hide announcement": {
+    "ja": "お知らせの非表示処理に失敗しました。",
+    "en": "failed to hide announcement"
+  },
+  "failed to hide contest": {
+    "ja": "コンテストの非公開処理に失敗しました。",
+    "en": "failed to hide contest"
+  },
+  "failed to hide problem": {
+    "ja": "問題の非公開処理に失敗しました。",
+    "en": "failed to hide problem"
+  },
+  "failed to hide problem explanation": {
+    "ja": "解説の非公開処理に失敗しました。",
+    "en": "failed to hide problem explanation"
+  },
+  "failed to inspect problem package": {
+    "ja": "問題パッケージの確認に失敗しました。",
+    "en": "failed to inspect problem package"
+  },
+  "failed to inspect ZIP package": {
+    "ja": "ZIPパッケージの確認に失敗しました。",
+    "en": "failed to inspect ZIP package"
+  },
+  "failed to join contest": {
+    "ja": "コンテストへの参加に失敗しました。",
+    "en": "failed to join contest"
+  },
+  "failed to load package manifest": {
+    "ja": "パッケージ情報の読み込みに失敗しました。",
+    "en": "failed to load package manifest"
+  },
+  "failed to load package test case": {
+    "ja": "テストケースの読み込みに失敗しました。",
+    "en": "failed to load package test case"
+  },
+  "failed to load problem samples": {
+    "ja": "サンプルの読み込みに失敗しました。",
+    "en": "failed to load problem samples"
+  },
+  "failed to load stored package": {
+    "ja": "保存済みパッケージの読み込みに失敗しました。",
+    "en": "failed to load stored package"
+  },
+  "failed to load test case": {
+    "ja": "テストケースの読み込みに失敗しました。",
+    "en": "failed to load test case"
+  },
+  "failed to migrate problem packages to object storage": {
+    "ja": "問題パッケージのストレージ移行に失敗しました。",
+    "en": "failed to migrate problem packages to object storage"
+  },
+  "failed to publish contest": {
+    "ja": "コンテストの公開に失敗しました。",
+    "en": "failed to publish contest"
+  },
+  "failed to publish problem": {
+    "ja": "問題の公開に失敗しました。",
+    "en": "failed to publish problem"
+  },
+  "failed to remove contest problem": {
+    "ja": "コンテストからの問題削除に失敗しました。",
+    "en": "failed to remove contest problem"
+  },
+  "failed to repair judge queue": {
+    "ja": "ジャッジキューの修復に失敗しました。",
+    "en": "failed to repair judge queue"
+  },
+  "failed to resolve report": {
+    "ja": "通報の解決処理に失敗しました。",
+    "en": "failed to resolve report"
+  },
+  "failed to run package test": {
+    "ja": "パッケージのテストに失敗しました。",
+    "en": "failed to run package test"
+  },
+  "failed to save manual problem package": {
+    "ja": "手動パッケージの保存に失敗しました。",
+    "en": "failed to save manual problem package"
+  },
+  "failed to save problem": {
+    "ja": "問題の保存に失敗しました。",
+    "en": "failed to save problem"
+  },
+  "failed to unfreeze user": {
+    "ja": "ユーザーの凍結解除に失敗しました。",
+    "en": "failed to unfreeze user"
+  },
+  "failed to unpublish contest": {
+    "ja": "コンテストの公開停止に失敗しました。",
+    "en": "failed to unpublish contest"
+  },
+  "failed to unpublish problem": {
+    "ja": "問題の公開停止に失敗しました。",
+    "en": "failed to unpublish problem"
+  },
+  "failed to update problem explanation": {
+    "ja": "解説の更新に失敗しました。",
+    "en": "failed to update problem explanation"
+  },
+  "failed to update profile": {
+    "ja": "プロフィールの更新に失敗しました。",
+    "en": "failed to update profile"
+  },
+  "failed to update report status": {
+    "ja": "通報の状態更新に失敗しました。",
+    "en": "failed to update report status"
+  },
+  "failed to update user role": {
+    "ja": "ユーザー権限の更新に失敗しました。",
+    "en": "failed to update user role"
+  },
+  "failed to upload problem package": {
+    "ja": "問題パッケージのアップロードに失敗しました。",
+    "en": "failed to upload problem package"
+  },
+  "failed to validate problem package": {
+    "ja": "問題パッケージの検証に失敗しました。",
+    "en": "failed to validate problem package"
+  },
+  "File:": {
+    "ja": "ファイル:",
+    "en": "File:"
+  },
+  "fileName is required": {
+    "ja": "ファイル名が必要です。",
+    "en": "fileName is required"
+  },
+  "Files:": {
+    "ja": "ファイル数:",
+    "en": "Files:"
+  },
+  "Filter by user/problem/contest/status/language. Source code is visible only to submitter and admin.": {
+    "ja": "ユーザー・問題・コンテスト・判定・言語で絞り込めます。ソースコードは提出者と管理者のみ閲覧できます。",
+    "en": "Filter by user/problem/contest/status/language. Source code is visible only to submitter and admin."
+  },
+  "Filters": {
+    "ja": "絞り込み",
+    "en": "Filters"
+  },
+  "Find": {
+    "ja": "検索",
+    "en": "Find"
+  },
+  "First login creates your user account automatically.": {
+    "ja": "初回ログイン時にアカウントが自動作成されます。",
+    "en": "First login creates your user account automatically."
+  },
+  "First Submission": {
+    "ja": "最初の提出",
+    "en": "First Submission"
+  },
+  "folded code": {
+    "ja": "折りたたんだコード",
+    "en": "folded code"
+  },
+  "For special judge, set": {
+    "ja": "スペシャルジャッジの場合は、次を設定してください：",
+    "en": "For special judge, set"
+  },
+  "Freeze": {
+    "ja": "凍結",
+    "en": "Freeze"
+  },
+  "frozen": {
+    "ja": "凍結中",
+    "en": "Frozen"
+  },
+  "full": {
+    "ja": "詳細を表示",
+    "en": "Full"
+  },
+  "GitHub": {
+    "ja": "GitHub",
+    "en": "GitHub"
+  },
+  "global": {
+    "ja": "グローバルナビゲーション",
+    "en": "Main Navigation"
+  },
+  "go": {
+    "ja": "移動",
+    "en": "go"
+  },
+  "Go to line": {
+    "ja": "行に移動",
+    "en": "Go to line"
+  },
+  "Group List": {
+    "ja": "グループ一覧",
+    "en": "Group List"
+  },
+  "Group Name": {
+    "ja": "グループ名",
+    "en": "Group Name"
+  },
+  "Group Only": {
+    "ja": "グループのみ",
+    "en": "Group Only"
+  },
+  "Group partial scores are optional. If you set `groups[].score`, every group must have it and total score must be exactly 100. If omitted, the judge uses binary scoring (all groups passed = 100).": {
+    "ja": "グループの部分点は任意です。`groups[].score`を設定する場合は全グループに指定し、合計を100点にしてください。省略時は全グループ通過で100点になります。",
+    "en": "Group partial scores are optional. If you set `groups[].score`, every group must have it and total score must be exactly 100. If omitted, the judge uses binary scoring (all groups passed = 100)."
+  },
+  "group_only": {
+    "ja": "グループのみ",
+    "en": "Groups Only"
+  },
+  "groupName and caseName are required": {
+    "ja": "グループ名とケース名が必要です。",
+    "en": "groupName and caseName are required"
+  },
+  "Groups": {
+    "ja": "グループ",
+    "en": "Groups"
+  },
+  "groups,": {
+    "ja": "グループ、",
+    "en": "groups,"
+  },
+  "Groups:": {
+    "ja": "グループ数:",
+    "en": "Groups:"
+  },
+  "Guest": {
+    "ja": "ゲスト",
+    "en": "Guest"
+  },
+  "hidden": {
+    "ja": "非表示",
+    "en": "hidden"
+  },
+  "Hidden": {
+    "ja": "非表示",
+    "en": "Hidden"
+  },
+  "Hide": {
+    "ja": "非表示にする",
+    "en": "Hide"
+  },
+  "Hide Explanation": {
+    "ja": "解説を非公開にする",
+    "en": "Hide Explanation"
+  },
+  "Hide Problem": {
+    "ja": "問題を非公開にする",
+    "en": "Hide Problem"
+  },
+  "ID": {
+    "ja": "ID",
+    "en": "ID"
+  },
+  "IDs may contain letters, digits, _ and - only and must not use reserved names.": {
+    "ja": "IDは英数字・_・-のみ使用でき、予約名は使えません。",
+    "en": "IDs may contain letters, digits, _ and - only and must not use reserved names."
+  },
+  "ignore_trailing_spaces": {
+    "ja": "行末の空白を無視",
+    "en": "Ignore Trailing Spaces"
+  },
+  "Import ZIP": {
+    "ja": "ZIPをインポート",
+    "en": "Import ZIP"
+  },
+  "In": {
+    "ja": "入力",
+    "en": "In"
+  },
+  "Individual test cases are hidden by test case visibility policy.": {
+    "ja": "公開設定により個別のテストケースは表示されません。",
+    "en": "Individual test cases are hidden by test case visibility policy."
+  },
+  "Input": {
+    "ja": "入力",
+    "en": "Input"
+  },
+  "Input Description": {
+    "ja": "入力形式",
+    "en": "Input Description"
+  },
+  "Insert {language} Code Cell": {
+    "ja": "{language}の実行欄を挿入",
+    "en": "Insert {language} Code Cell"
+  },
+  "Inspecting ZIP...": {
+    "ja": "ZIPを確認中...",
+    "en": "Inspecting ZIP..."
+  },
+  "Invalid chapter.": {
+    "ja": "章のデータが正しくありません。",
+    "en": "Invalid chapter."
+  },
+  "Invalid item kind.": {
+    "ja": "教材項目の種類が正しくありません。",
+    "en": "Invalid item kind."
+  },
+  "Invalid JSON request.": {
+    "ja": "JSONが正しくありません。",
+    "en": "Invalid JSON request."
+  },
+  "Invalid learning document.": {
+    "ja": "教材データが正しくありません。",
+    "en": "Invalid learning document."
+  },
+  "Invalid lesson object.": {
+    "ja": "教材データが正しくありません。",
+    "en": "Invalid lesson object."
+  },
+  "Invalid lesson storage key.": {
+    "ja": "教材の保存キーが正しくありません。",
+    "en": "Invalid lesson storage key."
+  },
+  "Invalid Markdown": {
+    "ja": "Markdownが正しくありません。",
+    "en": "Invalid Markdown"
+  },
+  "Invalid Markdown path.": {
+    "ja": "Markdownのパスが正しくありません。",
+    "en": "Invalid Markdown path."
+  },
+  "invalid role for manual assignment": {
+    "ja": "指定した権限を割り当てることはできません。",
+    "en": "invalid role for manual assignment"
+  },
+  "Invalid sandbox configuration.": {
+    "ja": "実行環境の設定が正しくありません。",
+    "en": "Invalid sandbox configuration."
+  },
+  "Invalid scoring: set all group scores or none": {
+    "ja": "部分点は全グループに設定するか、すべて空欄にしてください。",
+    "en": "Invalid scoring: set all group scores or none"
+  },
+  "Invalid visibility.": {
+    "ja": "公開範囲の設定が正しくありません。",
+    "en": "Invalid visibility."
+  },
+  "Invalid ZIP entry size.": {
+    "ja": "ZIP内のファイルサイズが正しくありません。",
+    "en": "Invalid ZIP entry size."
+  },
+  "Investigate": {
+    "ja": "調査中にする",
+    "en": "Investigate"
+  },
+  "investigating": {
+    "ja": "調査中",
+    "en": "Investigating"
+  },
+  "Item and version are required.": {
+    "ja": "教材項目と版を指定してください。",
+    "en": "Item and version are required."
+  },
+  "java": {
+    "ja": "Java",
+    "en": "Java"
+  },
+  "javascript": {
+    "ja": "JavaScript",
+    "en": "JavaScript"
+  },
+  "Job ID": {
+    "ja": "ジョブID",
+    "en": "Job ID"
+  },
+  "Join Contest": {
+    "ja": "コンテストに参加",
+    "en": "Join Contest"
+  },
+  "Joined Contests": {
+    "ja": "参加したコンテスト",
+    "en": "Joined Contests"
+  },
+  "Joining...": {
+    "ja": "参加処理中...",
+    "en": "Joining..."
+  },
+  "Judge Environment:": {
+    "ja": "ジャッジ環境:",
+    "en": "Judge Environment:"
+  },
+  "Judge Package": {
+    "ja": "ジャッジパッケージ",
+    "en": "Judge Package"
+  },
+  "Judge package is required before downloading ZIP.": {
+    "ja": "ZIPのダウンロードにはジャッジパッケージが必要です。",
+    "en": "Judge package is required before downloading ZIP."
+  },
+  "Judge package is required before running a local test.": {
+    "ja": "テストを実行するにはジャッジパッケージが必要です。",
+    "en": "Judge package is required before running a local test."
+  },
+  "Judge package is required.": {
+    "ja": "ジャッジパッケージが必要です。",
+    "en": "Judge package is required."
+  },
+  "Judge Queue": {
+    "ja": "ジャッジキュー",
+    "en": "Judge Queue"
+  },
+  "Judge Settings": {
+    "ja": "ジャッジ設定",
+    "en": "Judge Settings"
+  },
+  "Judge Start:": {
+    "ja": "ジャッジ開始:",
+    "en": "Judge Start:"
+  },
+  "judge update": {
+    "ja": "ジャッジの更新",
+    "en": "judge update"
+  },
+  "JUDGING": {
+    "ja": "判定中",
+    "en": "JUDGING"
+  },
+  "KB": {
+    "ja": "KB",
+    "en": "KB"
+  },
+  "Label": {
+    "ja": "ラベル",
+    "en": "Label"
+  },
+  "label already used in contest": {
+    "ja": "この問題ラベルは既に使われています。",
+    "en": "label already used in contest"
+  },
+  "Language": {
+    "ja": "言語",
+    "en": "Language"
+  },
+  "Language Breakdown": {
+    "ja": "言語別統計",
+    "en": "Language Breakdown"
+  },
+  "Language could not be saved. Please try again.": {
+    "ja": "言語設定を保存できませんでした。もう一度お試しください。",
+    "en": "Language could not be saved. Please try again."
+  },
+  "Language:": {
+    "ja": "言語:",
+    "en": "Language:"
+  },
+  "Large existing packages are loaded lazily. Test case contents are fetched only when selected, and names stay read-only until all cases are loaded.": {
+    "ja": "大きなパッケージは必要時に読み込みます。ケース内容は選択時に取得し、全ケースを読み込むまで名前は変更できません。",
+    "en": "Large existing packages are loaded lazily. Test case contents are fetched only when selected, and names stay read-only until all cases are loaded."
+  },
+  "Last Submission": {
+    "ja": "最後の提出",
+    "en": "Last Submission"
+  },
+  "Latest platform updates and moderation notices.": {
+    "ja": "更新情報と管理者からのお知らせです。",
+    "en": "Latest platform updates and moderation notices."
+  },
+  "Latest Submissions": {
+    "ja": "最新の提出",
+    "en": "Latest Submissions"
+  },
+  "Learn": {
+    "ja": "学習",
+    "en": "Learn"
+  },
+  "Learning item not found.": {
+    "ja": "教材項目が見つかりません。",
+    "en": "Learning item not found."
+  },
+  "Learning ZIP must be at most 2 MiB.": {
+    "ja": "教材ZIPは2 MiB以下にしてください。",
+    "en": "Learning ZIP must be at most 2 MiB."
+  },
+  "Lesson object exceeds 1 MiB.": {
+    "ja": "教材データが1 MiBを超えています。",
+    "en": "Lesson object exceeds 1 MiB."
+  },
+  "Lessons are completed with the read action.": {
+    "ja": "教材は「読了にする」で完了できます。",
+    "en": "Lessons are completed with the read action."
+  },
+  "Limit": {
+    "ja": "表示件数",
+    "en": "Limit"
+  },
+  "Limits": {
+    "ja": "実行制限",
+    "en": "Limits"
+  },
+  "Live Preview": {
+    "ja": "ライブプレビュー",
+    "en": "Live Preview"
+  },
+  "Load All Cases": {
+    "ja": "全ケースを読み込む",
+    "en": "Load All Cases"
+  },
+  "Load Existing Package": {
+    "ja": "既存パッケージを読み込む",
+    "en": "Load Existing Package"
+  },
+  "Load Existing Package First": {
+    "ja": "先に既存パッケージを読み込んでください",
+    "en": "Load Existing Package First"
+  },
+  "Loaded package metadata. Individual test cases will be fetched only when selected.": {
+    "ja": "パッケージ情報を読み込みました。個別ケースは選択時に取得します。",
+    "en": "Loaded package metadata. Individual test cases will be fetched only when selected."
+  },
+  "Loading All Cases...": {
+    "ja": "全ケースを読み込み中...",
+    "en": "Loading All Cases..."
+  },
+  "Loading Package Metadata...": {
+    "ja": "パッケージ情報を読み込み中...",
+    "en": "Loading Package Metadata..."
+  },
+  "Loading samples...": {
+    "ja": "サンプルを読み込み中...",
+    "en": "Loading samples..."
+  },
+  "Loading selected test case on demand...": {
+    "ja": "選択したテストケースを必要時に読み込みます...",
+    "en": "Loading selected test case on demand..."
+  },
+  "Loading selected test case...": {
+    "ja": "選択したテストケースを読み込み中...",
+    "en": "Loading selected test case..."
+  },
+  "Loading stored package manifest...": {
+    "ja": "保存済みパッケージの情報を読み込み中...",
+    "en": "Loading stored package manifest..."
+  },
+  "Maintenance notice": {
+    "ja": "メンテナンスのお知らせ",
+    "en": "Maintenance notice"
+  },
+  "manual review": {
+    "ja": "手動確認",
+    "en": "manual review"
+  },
+  "manual-package": {
+    "ja": "manual-package",
+    "en": "manual-package"
+  },
+  "Markdown Editor": {
+    "ja": "Markdownエディター",
+    "en": "Markdown Editor"
+  },
+  "Markdownは256 KiB以下にしてください。": {
+    "ja": "Markdownは256 KiB以下にしてください。",
+    "en": "Markdown must be at most 256 KiB."
+  },
+  "Markdownを保存して公開中…": {
+    "ja": "Markdownを保存して公開中…",
+    "en": "Saving Markdown and publishing…"
+  },
+  "match case": {
+    "ja": "大文字と小文字を区別",
+    "en": "match case"
+  },
+  "MB": {
+    "ja": "MB",
+    "en": "MB"
+  },
+  "MB /": {
+    "ja": "MB /",
+    "en": "MB /"
+  },
+  "MB)": {
+    "ja": "MB)",
+    "en": "MB)"
+  },
+  "Memory": {
+    "ja": "メモリ",
+    "en": "Memory"
+  },
+  "Memory Limit (MB)": {
+    "ja": "メモリ制限（MB）",
+    "en": "Memory Limit (MB)"
+  },
+  "Memory limit exceeded.": {
+    "ja": "メモリ制限を超えました。",
+    "en": "Memory limit exceeded."
+  },
+  "Memory Limit:": {
+    "ja": "メモリ制限:",
+    "en": "Memory Limit:"
+  },
+  "Memory:": {
+    "ja": "メモリ:",
+    "en": "Memory:"
+  },
+  "Message": {
+    "ja": "メッセージ",
+    "en": "Message"
+  },
+  "Migrate Problem ZIPs to R2": {
+    "ja": "問題ZIPをR2へ移行",
+    "en": "Migrate Problem ZIPs to R2"
+  },
+  "Mine": {
+    "ja": "自分の提出",
+    "en": "Mine"
+  },
+  "minutes": {
+    "ja": "分",
+    "en": "minutes"
+  },
+  "Missing Markdown file: {path}": {
+    "ja": "Markdownファイルが見つかりません: {path}",
+    "en": "Missing Markdown file: {path}"
+  },
+  "ms": {
+    "ja": "ms",
+    "en": "ms"
+  },
+  "ms /": {
+    "ja": "ms /",
+    "en": "ms /"
+  },
+  "ms / Memory:": {
+    "ja": "ms / メモリ:",
+    "en": "ms / Memory:"
+  },
+  "ms / ML": {
+    "ja": "ms / メモリ制限",
+    "en": "ms / ML"
+  },
+  "MVP prototype based on `atcoder_like_platform_spec_draft.md`. You can view recent submissions, contest status, and scoreboard activity here.": {
+    "ja": "最新の提出、コンテストの開催状況、順位表を確認できます。",
+    "en": "MVP prototype based on `atcoder_like_platform_spec_draft.md`. You can view recent submissions, contest status, and scoreboard activity here."
+  },
+  "New Problem": {
+    "ja": "問題を作成",
+    "en": "New Problem"
+  },
+  "next": {
+    "ja": "次へ",
+    "en": "next"
+  },
+  "Next change: {value0}.": {
+    "ja": "次回変更可能日時: {value0}。",
+    "en": "Next change: {value0}."
+  },
+  "no": {
+    "ja": "いいえ",
+    "en": "no"
+  },
+  "No announcements.": {
+    "ja": "お知らせはありません。",
+    "en": "No announcements."
+  },
+  "No changes to save.": {
+    "ja": "変更はありません。",
+    "en": "No changes to save."
+  },
+  "No contests available yet.": {
+    "ja": "コンテストはありません。",
+    "en": "No contests available yet."
+  },
+  "No groups yet.": {
+    "ja": "グループはありません。",
+    "en": "No groups yet."
+  },
+  "No OAuth provider is configured.": {
+    "ja": "ログインプロバイダーが設定されていません。",
+    "en": "No OAuth provider is configured."
+  },
+  "No package is attached yet. Start from a blank manual package or import a ZIP.": {
+    "ja": "パッケージは未設定です。空のパッケージを作成するか、ZIPをインポートしてください。",
+    "en": "No package is attached yet. Start from a blank manual package or import a ZIP."
+  },
+  "No queued jobs.": {
+    "ja": "待機中のジョブはありません。",
+    "en": "No queued jobs."
+  },
+  "No rejudge requests yet.": {
+    "ja": "再ジャッジ要求はありません。",
+    "en": "No rejudge requests yet."
+  },
+  "No samples yet. Add at least one sample if you want examples on the problem page.": {
+    "ja": "サンプルはありません。問題ページに例を表示するにはサンプルを追加してください。",
+    "en": "No samples yet. Add at least one sample if you want examples on the problem page."
+  },
+  "No submissions found for the current filter.": {
+    "ja": "指定条件に一致する提出はありません。",
+    "en": "No submissions found for the current filter."
+  },
+  "No submissions yet.": {
+    "ja": "提出はありません。",
+    "en": "No submissions yet."
+  },
+  "No test result data is available.": {
+    "ja": "テスト結果はありません。",
+    "en": "No test result data is available."
+  },
+  "No warnings.": {
+    "ja": "警告はありません。",
+    "en": "No warnings."
+  },
+  "Not Found": {
+    "ja": "ページが見つかりません",
+    "en": "Not Found"
+  },
+  "oauth profile is missing required fields": {
+    "ja": "ログイン情報の必須項目が不足しています。",
+    "en": "oauth profile is missing required fields"
+  },
+  "Object Storage Migration": {
+    "ja": "オブジェクトストレージへの移行",
+    "en": "Object Storage Migration"
+  },
+  "OJP": {
+    "ja": "OJP",
+    "en": "OJP"
+  },
+  "OJP - Online Judge": {
+    "ja": "OJP - オンラインジャッジ",
+    "en": "OJP - Online Judge"
+  },
+  "OJP Beginner Contest 002": {
+    "ja": "OJP ビギナーコンテスト 002",
+    "en": "OJP Beginner Contest 002"
+  },
+  "OJP Dashboard": {
+    "ja": "ダッシュボード",
+    "en": "OJP Dashboard"
+  },
+  "ojp-beginner-contest-002": {
+    "ja": "ojp-beginner-contest-002",
+    "en": "ojp-beginner-contest-002"
+  },
+  "on line": {
+    "ja": "行",
+    "en": "on line"
+  },
+  "Online judge, problems, contests and learning materials.": {
+    "ja": "オンラインジャッジ、問題、コンテスト、学習教材。",
+    "en": "Online judge, problems, contests and learning materials."
+  },
+  "Only me": {
+    "ja": "自分のみ",
+    "en": "Only me"
+  },
+  "Only your accepted submission for this problem can complete this item.": {
+    "ja": "この問題に対する自分のAC提出のみ完了に利用できます。",
+    "en": "Only your accepted submission for this problem can complete this item."
+  },
+  "open": {
+    "ja": "未対応",
+    "en": "Open"
+  },
+  "Open contest and scoreboard": {
+    "ja": "コンテストと順位表を開く",
+    "en": "Open contest and scoreboard"
+  },
+  "Open Created Problem": {
+    "ja": "作成した問題を開く",
+    "en": "Open Created Problem"
+  },
+  "Optional integer value (for example: 400, 800, 1200).": {
+    "ja": "任意の整数を指定できます（例: 400、800、1200）。",
+    "en": "Optional integer value (for example: 400, 800, 1200)."
+  },
+  "optional note": {
+    "ja": "補足（任意）",
+    "en": "optional note"
+  },
+  "or": {
+    "ja": "または",
+    "en": "or"
+  },
+  "Organized Contests": {
+    "ja": "主催したコンテスト",
+    "en": "Organized Contests"
+  },
+  "Orphan Waiting Submission IDs": {
+    "ja": "ジョブのない待機中の提出ID",
+    "en": "Orphan Waiting Submission IDs"
+  },
+  "Orphan waiting submissions:": {
+    "ja": "ジョブのない待機中の提出:",
+    "en": "Orphan waiting submissions:"
+  },
+  "Output": {
+    "ja": "出力",
+    "en": "Output"
+  },
+  "Output Description": {
+    "ja": "出力形式",
+    "en": "Output Description"
+  },
+  "Output limit exceeded (64 KiB).": {
+    "ja": "出力の上限（64 KiB）を超えました。",
+    "en": "Output limit exceeded (64 KiB)."
+  },
+  "Output limit exceeded.": {
+    "ja": "出力制限を超えました。",
+    "en": "Output limit exceeded."
+  },
+  "Overview": {
+    "ja": "概要",
+    "en": "Overview"
+  },
+  "p1000": {
+    "ja": "p1000",
+    "en": "p1000"
+  },
+  "Package editor cleared. This problem will be created without a package.": {
+    "ja": "パッケージを解除しました。パッケージなしで問題を作成します。",
+    "en": "Package editor cleared. This problem will be created without a package."
+  },
+  "Package editor disabled. Existing package stays unchanged on save.": {
+    "ja": "パッケージ編集を解除しました。保存しても既存パッケージは変わりません。",
+    "en": "Package editor disabled. Existing package stays unchanged on save."
+  },
+  "package job failed": {
+    "ja": "パッケージ処理に失敗しました。",
+    "en": "package job failed"
+  },
+  "Package job is queued...": {
+    "ja": "パッケージ処理がキューで待機中...",
+    "en": "Package job is queued..."
+  },
+  "package job not found": {
+    "ja": "パッケージジョブが見つかりません。",
+    "en": "package job not found"
+  },
+  "Package Test Run": {
+    "ja": "パッケージのテスト実行",
+    "en": "Package Test Run"
+  },
+  "Package uploaded. Waiting for worker validation...": {
+    "ja": "アップロード完了。workerの検証を待っています...",
+    "en": "Package uploaded. Waiting for worker validation..."
+  },
+  "Package uploaded. Waiting for worker...": {
+    "ja": "アップロード完了。workerを待っています...",
+    "en": "Package uploaded. Waiting for worker..."
+  },
+  "Package validation completed.": {
+    "ja": "パッケージの検証が完了しました。",
+    "en": "Package validation completed."
+  },
+  "Packaged Problems": {
+    "ja": "パッケージ設定済みの問題",
+    "en": "Packaged Problems"
+  },
+  "pairs": {
+    "ja": "ペア",
+    "en": "pairs"
+  },
+  "pairs / Tests:": {
+    "ja": "ペア / テスト:",
+    "en": "pairs / Tests:"
+  },
+  "partial": {
+    "ja": "概要のみ",
+    "en": "Summary"
+  },
+  "Partial Score": {
+    "ja": "部分点",
+    "en": "Partial Score"
+  },
+  "Partial scoring total={total} (must be 100)": {
+    "ja": "部分点の合計: {total}点（100点にしてください）",
+    "en": "Partial scoring total={total} (must be 100)"
+  },
+  "Partial scoring total=100": {
+    "ja": "部分点の合計: 100点",
+    "en": "Partial scoring total=100"
+  },
+  "Passing percentage must be 1-100.": {
+    "ja": "合格基準は1〜100%で指定してください。",
+    "en": "Passing percentage must be 1-100."
+  },
+  "Passing score: {percent}%. Answers are graded on the server.": {
+    "ja": "合格基準：{percent}%。採点はサーバー側で行います。",
+    "en": "Passing score: {percent}%. Answers are graded on the server."
+  },
+  "Peak Memory": {
+    "ja": "最大メモリ",
+    "en": "Peak Memory"
+  },
+  "Penalty": {
+    "ja": "ペナルティ",
+    "en": "Penalty"
+  },
+  "Penalty (minutes)": {
+    "ja": "ペナルティ（分）",
+    "en": "Penalty (minutes)"
+  },
+  "PENDING": {
+    "ja": "受付中",
+    "en": "PENDING"
+  },
+  "Platform Snapshot": {
+    "ja": "サイトの状況",
+    "en": "Platform Snapshot"
+  },
+  "Post Announcement": {
+    "ja": "お知らせを投稿",
+    "en": "Post Announcement"
+  },
+  "Practice items must reference an existing public problem.": {
+    "ja": "練習問題には既存の公開問題を指定してください。",
+    "en": "Practice items must reference an existing public problem."
+  },
+  "Practice Submissions": {
+    "ja": "練習での提出数",
+    "en": "Practice Submissions"
+  },
+  "Preparing ZIP import...": {
+    "ja": "ZIPのインポートを準備中...",
+    "en": "Preparing ZIP import..."
+  },
+  "Preview completed.": {
+    "ja": "プレビューが完了しました。",
+    "en": "Preview completed."
+  },
+  "Preview job is queued...": {
+    "ja": "プレビューがキューで待機中...",
+    "en": "Preview job is queued..."
+  },
+  "Preview job queued. Waiting for worker...": {
+    "ja": "プレビューがキューに入りました。workerを待っています...",
+    "en": "Preview job queued. Waiting for worker..."
+  },
+  "previous": {
+    "ja": "前へ",
+    "en": "previous"
+  },
+  "private": {
+    "ja": "非公開",
+    "en": "Private"
+  },
+  "Private": {
+    "ja": "非公開",
+    "en": "Private"
+  },
+  "private (default)": {
+    "ja": "非公開（標準）",
+    "en": "Private (Default)"
+  },
+  "problem": {
+    "ja": "問題",
+    "en": "Problem"
+  },
+  "Problem": {
+    "ja": "問題",
+    "en": "Problem"
+  },
+  "problem already included in contest": {
+    "ja": "この問題は既にコンテストに追加されています。",
+    "en": "problem already included in contest"
+  },
+  "Problem Controls": {
+    "ja": "問題管理",
+    "en": "Problem Controls"
+  },
+  "problem creation failed": {
+    "ja": "問題の作成に失敗しました。",
+    "en": "problem creation failed"
+  },
+  "problem creation requires problem_author role": {
+    "ja": "問題の作成にはproblem_author権限が必要です。",
+    "en": "problem creation requires problem_author role"
+  },
+  "Problem ID": {
+    "ja": "問題ID",
+    "en": "Problem ID"
+  },
+  "problem is not included in this contest": {
+    "ja": "この問題はコンテストに含まれていません。",
+    "en": "problem is not included in this contest"
+  },
+  "Problem metadata saved.": {
+    "ja": "問題の情報を保存しました。",
+    "en": "Problem metadata saved."
+  },
+  "Problem metadata saved. Preparing package...": {
+    "ja": "問題の情報を保存しました。パッケージを準備中...",
+    "en": "Problem metadata saved. Preparing package..."
+  },
+  "problem not found": {
+    "ja": "問題が見つかりません。",
+    "en": "problem not found"
+  },
+  "Problem Package (ZIP)": {
+    "ja": "問題パッケージ（ZIP）",
+    "en": "Problem Package (ZIP)"
+  },
+  "problem package is not configured. upload ZIP package before judging": {
+    "ja": "問題パッケージが未設定です。ジャッジする前にZIPをアップロードしてください。",
+    "en": "problem package is not configured. upload ZIP package before judging"
+  },
+  "problem package not found": {
+    "ja": "問題パッケージが見つかりません。",
+    "en": "problem package not found"
+  },
+  "problem update failed": {
+    "ja": "問題の更新に失敗しました。",
+    "en": "problem update failed"
+  },
+  "problem_author": {
+    "ja": "問題作成者",
+    "en": "Problem Author"
+  },
+  "Problem:": {
+    "ja": "問題:",
+    "en": "Problem:"
+  },
+  "problemId is required": {
+    "ja": "問題IDを指定してください。",
+    "en": "problemId is required"
+  },
+  "Problems": {
+    "ja": "問題",
+    "en": "Problems"
+  },
+  "Process limit exceeded.": {
+    "ja": "プロセス数の制限を超えました。",
+    "en": "Process limit exceeded."
+  },
+  "Profile": {
+    "ja": "プロフィール",
+    "en": "Profile"
+  },
+  "Profile text shown on your user page.": {
+    "ja": "プロフィールに表示される自己紹介です。",
+    "en": "Profile text shown on your user page."
+  },
+  "profile update failed": {
+    "ja": "プロフィールの更新に失敗しました。",
+    "en": "profile update failed"
+  },
+  "Profile updated.": {
+    "ja": "プロフィールを更新しました。",
+    "en": "Profile updated."
+  },
+  "Provide a judged submission ID.": {
+    "ja": "ジャッジ済みの提出IDを指定してください。",
+    "en": "Provide a judged submission ID."
+  },
+  "public": {
+    "ja": "公開",
+    "en": "Public"
+  },
+  "Public": {
+    "ja": "公開",
+    "en": "Public"
+  },
+  "Public name shown on submissions and rankings. It can be changed once every 30 days.": {
+    "ja": "提出や順位表に表示される名前です。30日に1回変更できます。",
+    "en": "Public name shown on submissions and rankings. It can be changed once every 30 days."
+  },
+  "Public Problems": {
+    "ja": "公開問題",
+    "en": "Public Problems"
+  },
+  "Publish": {
+    "ja": "公開する",
+    "en": "Publish"
+  },
+  "publish failed": {
+    "ja": "公開に失敗しました。",
+    "en": "publish failed"
+  },
+  "Publish makes this contest public. Unpublish makes it private.": {
+    "ja": "公開するとコンテストが公開され、公開停止すると非公開になります。",
+    "en": "Publish makes this contest public. Unpublish makes it private."
+  },
+  "Publish makes this problem public. Unpublish makes it private.": {
+    "ja": "公開すると問題が公開され、公開停止すると非公開になります。",
+    "en": "Publish makes this problem public. Unpublish makes it private."
+  },
+  "Publish Settings": {
+    "ja": "公開設定",
+    "en": "Publish Settings"
+  },
+  "Published.": {
+    "ja": "公開しました。",
+    "en": "Published."
+  },
+  "python": {
+    "ja": "Python",
+    "en": "Python"
+  },
+  "Questions need 2-8 options.": {
+    "ja": "設問には2〜8個の選択肢が必要です。",
+    "en": "Questions need 2-8 options."
+  },
+  "Queued": {
+    "ja": "待機中",
+    "en": "Queued"
+  },
+  "QUEUED": {
+    "ja": "待機中",
+    "en": "QUEUED"
+  },
+  "Queued jobs:": {
+    "ja": "待機中のジョブ数:",
+    "en": "Queued jobs:"
+  },
+  "R2 is not configured": {
+    "ja": "R2が設定されていません。",
+    "en": "R2 is not configured"
+  },
+  "R2 is required": {
+    "ja": "R2の設定が必要です。",
+    "en": "R2 is required"
+  },
+  "R2 is required for streamed package uploads": {
+    "ja": "ストリーミングアップロードにはR2が必要です。",
+    "en": "R2 is required for streamed package uploads"
+  },
+  "R2 upload is unavailable. Falling back to direct server preview...": {
+    "ja": "R2にアップロードできないため、サーバーで直接プレビューします...",
+    "en": "R2 upload is unavailable. Falling back to direct server preview..."
+  },
+  "Rank": {
+    "ja": "順位",
+    "en": "Rank"
+  },
+  "Rate": {
+    "ja": "割合",
+    "en": "Rate"
+  },
+  "Reading {path} ({current}/{total})": {
+    "ja": "読み込み中: {path}（{current}/{total}）",
+    "en": "Reading {path} ({current}/{total})"
+  },
+  "Reason": {
+    "ja": "理由",
+    "en": "Reason"
+  },
+  "Reason preset": {
+    "ja": "理由の選択",
+    "en": "Reason preset"
+  },
+  "Recent status transitions (AC / WA / TLE / ...) for the latest submissions.": {
+    "ja": "最新の提出の判定（AC / WA / TLEなど）を確認できます。",
+    "en": "Recent status transitions (AC / WA / TLE / ...) for the latest submissions."
+  },
+  "Recent Submissions": {
+    "ja": "最近の提出",
+    "en": "Recent Submissions"
+  },
+  "Redirecting to problem page...": {
+    "ja": "問題ページへ移動中...",
+    "en": "Redirecting to problem page..."
+  },
+  "Reference Output": {
+    "ja": "参照出力",
+    "en": "Reference Output"
+  },
+  "regexp": {
+    "ja": "正規表現",
+    "en": "regexp"
+  },
+  "rejudge cooldown active for this problem (60 seconds)": {
+    "ja": "この問題の再ジャッジは60秒間隔で要求できます。",
+    "en": "rejudge cooldown active for this problem (60 seconds)"
+  },
+  "rejudge failed": {
+    "ja": "再ジャッジの要求に失敗しました。",
+    "en": "rejudge failed"
+  },
+  "rejudge rate limit exceeded (max 3 requests per minute)": {
+    "ja": "再ジャッジ要求は1分間に3回までです。",
+    "en": "rejudge rate limit exceeded (max 3 requests per minute)"
+  },
+  "rejudge reason is required": {
+    "ja": "再ジャッジの理由を入力してください。",
+    "en": "rejudge reason is required"
+  },
+  "Rejudge Request": {
+    "ja": "再ジャッジ要求",
+    "en": "Rejudge Request"
+  },
+  "rejudge request failed": {
+    "ja": "再ジャッジの要求に失敗しました。",
+    "en": "rejudge request failed"
+  },
+  "Rejudge Requests": {
+    "ja": "再ジャッジ要求",
+    "en": "Rejudge Requests"
+  },
+  "Remove Case": {
+    "ja": "ケースを削除",
+    "en": "Remove Case"
+  },
+  "Remove Group": {
+    "ja": "グループを削除",
+    "en": "Remove Group"
+  },
+  "Remove Sample": {
+    "ja": "サンプルを削除",
+    "en": "Remove Sample"
+  },
+  "Repair Queue": {
+    "ja": "キューを修復",
+    "en": "Repair Queue"
+  },
+  "replace": {
+    "ja": "置換",
+    "en": "replace"
+  },
+  "Replace": {
+    "ja": "置換",
+    "en": "Replace"
+  },
+  "replace all": {
+    "ja": "すべて置換",
+    "en": "replace all"
+  },
+  "replaced $ matches": {
+    "ja": "$件を置換しました",
+    "en": "replaced $ matches"
+  },
+  "replaced match on line $": {
+    "ja": "$行目の一致を置換しました",
+    "en": "replaced match on line $"
+  },
+  "report creation failed": {
+    "ja": "通報の作成に失敗しました。",
+    "en": "report creation failed"
+  },
+  "report failed": {
+    "ja": "通報の送信に失敗しました。",
+    "en": "report failed"
+  },
+  "report not found": {
+    "ja": "通報が見つかりません。",
+    "en": "report not found"
+  },
+  "report reason is required": {
+    "ja": "通報の理由を入力してください。",
+    "en": "report reason is required"
+  },
+  "Reports": {
+    "ja": "通報",
+    "en": "Reports"
+  },
+  "Request body is required.": {
+    "ja": "リクエスト本文が必要です。",
+    "en": "Request body is required."
+  },
+  "Request exceeds 2 MiB.": {
+    "ja": "リクエストは2 MiB以下にしてください。",
+    "en": "Request exceeds 2 MiB."
+  },
+  "request failed": {
+    "ja": "リクエストに失敗しました。",
+    "en": "request failed"
+  },
+  "Request Rejudge": {
+    "ja": "再ジャッジを要求",
+    "en": "Request Rejudge"
+  },
+  "Requested": {
+    "ja": "要求日時",
+    "en": "Requested"
+  },
+  "Requesting...": {
+    "ja": "要求中...",
+    "en": "Requesting..."
+  },
+  "Required files: `statement.md`, `config.json`, `samples/*.in/.out`, `tests/<group>/*.in/.out`": {
+    "ja": "必須ファイル: `statement.md`、`config.json`、`samples/*.in/.out`、`tests/<group>/*.in/.out`",
+    "en": "Required files: `statement.md`, `config.json`, `samples/*.in/.out`, `tests/<group>/*.in/.out`"
+  },
+  "Reset": {
+    "ja": "リセット",
+    "en": "Reset"
+  },
+  "Reset the package editor to a blank template.": {
+    "ja": "パッケージを空のテンプレートに戻しました。",
+    "en": "Reset the package editor to a blank template."
+  },
+  "Reset to Blank": {
+    "ja": "空の状態に戻す",
+    "en": "Reset to Blank"
+  },
+  "Resolve": {
+    "ja": "解決済みにする",
+    "en": "Resolve"
+  },
+  "resolved": {
+    "ja": "解決済み",
+    "en": "Resolved"
+  },
+  "Role": {
+    "ja": "権限",
+    "en": "Role"
+  },
+  "role must be one of: user, problem_author, contest_organizer": {
+    "ja": "権限はuser、problem_author、contest_organizerのいずれかを指定してください。",
+    "en": "role must be one of: user, problem_author, contest_organizer"
+  },
+  "Role:": {
+    "ja": "権限:",
+    "en": "Role:"
+  },
+  "Run Test": {
+    "ja": "テストを実行",
+    "en": "Run Test"
+  },
+  "Runnable cells support python or javascript only.": {
+    "ja": "実行欄はPythonとJavaScriptのみ対応しています。",
+    "en": "Runnable cells support python or javascript only."
+  },
+  "Running": {
+    "ja": "開催中",
+    "en": "Running"
+  },
+  "RUNNING": {
+    "ja": "実行中",
+    "en": "RUNNING"
+  },
+  "Running...": {
+    "ja": "実行中...",
+    "en": "Running..."
+  },
+  "Runtime error.": {
+    "ja": "実行時エラーです。",
+    "en": "Runtime error."
+  },
+  "Sample": {
+    "ja": "サンプル",
+    "en": "Sample"
+  },
+  "Sample Description": {
+    "ja": "サンプルの説明",
+    "en": "Sample Description"
+  },
+  "Sample Input": {
+    "ja": "サンプル入力",
+    "en": "Sample Input"
+  },
+  "Sample Name": {
+    "ja": "サンプル名",
+    "en": "Sample Name"
+  },
+  "Sample Output": {
+    "ja": "サンプル出力",
+    "en": "Sample Output"
+  },
+  "Samples": {
+    "ja": "サンプル",
+    "en": "Samples"
+  },
+  "Samples:": {
+    "ja": "サンプル数:",
+    "en": "Samples:"
+  },
+  "Save Profile": {
+    "ja": "プロフィールを保存",
+    "en": "Save Profile"
+  },
+  "Save the current draft before publishing.": {
+    "ja": "公開する前に現在の下書きを保存してください。",
+    "en": "Save the current draft before publishing."
+  },
+  "Saving problem metadata...": {
+    "ja": "問題の情報を保存中...",
+    "en": "Saving problem metadata..."
+  },
+  "Saving...": {
+    "ja": "保存中...",
+    "en": "Saving..."
+  },
+  "Scheduled": {
+    "ja": "開催前",
+    "en": "Scheduled"
+  },
+  "Score": {
+    "ja": "得点",
+    "en": "Score"
+  },
+  "Score:": {
+    "ja": "得点:",
+    "en": "Score:"
+  },
+  "Scoreboard": {
+    "ja": "順位表",
+    "en": "Scoreboard"
+  },
+  "Scoreboard Entries": {
+    "ja": "順位表の掲載件数",
+    "en": "Scoreboard Entries"
+  },
+  "Scoreboard mode:": {
+    "ja": "順位表の表示方式:",
+    "en": "Scoreboard mode:"
+  },
+  "Scoreboard Visibility": {
+    "ja": "順位表の公開範囲",
+    "en": "Scoreboard Visibility"
+  },
+  "scoring bug": {
+    "ja": "採点の不具合",
+    "en": "scoring bug"
+  },
+  "Selected Case": {
+    "ja": "選択中のケース",
+    "en": "Selected Case"
+  },
+  "Selected Group": {
+    "ja": "選択中のグループ",
+    "en": "Selected Group"
+  },
+  "Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields, and converts its tests into the editor below.": {
+    "ja": "ZIPを選択すると`statement.md`と`config.json`を確認し、項目を自動入力してテストケースを編集欄に取り込みます。",
+    "en": "Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields, and converts its tests into the editor below."
+  },
+  "Selection deleted": {
+    "ja": "選択部分を削除しました",
+    "en": "Selection deleted"
+  },
+  "Sending...": {
+    "ja": "送信中...",
+    "en": "Sending..."
+  },
+  "Service update details...": {
+    "ja": "更新情報の詳細...",
+    "en": "Service update details..."
+  },
+  "Sign in": {
+    "ja": "ログイン",
+    "en": "Sign in"
+  },
+  "Sign in is required to use \"Only me\" filter.": {
+    "ja": "「自分のみ」で絞り込むにはログインしてください。",
+    "en": "Sign in is required to use \"Only me\" filter."
+  },
+  "Sign in to join": {
+    "ja": "ログインして参加",
+    "en": "Sign in to join"
+  },
+  "Sign In to Submit": {
+    "ja": "ログインして提出",
+    "en": "Sign In to Submit"
+  },
+  "Sign in with GitHub": {
+    "ja": "GitHubでログイン",
+    "en": "Sign in with GitHub"
+  },
+  "Sign in with Google": {
+    "ja": "Googleでログイン",
+    "en": "Sign in with Google"
+  },
+  "Sign in with your GitHub or Google account to use OJP.": {
+    "ja": "GitHubまたはGoogleのアカウントでOJPにログインできます。",
+    "en": "Sign in with your GitHub or Google account to use OJP."
+  },
+  "Sign out": {
+    "ja": "ログアウト",
+    "en": "Sign out"
+  },
+  "Signed in as:": {
+    "ja": "ログイン中:",
+    "en": "Signed in as:"
+  },
+  "Slug": {
+    "ja": "識別名",
+    "en": "Slug"
+  },
+  "slug must not be empty": {
+    "ja": "識別名を入力してください。",
+    "en": "slug must not be empty"
+  },
+  "Slug must use lowercase letters, digits and hyphens.": {
+    "ja": "識別名には小文字の英字・数字・ハイフンを使用してください。",
+    "en": "Slug must use lowercase letters, digits and hyphens."
+  },
+  "Solved Problems": {
+    "ja": "正解した問題",
+    "en": "Solved Problems"
+  },
+  "Some submissions are waiting for judge. The list refreshes automatically.": {
+    "ja": "ジャッジ待ちの提出があります。一覧は自動で更新されます。",
+    "en": "Some submissions are waiting for judge. The list refreshes automatically."
+  },
+  "Source Code": {
+    "ja": "ソースコード",
+    "en": "Source Code"
+  },
+  "Source code is required.": {
+    "ja": "ソースコードを入力してください。",
+    "en": "Source code is required."
+  },
+  "Source Label": {
+    "ja": "パッケージ名",
+    "en": "Source Label"
+  },
+  "sourceCode is required": {
+    "ja": "ソースコードを入力してください。",
+    "en": "sourceCode is required"
+  },
+  "special judge configuration is incomplete": {
+    "ja": "スペシャルジャッジの設定が不足しています。",
+    "en": "special judge configuration is incomplete"
+  },
+  "Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error.": {
+    "ja": "スペシャルジャッジには入力・参照出力・提出コードの出力の3つのファイルパスが渡されます。終了コード`0`はAC、`1`はWA、それ以外はジャッジエラーです。",
+    "en": "Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error."
+  },
+  "special judge resource limit exceeded": {
+    "ja": "スペシャルジャッジのリソース制限を超えました。",
+    "en": "special judge resource limit exceeded"
+  },
+  "special judge runtime is not prepared": {
+    "ja": "スペシャルジャッジの実行環境が準備されていません。",
+    "en": "special judge runtime is not prepared"
+  },
+  "special judge timeout": {
+    "ja": "スペシャルジャッジがタイムアウトしました。",
+    "en": "special judge timeout"
+  },
+  "special_judge": {
+    "ja": "スペシャルジャッジ",
+    "en": "Special Judge"
+  },
+  "Start Manual Package": {
+    "ja": "手動パッケージを作成",
+    "en": "Start Manual Package"
+  },
+  "Start:": {
+    "ja": "開始:",
+    "en": "Start:"
+  },
+  "Started a blank manual package.": {
+    "ja": "空の手動パッケージを作成しました。",
+    "en": "Started a blank manual package."
+  },
+  "Statement": {
+    "ja": "問題文",
+    "en": "Statement"
+  },
+  "Statement (Markdown)": {
+    "ja": "問題文（Markdown）",
+    "en": "Statement (Markdown)"
+  },
+  "statement ambiguous / abusive content / other": {
+    "ja": "問題文の不備 / 不適切な内容 / その他",
+    "en": "statement ambiguous / abusive content / other"
+  },
+  "Statement is required.": {
+    "ja": "問題文を入力してください。",
+    "en": "Statement is required."
+  },
+  "Status": {
+    "ja": "状態",
+    "en": "Status"
+  },
+  "Status:": {
+    "ja": "状態:",
+    "en": "Status:"
+  },
+  "storageRef is required": {
+    "ja": "ストレージの参照情報が必要です。",
+    "en": "storageRef is required"
+  },
+  "Stored ZIP:": {
+    "ja": "保存済みZIP:",
+    "en": "Stored ZIP:"
+  },
+  "submission": {
+    "ja": "提出",
+    "en": "Submission"
+  },
+  "Submission": {
+    "ja": "提出",
+    "en": "Submission"
+  },
+  "submission cooldown active for this problem (10 seconds)": {
+    "ja": "この問題への提出は10秒間隔で行えます。",
+    "en": "submission cooldown active for this problem (10 seconds)"
+  },
+  "submission failed": {
+    "ja": "提出に失敗しました。",
+    "en": "submission failed"
+  },
+  "submission not found": {
+    "ja": "提出が見つかりません。",
+    "en": "submission not found"
+  },
+  "submission rate limit exceeded (max 20 submissions per minute)": {
+    "ja": "提出は1分間に20回までです。",
+    "en": "submission rate limit exceeded (max 20 submissions per minute)"
+  },
+  "Submissions": {
+    "ja": "提出",
+    "en": "Submissions"
+  },
+  "Submit": {
+    "ja": "提出",
+    "en": "Submit"
+  },
+  "Submit an accepted solution after this course version was published.": {
+    "ja": "この版の公開後に正解した提出を指定してください。",
+    "en": "Submit an accepted solution after this course version was published."
+  },
+  "Submit Report": {
+    "ja": "通報を送信",
+    "en": "Submit Report"
+  },
+  "Submit:": {
+    "ja": "提出:",
+    "en": "Submit:"
+  },
+  "Submitted": {
+    "ja": "提出日時",
+    "en": "Submitted"
+  },
+  "sum of config.groups[*].score must be exactly 100": {
+    "ja": "部分点の合計は100点にしてください。",
+    "en": "sum of config.groups[*].score must be exactly 100"
+  },
+  "sum_of_groups": {
+    "ja": "グループ別部分点",
+    "en": "Group Scores"
+  },
+  "summary": {
+    "ja": "概要のみ",
+    "en": "Summary"
+  },
+  "Target": {
+    "ja": "対象",
+    "en": "Target"
+  },
+  "Target:": {
+    "ja": "対象:",
+    "en": "Target:"
+  },
+  "test case not found": {
+    "ja": "テストケースが見つかりません。",
+    "en": "test case not found"
+  },
+  "Test Case Visibility": {
+    "ja": "テストケースの公開範囲",
+    "en": "Test Case Visibility"
+  },
+  "Test Case Visibility:": {
+    "ja": "テストケースの公開範囲:",
+    "en": "Test Case Visibility:"
+  },
+  "Test Results": {
+    "ja": "テスト結果",
+    "en": "Test Results"
+  },
+  "Test Results・提出詳細": {
+    "ja": "Test Results・提出詳細",
+    "en": "Test Results / Submission details"
+  },
+  "testcase fix": {
+    "ja": "テストケースの修正",
+    "en": "testcase fix"
+  },
+  "The linked problem is no longer available.": {
+    "ja": "関連する問題は現在利用できません。",
+    "en": "The linked problem is no longer available."
+  },
+  "The linked problem is not available.": {
+    "ja": "関連する問題を利用できません。",
+    "en": "The linked problem is not available."
+  },
+  "This course has not been published.": {
+    "ja": "このコースは公開されていません。",
+    "en": "This course has not been published."
+  },
+  "This item is not a quiz.": {
+    "ja": "この項目はクイズではありません。",
+    "en": "This item is not a quiz."
+  },
+  "This item requires a quiz attempt.": {
+    "ja": "この項目を完了するにはクイズに回答してください。",
+    "en": "This item requires a quiz attempt."
+  },
+  "This problem already has a stored package. Load it only when you need to inspect or edit tests.": {
+    "ja": "この問題には保存済みパッケージがあります。テストの確認や編集が必要なときに読み込んでください。",
+    "en": "This problem already has a stored package. Load it only when you need to inspect or edit tests."
+  },
+  "This submission is waiting for judge. The page refreshes automatically.": {
+    "ja": "ジャッジ待ちです。ページは自動で更新されます。",
+    "en": "This submission is waiting for judge. The page refreshes automatically."
+  },
+  "Time": {
+    "ja": "実行時間",
+    "en": "Time"
+  },
+  "Time Limit (ms)": {
+    "ja": "実行時間制限（ms）",
+    "en": "Time Limit (ms)"
+  },
+  "Time limit exceeded.": {
+    "ja": "実行時間制限を超えました。",
+    "en": "Time limit exceeded."
+  },
+  "Time Limit:": {
+    "ja": "実行時間制限:",
+    "en": "Time Limit:"
+  },
+  "Time:": {
+    "ja": "実行時間:",
+    "en": "Time:"
+  },
+  "Time(max):": {
+    "ja": "最大実行時間:",
+    "en": "Time(max):"
+  },
+  "Title": {
+    "ja": "タイトル",
+    "en": "Title"
+  },
+  "to": {
+    "ja": "から",
+    "en": "to"
+  },
+  "Too many or invalid learning items.": {
+    "ja": "教材項目が多すぎるか、データが正しくありません。",
+    "en": "Too many or invalid learning items."
+  },
+  "Too many ZIP entries.": {
+    "ja": "ZIP内のファイル数が多すぎます。",
+    "en": "Too many ZIP entries."
+  },
+  "Total": {
+    "ja": "合計",
+    "en": "Total"
+  },
+  "u2": {
+    "ja": "u2",
+    "en": "u2"
+  },
+  "unexpected error": {
+    "ja": "予期しないエラーが発生しました。",
+    "en": "unexpected error"
+  },
+  "Unexpected error occurred.": {
+    "ja": "予期しないエラーが発生しました。",
+    "en": "Unexpected error occurred."
+  },
+  "unfold": {
+    "ja": "展開",
+    "en": "unfold"
+  },
+  "Unfreeze": {
+    "ja": "凍結を解除",
+    "en": "Unfreeze"
+  },
+  "Unknown question.": {
+    "ja": "設問が見つかりません。",
+    "en": "Unknown question."
+  },
+  "unlisted": {
+    "ja": "限定公開",
+    "en": "Unlisted"
+  },
+  "Unlisted": {
+    "ja": "限定公開",
+    "en": "Unlisted"
+  },
+  "Unpublish": {
+    "ja": "公開停止",
+    "en": "Unpublish"
+  },
+  "unpublish failed": {
+    "ja": "公開停止に失敗しました。",
+    "en": "unpublish failed"
+  },
+  "Unpublished.": {
+    "ja": "公開を停止しました。",
+    "en": "Unpublished."
+  },
+  "Unrated": {
+    "ja": "Unrated",
+    "en": "Unrated"
+  },
+  "Unsafe ZIP path.": {
+    "ja": "ZIPに安全でないファイルパスが含まれています。",
+    "en": "Unsafe ZIP path."
+  },
+  "Unsupported learning ZIP format.": {
+    "ja": "未対応の教材ZIP形式です。",
+    "en": "Unsupported learning ZIP format."
+  },
+  "Unsupported runtime language.": {
+    "ja": "未対応の実行言語です。",
+    "en": "Unsupported runtime language."
+  },
+  "Up": {
+    "ja": "上へ",
+    "en": "Up"
+  },
+  "Update": {
+    "ja": "更新",
+    "en": "Update"
+  },
+  "Update contest window, settings, and problem set.": {
+    "ja": "開催期間、設定、問題セットを更新します。",
+    "en": "Update contest window, settings, and problem set."
+  },
+  "Update Role": {
+    "ja": "権限を更新",
+    "en": "Update Role"
+  },
+  "Update statement, limits, and the judge package, including manual test groups and ZIP import.": {
+    "ja": "問題文、制限、ジャッジパッケージを更新します。手動でのテスト編集やZIPインポートも利用できます。",
+    "en": "Update statement, limits, and the judge package, including manual test groups and ZIP import."
+  },
+  "Updated": {
+    "ja": "更新日時",
+    "en": "Updated"
+  },
+  "Updated:": {
+    "ja": "更新日時:",
+    "en": "Updated:"
+  },
+  "upload failed": {
+    "ja": "アップロードに失敗しました。",
+    "en": "upload failed"
+  },
+  "Uploading package ZIP to object storage...": {
+    "ja": "パッケージZIPをストレージへアップロード中...",
+    "en": "Uploading package ZIP to object storage..."
+  },
+  "Uploading package ZIP...": {
+    "ja": "パッケージZIPをアップロード中...",
+    "en": "Uploading package ZIP..."
+  },
+  "Use `case_name_visible` only when needed to avoid leaking hidden test intent.": {
+    "ja": "非公開テストの意図が漏れないよう、`case_name_visible`は必要な場合のみ使用してください。",
+    "en": "Use `case_name_visible` only when needed to avoid leaking hidden test intent."
+  },
+  "user": {
+    "ja": "一般ユーザー",
+    "en": "User"
+  },
+  "User": {
+    "ja": "ユーザー",
+    "en": "User"
+  },
+  "user account is deleted": {
+    "ja": "このアカウントは削除されています。",
+    "en": "user account is deleted"
+  },
+  "user account is not active": {
+    "ja": "このアカウントは有効ではありません。",
+    "en": "user account is not active"
+  },
+  "User ID": {
+    "ja": "ユーザーID",
+    "en": "User ID"
+  },
+  "user not found": {
+    "ja": "ユーザーが見つかりません。",
+    "en": "user not found"
+  },
+  "User:": {
+    "ja": "ユーザー:",
+    "en": "User:"
+  },
+  "Username:": {
+    "ja": "ユーザー名:",
+    "en": "Username:"
+  },
+  "Users": {
+    "ja": "ユーザー",
+    "en": "Users"
+  },
+  "Validate ZIP Package": {
+    "ja": "ZIPパッケージを検証",
+    "en": "Validate ZIP Package"
+  },
+  "Validating...": {
+    "ja": "検証中...",
+    "en": "Validating..."
+  },
+  "Validation Result": {
+    "ja": "検証結果",
+    "en": "Validation Result"
+  },
+  "Verdict": {
+    "ja": "判定",
+    "en": "Verdict"
+  },
+  "Verdict Breakdown": {
+    "ja": "判定別統計",
+    "en": "Verdict Breakdown"
+  },
+  "View": {
+    "ja": "表示",
+    "en": "View"
+  },
+  "View all": {
+    "ja": "すべて見る",
+    "en": "View all"
+  },
+  "View Submissions": {
+    "ja": "提出を見る",
+    "en": "View Submissions"
+  },
+  "Visibility": {
+    "ja": "公開範囲",
+    "en": "Visibility"
+  },
+  "Visibility mode:": {
+    "ja": "公開設定:",
+    "en": "Visibility mode:"
+  },
+  "Wait 3 seconds before retrying the quiz.": {
+    "ja": "クイズを再試行するまで3秒お待ちください。",
+    "en": "Wait 3 seconds before retrying the quiz."
+  },
+  "Waiting Judge": {
+    "ja": "ジャッジ待ち",
+    "en": "Waiting Judge"
+  },
+  "Waiting judge.": {
+    "ja": "ジャッジ待ちです。",
+    "en": "Waiting judge."
+  },
+  "Waiting submissions:": {
+    "ja": "待機中の提出数:",
+    "en": "Waiting submissions:"
+  },
+  "Warnings": {
+    "ja": "警告",
+    "en": "Warnings"
+  },
+  "Window": {
+    "ja": "開催期間",
+    "en": "Window"
+  },
+  "Worker is running the preview...": {
+    "ja": "workerでプレビューを実行中...",
+    "en": "Worker is running the preview..."
+  },
+  "Worker is validating and applying the package...": {
+    "ja": "workerでパッケージを検証・適用中...",
+    "en": "Worker is validating and applying the package..."
+  },
+  "Worker running:": {
+    "ja": "worker稼働中:",
+    "en": "Worker running:"
+  },
+  "Workspace limit exceeded.": {
+    "ja": "作業領域の容量制限を超えました。",
+    "en": "Workspace limit exceeded."
+  },
+  "Wrong answer.": {
+    "ja": "期待する出力と一致しません。",
+    "en": "Wrong answer."
+  },
+  "X / Twitter": {
+    "ja": "X / Twitter",
+    "en": "X / Twitter"
+  },
+  "x-ojp-file-name header is required": {
+    "ja": "x-ojp-file-nameヘッダーが必要です。",
+    "en": "x-ojp-file-name header is required"
+  },
+  "x-ojp-file-size header is required for streamed uploads": {
+    "ja": "ストリーミングアップロードにはx-ojp-file-sizeヘッダーが必要です。",
+    "en": "x-ojp-file-size header is required for streamed uploads"
+  },
+  "yes": {
+    "ja": "はい",
+    "en": "yes"
+  },
+  "you cannot access this package job": {
+    "ja": "このパッケージジョブにアクセスできません。",
+    "en": "you cannot access this package job"
+  },
+  "you cannot download package for this problem": {
+    "ja": "この問題のパッケージをダウンロードする権限がありません。",
+    "en": "you cannot download package for this problem"
+  },
+  "you cannot edit this contest": {
+    "ja": "このコンテストを編集する権限がありません。",
+    "en": "you cannot edit this contest"
+  },
+  "you cannot edit this problem": {
+    "ja": "この問題を編集する権限がありません。",
+    "en": "you cannot edit this problem"
+  },
+  "you cannot inspect package for this problem": {
+    "ja": "この問題のパッケージを確認する権限がありません。",
+    "en": "you cannot inspect package for this problem"
+  },
+  "you cannot submit to this problem": {
+    "ja": "この問題に提出する権限がありません。",
+    "en": "you cannot submit to this problem"
+  },
+  "you cannot upload package for this problem": {
+    "ja": "この問題のパッケージをアップロードする権限がありません。",
+    "en": "you cannot upload package for this problem"
+  },
+  "you cannot view this explanation": {
+    "ja": "この解説を閲覧する権限がありません。",
+    "en": "you cannot view this explanation"
+  },
+  "You do not have permission to edit this contest.": {
+    "ja": "このコンテストを編集する権限がありません。",
+    "en": "You do not have permission to edit this contest."
+  },
+  "You do not have permission to edit this problem.": {
+    "ja": "この問題を編集する権限がありません。",
+    "en": "You do not have permission to edit this problem."
+  },
+  "you do not have permission to request rejudge": {
+    "ja": "再ジャッジを要求する権限がありません。",
+    "en": "you do not have permission to request rejudge"
+  },
+  "You need `contest_organizer` (or admin) role to create contests.": {
+    "ja": "コンテストの作成には`contest_organizer`またはadmin権限が必要です。",
+    "en": "You need `contest_organizer` (or admin) role to create contests."
+  },
+  "You need `problem_author` (or admin) role to create problems.": {
+    "ja": "問題の作成には`problem_author`またはadmin権限が必要です。",
+    "en": "You need `problem_author` (or admin) role to create problems."
+  },
+  "Your account is not active.": {
+    "ja": "アカウントが有効ではありません。",
+    "en": "Your account is not active."
+  },
+  "zip file is required": {
+    "ja": "ZIPファイルが必要です。",
+    "en": "zip file is required"
+  },
+  "zip file is required (multipart/form-data field: file)": {
+    "ja": "ZIPファイルが必要です（multipart/form-dataのfile項目）。",
+    "en": "zip file is required (multipart/form-data field: file)"
+  },
+  "ZIP import / export と、サンプル・グループ・ケース・checker 設定をここで管理します。": {
+    "ja": "ZIPの入出力、サンプル・グループ・ケース・checkerの設定を管理します。",
+    "en": "Manage ZIP import/export, samples, groups, cases and checker settings here."
+  },
+  "ZIP import and manual test case editing are both handled from the main form below.": {
+    "ja": "ZIPのインポートと手動テスト編集は、下のフォームから行えます。",
+    "en": "ZIP import and manual test case editing are both handled from the main form below."
+  },
+  "ZIP must contain course.json.": {
+    "ja": "ZIPにはcourse.jsonが必要です。",
+    "en": "ZIP must contain course.json."
+  },
+  "zip request body is required": {
+    "ja": "ZIPリクエスト本文が必要です。",
+    "en": "zip request body is required"
+  },
+  "ZIP size:": {
+    "ja": "ZIPサイズ:",
+    "en": "ZIP size:"
+  },
+  "ZIP text files must use UTF-8.": {
+    "ja": "ZIP内のテキストはUTF-8で保存してください。",
+    "en": "ZIP text files must use UTF-8."
+  },
+  "ZIPから取り込む": {
+    "ja": "ZIPから取り込む",
+    "en": "Import ZIP"
+  },
+  "ZIPにはcourse.jsonと教材のMarkdownが入ります。正解・解説も含むため、作成者用ファイルとして扱ってください。公開範囲の変更は公開操作時に反映します。": {
+    "ja": "ZIPにはcourse.jsonと教材のMarkdownが入ります。正解・解説も含むため、作成者用ファイルとして扱ってください。公開範囲の変更は公開操作時に反映します。",
+    "en": "The ZIP contains course.json and lesson Markdown, including answers and explanations. Keep it private for authors. Visibility changes take effect when publishing."
+  },
+  "ZIPファイルを選択してください。": {
+    "ja": "ZIPファイルを選択してください。",
+    "en": "Select a ZIP file."
+  },
+  "ZIP取り込みに失敗しました。": {
+    "ja": "ZIP取り込みに失敗しました。",
+    "en": "Could not import the ZIP."
+  },
+  "ZIP検証に失敗しました。": {
+    "ja": "ZIP検証に失敗しました。",
+    "en": "ZIP validation failed."
+  },
+  "アップロードに失敗しました。": {
+    "ja": "アップロードに失敗しました。",
+    "en": "Upload failed."
+  },
+  "エディターを準備しています…": {
+    "ja": "エディターを準備しています…",
+    "en": "Preparing editor…"
+  },
+  "エラー": {
+    "ja": "エラー",
+    "en": "Error"
+  },
+  "お知らせ、通報管理、ユーザー凍結、問題/解説/コンテスト非公開化、再ジャッジ要求履歴を管理します。": {
+    "ja": "お知らせ、通報管理、ユーザー凍結、問題/解説/コンテスト非公開化、再ジャッジ要求履歴を管理します。",
+    "en": "Manage announcements, reports, account freezes, problem/editorial/contest visibility and rejudge requests."
+  },
+  "クイズ": {
+    "ja": "クイズ",
+    "en": "Quiz"
+  },
+  "コースを作成": {
+    "ja": "コースを作成",
+    "en": "Create Course"
+  },
+  "コース一覧": {
+    "ja": "コース一覧",
+    "en": "Courses"
+  },
+  "コース一覧へ": {
+    "ja": "コース一覧へ",
+    "en": "Back to Courses"
+  },
+  "コース名": {
+    "ja": "コース名",
+    "en": "Course Title"
+  },
+  "コース完了に必須": {
+    "ja": "コース完了に必須",
+    "en": "Required for course completion"
+  },
+  "コース設定": {
+    "ja": "コース設定",
+    "en": "Course Settings"
+  },
+  "このコースの公開を停止しますか？進捗と過去の版は削除されません。": {
+    "ja": "このコースの公開を停止しますか？進捗と過去の版は削除されません。",
+    "en": "Unpublish this course? Progress and previous versions will be kept."
+  },
+  "このコンテストの順位表は終了後に公開されます。": {
+    "ja": "このコンテストの順位表は終了後に公開されます。",
+    "en": "The scoreboard will be available after this contest ends."
+  },
+  "このタブを下書きから削除しますか？": {
+    "ja": "このタブを下書きから削除しますか？",
+    "en": "Delete this tab from the draft?"
+  },
+  "このページの下から直接提出できます。提出後は非同期ジャッジされ、提出詳細で結果を確認できます。": {
+    "ja": "このページの下から直接提出できます。提出後は非同期ジャッジされ、提出詳細で結果を確認できます。",
+    "en": "Submit directly at the bottom of this page. Judging runs asynchronously; view the results on the submission detail page."
+  },
+  "この章と中の教材を下書きから削除しますか？": {
+    "ja": "この章と中の教材を下書きから削除しますか？",
+    "en": "Delete this chapter and its materials from the draft?"
+  },
+  "この章を学ぶ": {
+    "ja": "この章を学ぶ",
+    "en": "Start this chapter"
+  },
+  "コンテスト {value0} への提出です。参加済みかつ開催中の場合のみ受理されます。": {
+    "ja": "コンテスト {value0} への提出です。参加済みかつ開催中の場合のみ受理されます。",
+    "en": "Submitting to contest {value0}. Submissions are accepted only from registered participants while the contest is running."
+  },
+  "コンテストが作成されていません。": {
+    "ja": "コンテストが作成されていません。",
+    "en": "No contests have been created."
+  },
+  "コンテスト一覧です。状態遷移（scheduled/running/ended）と順位表公開設定を確認できます。": {
+    "ja": "コンテスト一覧です。状態遷移（scheduled/running/ended）と順位表公開設定を確認できます。",
+    "en": "Browse contests, their schedules and scoreboard visibility settings."
+  },
+  "コンテスト詳細と順位表です。順位表の公開粒度は `scoreboardVisibility` と開催状態で制御されます。": {
+    "ja": "コンテスト詳細と順位表です。順位表の公開粒度は `scoreboardVisibility` と開催状態で制御されます。",
+    "en": "Contest details and scoreboard. Scoreboard detail is controlled by the visibility setting and contest status."
+  },
+  "サンプルを編集するか、Markdownを取り込んで教材を登録してください。": {
+    "ja": "サンプルを編集するか、Markdownを取り込んで教材を登録してください。",
+    "en": "Edit the sample or import Markdown to create learning materials."
+  },
+  "すると進捗を保存できます。": {
+    "ja": "すると進捗を保存できます。",
+    "en": " to save your progress."
+  },
+  "ソースコード全文は提出者本人または管理者のみ閲覧できます。": {
+    "ja": "ソースコード全文は提出者本人または管理者のみ閲覧できます。",
+    "en": "Only the submitter and administrators can view the full source code."
+  },
+  "タイトル": {
+    "ja": "タイトル",
+    "en": "Title"
+  },
+  "タブの名前": {
+    "ja": "タブの名前",
+    "en": "Tab Title"
+  },
+  "タブを削除": {
+    "ja": "タブを削除",
+    "en": "Delete Tab"
+  },
+  "タブを前へ": {
+    "ja": "タブを前へ",
+    "en": "Move Tab Left"
+  },
+  "タブを後ろへ": {
+    "ja": "タブを後ろへ",
+    "en": "Move Tab Right"
+  },
+  "テスト run": {
+    "ja": "テスト実行",
+    "en": "Test Run"
+  },
+  "テストケース": {
+    "ja": "テストケース",
+    "en": "Test Cases"
+  },
+  "の設定": {
+    "ja": "の設定",
+    "en": " settings"
+  },
+  "ブラウザで試し実行": {
+    "ja": "ブラウザで試し実行",
+    "en": "Run in Browser"
+  },
+  "プロフィール編集と、自分の提出・作成・参加状況の統計をまとめて確認できます。": {
+    "ja": "プロフィール編集と、自分の提出・作成・参加状況の統計をまとめて確認できます。",
+    "en": "Edit your profile and view statistics for submissions, authored content and participation."
+  },
+  "まだ公開されているコースはありません": {
+    "ja": "まだ公開されているコースはありません",
+    "en": "No published courses yet"
+  },
+  "もう一度確認しましょう": {
+    "ja": "もう一度確認しましょう",
+    "en": "Try again"
+  },
+  "ライブプレビューを表示": {
+    "ja": "ライブプレビューを表示",
+    "en": "Show Live Preview"
+  },
+  "ラジオボタンで正解を指定します。": {
+    "ja": "ラジオボタンで正解を指定します。",
+    "en": "Select the correct answer using the radio button."
+  },
+  "リンクを知っている人": {
+    "ja": "リンクを知っている人",
+    "en": "Anyone with the link"
+  },
+  "ログイン": {
+    "ja": "ログイン",
+    "en": "Sign in"
+  },
+  "を追加": {
+    "ja": "を追加",
+    "en": "Add"
+  },
+  "下書き": {
+    "ja": "下書き",
+    "en": "Draft"
+  },
+  "下書きを保存しても公開版は変わりません。「保存して公開」で新しい版を公開します。": {
+    "ja": "下書きを保存しても公開版は変わりません。「保存して公開」で新しい版を公開します。",
+    "en": "Saving a draft does not change the published version. Use \"Save and Publish\" to publish a new version."
+  },
+  "下書きを保存しました。公開版は変更されません。": {
+    "ja": "下書きを保存しました。公開版は変更されません。",
+    "en": "Draft saved. The published version is unchanged."
+  },
+  "下書き保存": {
+    "ja": "下書き保存",
+    "en": "Save Draft"
+  },
+  "不正解": {
+    "ja": "不正解",
+    "en": "Incorrect"
+  },
+  "不適切コンテンツや問題不備の通報を管理者に送信します。": {
+    "ja": "不適切コンテンツや問題不備の通報を管理者に送信します。",
+    "en": "Report inappropriate content or problems to the administrators."
+  },
+  "予期しないエラーが発生しました。": {
+    "ja": "予期しないエラーが発生しました。",
+    "en": "An unexpected error occurred."
+  },
+  "以前の版：{value0} / {value1} 完了": {
+    "ja": "以前の版：{value0} / {value1} 完了",
+    "en": "Previous version: {value0} / {value1} complete"
+  },
+  "以前の版の進捗から再開": {
+    "ja": "以前の版の進捗から再開",
+    "en": "Resume Previous Version"
+  },
+  "作成する": {
+    "ja": "作成する",
+    "en": "Create"
+  },
+  "作成者・管理者のみ": {
+    "ja": "作成者・管理者のみ",
+    "en": "Author and administrators only"
+  },
+  "保存して公開": {
+    "ja": "保存して公開",
+    "en": "Save and Publish"
+  },
+  "保存に失敗しました。": {
+    "ja": "保存に失敗しました。",
+    "en": "Could not save changes."
+  },
+  "保存中...": {
+    "ja": "保存中...",
+    "en": "Saving..."
+  },
+  "保存中…": {
+    "ja": "保存中…",
+    "en": "Saving…"
+  },
+  "保存済み": {
+    "ja": "保存済み",
+    "en": "Saved"
+  },
+  "停止": {
+    "ja": "停止",
+    "en": "Stop"
+  },
+  "入力": {
+    "ja": "入力",
+    "en": "Input"
+  },
+  "全体に公開": {
+    "ja": "全体に公開",
+    "en": "Public"
+  },
+  "公開を停止しました。": {
+    "ja": "公開を停止しました。",
+    "en": "Course unpublished."
+  },
+  "公開停止": {
+    "ja": "公開停止",
+    "en": "Unpublish"
+  },
+  "公開前のAC提出でも完了にできる": {
+    "ja": "公開前のAC提出でも完了にできる",
+    "en": "Allow accepted submissions from before publication"
+  },
+  "公開済み問題": {
+    "ja": "公開済み問題",
+    "en": "Published Problem"
+  },
+  "公開版あり": {
+    "ja": "公開版あり",
+    "en": "Published"
+  },
+  "公開版を確認": {
+    "ja": "公開版を確認",
+    "en": "View Published Version"
+  },
+  "公開範囲": {
+    "ja": "公開範囲",
+    "en": "Visibility"
+  },
+  "再ジャッジ要求は、管理者・問題作成者・対象コンテスト主催者のみ可能です。": {
+    "ja": "再ジャッジ要求は、管理者・問題作成者・対象コンテスト主催者のみ可能です。",
+    "en": "Only administrators, problem authors and the relevant contest organizer can request a rejudge."
+  },
+  "最低1問は選択してください。": {
+    "ja": "最低1問は選択してください。",
+    "en": "Select at least one problem."
+  },
+  "最新の教材に移動する": {
+    "ja": "最新の教材に移動する",
+    "en": "View Latest Version"
+  },
+  "出力": {
+    "ja": "出力",
+    "en": "Output"
+  },
+  "出力の上限（64 KiB）を超えました。": {
+    "ja": "出力の上限（64 KiB）を超えました。",
+    "en": "Output limit exceeded (64 KiB)."
+  },
+  "出力メッセージが多すぎるため停止しました。": {
+    "ja": "出力メッセージが多すぎるため停止しました。",
+    "en": "Stopped because too many output messages were produced."
+  },
+  "初期コードに戻す": {
+    "ja": "初期コードに戻す",
+    "en": "Reset Code"
+  },
+  "削除": {
+    "ja": "削除",
+    "en": "Delete"
+  },
+  "前へ": {
+    "ja": "前へ",
+    "en": "Previous"
+  },
+  "合格": {
+    "ja": "合格",
+    "en": "Passed"
+  },
+  "合格基準：": {
+    "ja": "合格基準：",
+    "en": "Passing score:"
+  },
+  "合格率（%）": {
+    "ja": "合格率（%）",
+    "en": "Passing Score (%)"
+  },
+  "問": {
+    "ja": "問",
+    "en": "Question"
+  },
+  "問題ID（一覧にない場合）": {
+    "ja": "問題ID（一覧にない場合）",
+    "en": "Problem ID (if not listed)"
+  },
+  "問題セット": {
+    "ja": "問題セット",
+    "en": "Problem Set"
+  },
+  "問題に戻る": {
+    "ja": "問題に戻る",
+    "en": "Back to Problem"
+  },
+  "問題の設定など": {
+    "ja": "問題の設定など",
+    "en": "Problem Settings"
+  },
+  "問題ページを開く": {
+    "ja": "問題ページを開く",
+    "en": "Open Problem"
+  },
+  "問題へ戻る": {
+    "ja": "問題へ戻る",
+    "en": "Back to Problem"
+  },
+  "問題を選択": {
+    "ja": "問題を選択",
+    "en": "Select a Problem"
+  },
+  "問題一覧です。公開範囲と制約情報を確認できます。": {
+    "ja": "問題一覧です。公開範囲と制約情報を確認できます。",
+    "en": "Browse problems and their visibility and execution limits."
+  },
+  "問題文など": {
+    "ja": "問題文など",
+    "en": "Problem Statement"
+  },
+  "問題詳細と制約を確認し、そのまま提出できます。": {
+    "ja": "問題詳細と制約を確認し、そのまま提出できます。",
+    "en": "Read the problem and its constraints, then submit your solution."
+  },
+  "回答して採点する": {
+    "ja": "回答して採点する",
+    "en": "Submit Answers"
+  },
+  "回答後の解説（Markdown）": {
+    "ja": "回答後の解説（Markdown）",
+    "en": "Answer Explanation (Markdown)"
+  },
+  "学習": {
+    "ja": "学習",
+    "en": "Learn"
+  },
+  "学習する": {
+    "ja": "学習する",
+    "en": "Start Learning"
+  },
+  "学習データに接続できませんでした。しばらくしてから再度お試しください。": {
+    "ja": "学習データに接続できませんでした。しばらくしてから再度お試しください。",
+    "en": "Could not connect to learning data. Please try again later."
+  },
+  "学習ページを表示できません": {
+    "ja": "学習ページを表示できません",
+    "en": "Learning Page Unavailable"
+  },
+  "学習モード": {
+    "ja": "学習モード",
+    "en": "Learning"
+  },
+  "学習用テーブルが未作成です。デプロイ前に npm run db:learning を実行してください。": {
+    "ja": "学習用テーブルが未作成です。デプロイ前に npm run db:learning を実行してください。",
+    "en": "Learning tables have not been created. Run npm run db:learning before deployment."
+  },
+  "学習者によるコード編集を禁止する": {
+    "ja": "学習者によるコード編集を禁止する",
+    "en": "Disable code editing for learners"
+  },
+  "学習者表示のプレビュー": {
+    "ja": "学習者表示のプレビュー",
+    "en": "Learner Preview"
+  },
+  "学習進捗": {
+    "ja": "学習進捗",
+    "en": "Learning Progress"
+  },
+  "完了": {
+    "ja": "完了",
+    "en": "Complete"
+  },
+  "実行": {
+    "ja": "実行",
+    "en": "Run"
+  },
+  "実行コード {value0}": {
+    "ja": "実行コード {value0}",
+    "en": "Runnable code {value0}"
+  },
+  "実行中…": {
+    "ja": "実行中…",
+    "en": "Running…"
+  },
+  "実行時間の上限（10秒）を超えました。": {
+    "ja": "実行時間の上限（10秒）を超えました。",
+    "en": "Execution time limit exceeded (10 seconds)."
+  },
+  "実行欄": {
+    "ja": "実行欄",
+    "en": "Code Cell"
+  },
+  "実行欄を挿入": {
+    "ja": "実行欄を挿入",
+    "en": "Insert Code Cell"
+  },
+  "実行環境の準備がタイムアウトしました。": {
+    "ja": "実行環境の準備がタイムアウトしました。",
+    "en": "Runtime preparation timed out."
+  },
+  "実行環境を準備中…": {
+    "ja": "実行環境を準備中…",
+    "en": "Preparing Runtime…"
+  },
+  "必須項目": {
+    "ja": "必須項目",
+    "en": "Required items"
+  },
+  "指定されたリソースにアクセスできません。公開範囲設定により表示できない場合もあります。": {
+    "ja": "指定されたリソースにアクセスできません。公開範囲設定により表示できない場合もあります。",
+    "en": "The requested resource is unavailable. Its visibility settings may restrict access."
+  },
+  "採点と進捗保存にはログインしてください。": {
+    "ja": "採点と進捗保存にはログインしてください。",
+    "en": "Sign in to grade answers and save your progress."
+  },
+  "採点に失敗しました。": {
+    "ja": "採点に失敗しました。",
+    "en": "Could not grade the answers."
+  },
+  "採点中…": {
+    "ja": "採点中…",
+    "en": "Grading…"
+  },
+  "提出する": {
+    "ja": "提出する",
+    "en": "Submit"
+  },
+  "提出するにはログインが必要です。ログイン後、この問題ページに戻ります。": {
+    "ja": "提出するにはログインが必要です。ログイン後、この問題ページに戻ります。",
+    "en": "Sign in to submit. You will return to this problem after signing in."
+  },
+  "提出と進捗保存にはログインしてください。": {
+    "ja": "提出と進捗保存にはログインしてください。",
+    "en": "Sign in to submit and save your progress."
+  },
+  "提出に失敗しました。": {
+    "ja": "提出に失敗しました。",
+    "en": "Could not submit the code."
+  },
+  "提出の詳細結果です。テストケースごとの判定を確認できます。": {
+    "ja": "提出の詳細結果です。テストケースごとの判定を確認できます。",
+    "en": "Submission details and per-test-case results."
+  },
+  "提出は非同期ジャッジされます。対象問題に ZIP パッケージ（tests/config）が未設定の場合は `internal_error` になります。": {
+    "ja": "提出は非同期ジャッジされます。対象問題に ZIP パッケージ（tests/config）が未設定の場合は `internal_error` になります。",
+    "en": "Submissions are judged asynchronously. If the problem has no ZIP package (tests/config), the result is `internal_error`."
+  },
+  "提出を確認": {
+    "ja": "提出を確認",
+    "en": "Verify Submission"
+  },
+  "提出中...": {
+    "ja": "提出中...",
+    "en": "Submitting..."
+  },
+  "提出中…": {
+    "ja": "提出中…",
+    "en": "Submitting…"
+  },
+  "提出後に非同期ジャッジを実行し、提出詳細画面でテストケース別結果を確認できます。": {
+    "ja": "提出後に非同期ジャッジを実行し、提出詳細画面でテストケース別結果を確認できます。",
+    "en": "Judging runs asynchronously after submission. View per-case results on the submission detail page."
+  },
+  "提出言語": {
+    "ja": "提出言語",
+    "en": "Submission Language"
+  },
+  "提出詳細URLの最後にある提出ID": {
+    "ja": "提出詳細URLの最後にある提出ID",
+    "en": "Submission ID at the end of the detail URL"
+  },
+  "操作に失敗しました。": {
+    "ja": "操作に失敗しました。",
+    "en": "The operation failed."
+  },
+  "教材": {
+    "ja": "教材",
+    "en": "Lesson"
+  },
+  "教材、確認クイズ、練習問題を章の中で切り替えながら学べます。": {
+    "ja": "教材、確認クイズ、練習問題を章の中で切り替えながら学べます。",
+    "en": "Study lessons, take quizzes and solve practice problems within each chapter."
+  },
+  "教材ZIPは2 MiB以下にしてください。": {
+    "ja": "教材ZIPは2 MiB以下にしてください。",
+    "en": "Learning ZIP must be at most 2 MiB."
+  },
+  "教材が登録されると、ここから学習を始められます。": {
+    "ja": "教材が登録されると、ここから学習を始められます。",
+    "en": "Start learning here once courses are published."
+  },
+  "教材の読了・クイズ合格・練習問題のACをここで確認できます。": {
+    "ja": "教材の読了・クイズ合格・練習問題のACをここで確認できます。",
+    "en": "View completed lessons, passed quizzes and accepted practice submissions here."
+  },
+  "教材を取得できませんでした。": {
+    "ja": "教材を取得できませんでした。",
+    "en": "Could not fetch learning materials."
+  },
+  "教材を編集": {
+    "ja": "教材を編集",
+    "en": "Edit Course"
+  },
+  "教材を読み込めませんでした。": {
+    "ja": "教材を読み込めませんでした。",
+    "en": "Could not load learning materials."
+  },
+  "教材を読み込んでいます…": {
+    "ja": "教材を読み込んでいます…",
+    "en": "Loading learning materials…"
+  },
+  "教材作成にはproblem_authorまたはadmin権限が必要です。": {
+    "ja": "教材作成にはproblem_authorまたはadmin権限が必要です。",
+    "en": "Creating learning materials requires the problem_author or admin role."
+  },
+  "新しい版を公開しました。": {
+    "ja": "新しい版を公開しました。",
+    "en": "Published a new version."
+  },
+  "新規コンテスト": {
+    "ja": "新規コンテスト",
+    "en": "New Contest"
+  },
+  "新規作成": {
+    "ja": "新規作成",
+    "en": "Create New"
+  },
+  "既存ジャッジを利用します。非公開問題へのアクセスは付与しません。": {
+    "ja": "既存ジャッジを利用します。非公開問題へのアクセスは付与しません。",
+    "en": "Uses the existing judge. This does not grant access to private problems."
+  },
+  "更新する": {
+    "ja": "更新する",
+    "en": "Update"
+  },
+  "書き出しに失敗しました。": {
+    "ja": "書き出しに失敗しました。",
+    "en": "Could not export the ZIP."
+  },
+  "未保存の変更あり": {
+    "ja": "未保存の変更あり",
+    "en": "Unsaved changes"
+  },
+  "本文・補足（Markdown）": {
+    "ja": "本文・補足（Markdown）",
+    "en": "Content / Notes (Markdown)"
+  },
+  "概要": {
+    "ja": "概要",
+    "en": "Summary"
+  },
+  "標準入力": {
+    "ja": "標準入力",
+    "en": "Standard Input"
+  },
+  "標準入力の初期値": {
+    "ja": "標準入力の初期値",
+    "en": "Initial Standard Input"
+  },
+  "標準出力": {
+    "ja": "標準出力",
+    "en": "Standard Output"
+  },
+  "次へ": {
+    "ja": "次へ",
+    "en": "Next"
+  },
+  "正解": {
+    "ja": "正解",
+    "en": "Correct"
+  },
+  "正解：": {
+    "ja": "正解：",
+    "en": "Correct answer:"
+  },
+  "現在のテストケースと special judge 設定を使って、保存前にコードを試せます。": {
+    "ja": "現在のテストケースと special judge 設定を使って、保存前にコードを試せます。",
+    "en": "Test code against the current test cases and special judge settings before saving."
+  },
+  "現在の内容をZIPでダウンロード": {
+    "ja": "現在の内容をZIPでダウンロード",
+    "en": "Download Current ZIP"
+  },
+  "現在は summary モードです。問題別の詳細はコンテスト終了後に公開されます。": {
+    "ja": "現在は summary モードです。問題別の詳細はコンテスト終了後に公開されます。",
+    "en": "Summary mode is active. Per-problem details will be available after the contest ends."
+  },
+  "理由は必須で、`judge update / testcase fix / scoring bug / manual review` を選択できます。": {
+    "ja": "理由は必須で、`judge update / testcase fix / scoring bug / manual review` を選択できます。",
+    "en": "A reason is required. Choose `judge update / testcase fix / scoring bug / manual review`."
+  },
+  "確認クイズ": {
+    "ja": "確認クイズ",
+    "en": "Quiz"
+  },
+  "終了時刻": {
+    "ja": "終了時刻",
+    "en": "End Time"
+  },
+  "結果の取得に失敗しました。": {
+    "ja": "結果の取得に失敗しました。",
+    "en": "Could not fetch results."
+  },
+  "編集": {
+    "ja": "編集",
+    "en": "Edit"
+  },
+  "練習": {
+    "ja": "練習",
+    "en": "Practice"
+  },
+  "練習問題": {
+    "ja": "練習問題",
+    "en": "Practice Problem"
+  },
+  "練習問題の関連付け": {
+    "ja": "練習問題の関連付け",
+    "en": "Practice Problem Link"
+  },
+  "表示できる問題がありません。": {
+    "ja": "表示できる問題がありません。",
+    "en": "No problems are available."
+  },
+  "解説": {
+    "ja": "解説",
+    "en": "Editorial"
+  },
+  "解説はコンテスト終了後に公開されます。": {
+    "ja": "解説はコンテスト終了後に公開されます。",
+    "en": "The editorial will be published after the contest ends."
+  },
+  "解説はまだありません。": {
+    "ja": "解説はまだありません。",
+    "en": "No editorial is available yet."
+  },
+  "解説は現在非公開です。": {
+    "ja": "解説は現在非公開です。",
+    "en": "The editorial is currently private."
+  },
+  "解説専用ページです。公開条件に応じて内容が表示されます。": {
+    "ja": "解説専用ページです。公開条件に応じて内容が表示されます。",
+    "en": "The editorial is displayed according to its visibility settings."
+  },
+  "設問（Markdown）": {
+    "ja": "設問（Markdown）",
+    "en": "Question (Markdown)"
+  },
+  "設問を削除": {
+    "ja": "設問を削除",
+    "en": "Delete Question"
+  },
+  "設問を追加": {
+    "ja": "設問を追加",
+    "en": "Add Question"
+  },
+  "説明": {
+    "ja": "説明",
+    "en": "Description"
+  },
+  "読了にする": {
+    "ja": "読了にする",
+    "en": "Mark as Read"
+  },
+  "読了済み": {
+    "ja": "読了済み",
+    "en": "Read"
+  },
+  "識別名（半角英数字・ハイフン）": {
+    "ja": "識別名（半角英数字・ハイフン）",
+    "en": "Slug (ASCII letters, digits and hyphens)"
+  },
+  "通報": {
+    "ja": "通報",
+    "en": "Report"
+  },
+  "進捗の保存に失敗しました。": {
+    "ja": "進捗の保存に失敗しました。",
+    "en": "Could not save progress."
+  },
+  "進捗は公開版ごとに保存されます。教材の更新後も以前の版の学習URL・進捗は残ります。": {
+    "ja": "進捗は公開版ごとに保存されます。教材の更新後も以前の版の学習URL・進捗は残ります。",
+    "en": "Progress is saved per published version. Previous learning URLs and progress remain available after updates."
+  },
+  "進捗保存に失敗しました。": {
+    "ja": "進捗保存に失敗しました。",
+    "en": "Could not save progress."
+  },
+  "過去のAC提出を使って完了にする": {
+    "ja": "過去のAC提出を使って完了にする",
+    "en": "Complete with a Previous AC Submission"
+  },
+  "選択肢": {
+    "ja": "選択肢",
+    "en": "Answer Option"
+  },
+  "選択肢を追加": {
+    "ja": "選択肢を追加",
+    "en": "Add Option"
+  },
+  "選択順で問題ラベルを `A`, `B`, `C` と割り当てます。現在:": {
+    "ja": "選択順で問題ラベルを `A`, `B`, `C` と割り当てます。現在:",
+    "en": "Problem labels `A`, `B`, `C` follow the selection order. Current order:"
+  },
+  "開催期間、問題セット、順位表公開設定を入力してコンテストを作成します。": {
+    "ja": "開催期間、問題セット、順位表公開設定を入力してコンテストを作成します。",
+    "en": "Create a contest by configuring its schedule, problem set and scoreboard visibility."
+  },
+  "開始:": {
+    "ja": "開始:",
+    "en": "Start:"
+  },
+  "開始時刻": {
+    "ja": "開始時刻",
+    "en": "Start Time"
+  },
+  "章": {
+    "ja": "章",
+    "en": "Chapter"
+  },
+  "章とタブ": {
+    "ja": "章とタブ",
+    "en": "Chapters and Tabs"
+  },
+  "章の名前": {
+    "ja": "章の名前",
+    "en": "Chapter Title"
+  },
+  "章の教材・クイズ・練習問題": {
+    "ja": "章の教材・クイズ・練習問題",
+    "en": "Chapter lessons, quizzes and practice problems"
+  },
+  "章を上へ": {
+    "ja": "章を上へ",
+    "en": "Move Chapter Up"
+  },
+  "章を下へ": {
+    "ja": "章を下へ",
+    "en": "Move Chapter Down"
+  },
+  "章を削除": {
+    "ja": "章を削除",
+    "en": "Delete Chapter"
+  },
+  "章を追加": {
+    "ja": "章を追加",
+    "en": "Add Chapter"
+  },
+  "順位表データがありません。": {
+    "ja": "順位表データがありません。",
+    "en": "No scoreboard data is available."
+  },
+  "Contest Details": {
+    "ja": "コンテスト詳細",
+    "en": "Contest Details"
+  },
+  "Virtual submissions do not affect official standings or ratings.": {
+    "ja": "バーチャル提出は正式順位表やレーティングに影響しません。",
+    "en": "Virtual submissions do not affect official standings or ratings."
+  },
+  "Contest submissions count only during the official window. After it ends, submissions are treated as practice.": {
+    "ja": "開催中の提出だけが正式順位表に反映され、終了後は練習提出として扱われます。",
+    "en": "Contest submissions count only during the official window. After it ends, submissions are treated as practice."
+  },
+  "Ratings": {
+    "ja": "レーティング",
+    "en": "Ratings"
+  },
+  "OJP Elo Rating": {
+    "ja": "OJP Elo レーティング",
+    "en": "OJP Elo Rating"
+  },
+  "Rating Rules": {
+    "ja": "レーティングのルール",
+    "en": "Rating Rules"
+  },
+  "Independent of AtCoder ratings. Initial rating: 1500; K: 32. Only public Rated contests count.": {
+    "ja": "AtCoderとは独立したレーティングです。初期値1500・K値32で、公開されたRatedコンテストだけが対象です。",
+    "en": "Independent of AtCoder ratings. Initial rating: 1500; K: 32. Only public Rated contests count."
+  },
+  "Each result is compared with every eligible opponent using Elo expected scores. Ties count as half a win, and the average difference determines the change.": {
+    "ja": "対象の各参加者との結果をEloの期待勝率と比較します。同順位は引き分けとし、その差の平均で変動を決めます。",
+    "en": "Each result is compared with every eligible opponent using Elo expected scores. Ties count as half a win, and the average difference determines the change."
+  },
+  "Rated requires a public contest and at least two eligible participants. Organizers, problem authors and virtual participants are excluded.": {
+    "ja": "Ratedには公開設定と対象参加者2人以上が必要です。主催者・出題者・バーチャル参加者は対象外です。",
+    "en": "Rated requires a public contest and at least two eligible participants. Organizers, problem authors and virtual participants are excluded."
+  },
+  "Ratings are recalculated chronologically from judged official submissions. Pending judgments or internal errors defer this and later Rated results; rejudging never applies a change twice.": {
+    "ja": "正式提出の結果から終了時刻順に再計算します。未完了のジャッジや内部エラーがある場合、それ以降のRatedの計算も保留します。再ジャッジで二重加算はしません。",
+    "en": "Ratings are recalculated chronologically from judged official submissions. Pending judgments or internal errors defer this and later Rated results; rejudging never applies a change twice."
+  },
+  "Rating Leaderboard": {
+    "ja": "レーティング順位表",
+    "en": "Rating Leaderboard"
+  },
+  "Rating": {
+    "ja": "レーティング",
+    "en": "Rating"
+  },
+  "Rated Contests": {
+    "ja": "Rated参加回数",
+    "en": "Rated Contests"
+  },
+  "No Rated contest history yet.": {
+    "ja": "Ratedコンテストの履歴はまだありません。",
+    "en": "No Rated contest history yet."
+  },
+  "Timing, problem set, points, penalty and Rated settings are locked after the contest starts.": {
+    "ja": "開始後は開催日時・問題セット・配点・ペナルティ・Rated設定を変更できません。",
+    "en": "Timing, problem set, points, penalty and Rated settings are locked after the contest starts."
+  },
+  "開始日時": {
+    "ja": "開始日時",
+    "en": "Start Time"
+  },
+  "終了日時": {
+    "ja": "終了日時",
+    "en": "End Time"
+  },
+  "Full standings": {
+    "ja": "全詳細を公開",
+    "en": "Full standings"
+  },
+  "Totals only until the contest ends": {
+    "ja": "終了までは合計点だけを公開",
+    "en": "Totals only until the contest ends"
+  },
+  "Hidden until the contest ends": {
+    "ja": "終了まで非公開",
+    "en": "Hidden until the contest ends"
+  },
+  "Rated contest (OJP Elo)": {
+    "ja": "Ratedコンテスト（OJP Elo）",
+    "en": "Rated contest (OJP Elo)"
+  },
+  "Maximum Points": {
+    "ja": "満点の配点",
+    "en": "Maximum Points"
+  },
+  "Order": {
+    "ja": "順序",
+    "en": "Order"
+  },
+  "Problem label {index}": {
+    "ja": "問題{index}のラベル",
+    "en": "Problem label {index}"
+  },
+  "Maximum points {index}": {
+    "ja": "問題{index}の満点配点",
+    "en": "Maximum points {index}"
+  },
+  "Move Up": {
+    "ja": "上へ",
+    "en": "Move Up"
+  },
+  "Move Down": {
+    "ja": "下へ",
+    "en": "Move Down"
+  },
+  "Problem scores (0-100) are scaled to the configured maximum points. Partial scores are retained to two decimal places.": {
+    "ja": "問題の得点（0〜100点）を設定した配点に換算します。部分点は小数第2位まで保持します。",
+    "en": "Problem scores (0-100) are scaled to the configured maximum points. Partial scores are retained to two decimal places."
+  },
+  "Joined": {
+    "ja": "参加済み",
+    "en": "Joined"
+  },
+  "End this virtual attempt? It cannot be restarted.": {
+    "ja": "このバーチャル参加を終了しますか？ 同じコンテストでは再開できません。",
+    "en": "End this virtual attempt? It cannot be restarted."
+  },
+  "Rating Change": {
+    "ja": "レーティング変動",
+    "en": "Rating Change"
+  },
+  "Contest ended": {
+    "ja": "コンテスト終了",
+    "en": "Contest ended"
+  },
+  "Standings refresh automatically every 5 seconds while this tab is visible.": {
+    "ja": "このタブを表示中は5秒ごとに順位表を自動更新します。",
+    "en": "Standings refresh automatically every 5 seconds while this tab is visible."
+  },
+  "Available after the contest starts": {
+    "ja": "開始後に公開",
+    "en": "Available after the contest starts"
+  },
+  "Official Standings": {
+    "ja": "正式順位表",
+    "en": "Official Standings"
+  },
+  "Rating Rules and Leaderboard": {
+    "ja": "レーティングのルール・順位表",
+    "en": "Rating Rules and Leaderboard"
+  },
+  "Virtual Participation": {
+    "ja": "バーチャル参加",
+    "en": "Virtual Participation"
+  },
+  "One timed attempt per contest. Your timer is stored on the server and cannot be reset. Official standings and ratings are unaffected.": {
+    "ja": "コンテストごとに1回、制限時間付きで参加できます。開始時刻はサーバーに保存され、タイマーはリセットできません。正式順位表やレーティングには影響しません。",
+    "en": "One timed attempt per contest. Your timer is stored on the server and cannot be reset. Official standings and ratings are unaffected."
+  },
+  "Virtual time remaining: {time}": {
+    "ja": "バーチャル残り時間: {time}",
+    "en": "Virtual time remaining: {time}"
+  },
+  "Virtual participation has ended.": {
+    "ja": "バーチャル参加は終了しています。",
+    "en": "Virtual participation has ended."
+  },
+  "Finish Virtual Participation": {
+    "ja": "バーチャル参加を終了",
+    "en": "Finish Virtual Participation"
+  },
+  "Date": {
+    "ja": "日時",
+    "en": "Date"
+  },
+  "Contest title is required (maximum 200 characters).": {
+    "ja": "コンテストのタイトルは必須です（200文字まで）。",
+    "en": "Contest title is required (maximum 200 characters)."
+  },
+  "Contest slug must use ASCII letters, digits and hyphens (maximum 100 characters).": {
+    "ja": "Slugは半角英数字とハイフンで指定してください（100文字まで）。",
+    "en": "Contest slug must use ASCII letters, digits and hyphens (maximum 100 characters)."
+  },
+  "Contest description is too long.": {
+    "ja": "コンテストの説明が長すぎます。",
+    "en": "Contest description is too long."
+  },
+  "Contest duration must be positive and at most 31 days.": {
+    "ja": "終了日時は開始日時より後、開催期間は31日以内にしてください。",
+    "en": "Contest duration must be positive and at most 31 days."
+  },
+  "Penalty must be an integer between 0 and 1440 minutes.": {
+    "ja": "ペナルティは0〜1440分の整数で指定してください。",
+    "en": "Penalty must be an integer between 0 and 1440 minutes."
+  },
+  "Invalid contest visibility.": {
+    "ja": "コンテストの公開設定が不正です。",
+    "en": "Invalid contest visibility."
+  },
+  "Rated must be a boolean.": {
+    "ja": "Ratedは有効・無効で指定してください。",
+    "en": "Rated must be a boolean."
+  },
+  "Rated contests must be public.": {
+    "ja": "Ratedコンテストは公開設定にしてください。",
+    "en": "Rated contests must be public."
+  },
+  "Select between 1 and 100 contest problems.": {
+    "ja": "問題を1〜100問選択してください。",
+    "en": "Select between 1 and 100 contest problems."
+  },
+  "Contest problem IDs, labels and ordering must be unique.": {
+    "ja": "問題ID・ラベル・順序は重複しないようにしてください。",
+    "en": "Contest problem IDs, labels and ordering must be unique."
+  },
+  "Invalid contest problem label or ordering.": {
+    "ja": "問題のラベルまたは順序が不正です。",
+    "en": "Invalid contest problem label or ordering."
+  },
+  "Problem points must be an integer between 1 and 1000000.": {
+    "ja": "配点は1〜1000000の整数で指定してください。",
+    "en": "Problem points must be an integer between 1 and 1000000."
+  },
+  "You cannot add this problem to a contest.": {
+    "ja": "この問題をコンテストに追加する権限がありません。",
+    "en": "You cannot add this problem to a contest."
+  },
+  "A started Rated contest must remain public.": {
+    "ja": "開始済みのRatedコンテストは公開設定を維持してください。",
+    "en": "A started Rated contest must remain public."
+  },
+  "Invalid contest problem set.": {
+    "ja": "コンテストの問題セットが不正です。",
+    "en": "Invalid contest problem set."
+  },
+  "Invalid contest settings.": {
+    "ja": "コンテストの設定が不正です。",
+    "en": "Invalid contest settings."
+  },
+  "Rated contests must be configured before they start.": {
+    "ja": "Rated設定はコンテスト開始前に行ってください。",
+    "en": "Rated contests must be configured before they start."
+  },
+  "Virtual participation is available only after the contest ends.": {
+    "ja": "バーチャル参加はコンテスト終了後に利用できます。",
+    "en": "Virtual participation is available only after the contest ends."
+  },
+  "Virtual participation not found.": {
+    "ja": "バーチャル参加が見つかりません。",
+    "en": "Virtual participation not found."
+  },
+  "Virtual submissions require a contest.": {
+    "ja": "バーチャル提出にはコンテストの指定が必要です。",
+    "en": "Virtual submissions require a contest."
+  },
+  "This contest is Unrated.": {
+    "ja": "このコンテストはUnratedです。",
+    "en": "This contest is Unrated."
+  },
+  "Ratings will be calculated after the contest ends.": {
+    "ja": "レーティングはコンテスト終了後に計算されます。",
+    "en": "Ratings will be calculated after the contest ends."
+  },
+  "Ratings are pending until all judgments, including earlier Rated contests, are complete and internal errors are resolved.": {
+    "ja": "先行するRatedコンテストを含め、すべてのジャッジ完了と内部エラー解消までレーティングを保留します。",
+    "en": "Ratings are pending until all judgments, including earlier Rated contests, are complete and internal errors are resolved."
+  },
+  "At least two eligible participants are needed to update ratings.": {
+    "ja": "レーティングの更新には対象参加者が2人以上必要です。",
+    "en": "At least two eligible participants are needed to update ratings."
+  },
+  "OJP Elo ratings calculated. Virtual participation does not affect ratings.": {
+    "ja": "OJP Eloレーティングを計算しました。バーチャル参加は対象外です。",
+    "en": "OJP Elo ratings calculated. Virtual participation does not affect ratings."
+  },
+  "Standings could not be refreshed. Retrying automatically.": {
+    "ja": "順位表を更新できませんでした。自動で再試行します。",
+    "en": "Standings could not be refreshed. Retrying automatically."
+  },
+  "Starts in {time}": {
+    "ja": "開始まで: {time}",
+    "en": "Starts in {time}"
+  },
+  "Time remaining: {time}": {
+    "ja": "残り時間: {time}",
+    "en": "Time remaining: {time}"
+  },
+  "Rated (OJP Elo)": {
+    "ja": "Rated（OJP Elo）",
+    "en": "Rated (OJP Elo)"
+  },
+  "Virtual Submit": {
+    "ja": "バーチャル提出",
+    "en": "Virtual Submit"
+  },
+  "Practice Submit": {
+    "ja": "練習提出",
+    "en": "Practice Submit"
+  },
+  "Starting...": {
+    "ja": "開始中...",
+    "en": "Starting..."
+  },
+  "Start Virtual Participation": {
+    "ja": "バーチャル参加を開始",
+    "en": "Start Virtual Participation"
+  },
+  "Invalid virtual participation action.": {
+    "ja": "バーチャル参加の操作が不正です。",
+    "en": "Invalid virtual participation action."
+  },
+  "failed to update virtual participation": {
+    "ja": "バーチャル参加を更新できませんでした。",
+    "en": "failed to update virtual participation"
+  },
+  "Virtual Submissions": {
+    "ja": "バーチャル提出",
+    "en": "Virtual Submissions"
+  },
+  "Cannot rejudge while this submission is still being judged.": {
+    "ja": "この提出はまだジャッジ中のため、再ジャッジできません。",
+    "en": "Cannot rejudge while this submission is still being judged."
+  },
+  "Submission metadata is not available for judging.": {
+    "ja": "提出情報を取得できないため、ジャッジを実行できません。",
+    "en": "Submission metadata is not available for judging."
+  },
+  "Times use Japan Standard Time (UTC+09:00).": {
+    "ja": "日時は日本標準時（UTC+09:00）で指定します。",
+    "en": "Times use Japan Standard Time (UTC+09:00)."
+  },
+  "Select problem {title} ({id})": {
+    "ja": "問題を選択: {title} ({id})",
+    "en": "Select problem {title} ({id})"
+  },
+  "Confirm Finish": {
+    "ja": "終了を確定",
+    "en": "Confirm Finish"
+  },
+  "Cancel": {
+    "ja": "キャンセル",
+    "en": "Cancel"
+  }
+}

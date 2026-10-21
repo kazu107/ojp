@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { FormEvent, useState } from "react";
 import type { ProblemPackageValidationResult } from "@/lib/problem-package";
@@ -8,6 +10,7 @@ interface ProblemPackageUploadFormProps {
 }
 
 export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadFormProps) {
+  const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
@@ -51,7 +54,7 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
   return (
     <form className="form" onSubmit={onSubmit}>
       <label className="field">
-        <span className="field-label">Problem Package (ZIP)</span>
+        <span className="field-label">{t("Problem Package (ZIP)")}</span>
         <input
           className="input"
           type="file"
@@ -61,60 +64,52 @@ export function ProblemPackageUploadForm({ problemId }: ProblemPackageUploadForm
       </label>
 
       <p className="text-soft">
-        Required files: `statement.md`, `config.json`, `samples/*.in/.out`,
-        `tests/&lt;group&gt;/*.in/.out`
+        {t("Required files: `statement.md`, `config.json`, `samples/*.in/.out`, `tests/<group>/*.in/.out`")}</p>
+      <p className="text-soft">
+        {t("In ")}<code>config.json</code>{t(", each group can be either ")}<code>&quot;group1&quot;</code> {t(" or")}{" "}
+        <code>{t("{ \"name\": \"group1\", \"score\": 50 }")}</code>{t(". Test files are auto-detected from each ")}<code>tests/&lt;group&gt;/</code> {t(" directory.")}</p>
+      <p className="text-soft">
+        {t("For special judge, set ")}<code>checkerType</code> {t(" to ")}<code>special_judge</code>{t(", set")}{" "}
+        <code>checkerLanguage</code>{t(", and include the checker source at ")}<code>checker/Main.*</code>.
       </p>
       <p className="text-soft">
-        In <code>config.json</code>, each group can be either <code>&quot;group1&quot;</code> or{" "}
-        <code>{`{ "name": "group1", "score": 50 }`}</code>. Test files are auto-detected from
-        each <code>tests/&lt;group&gt;/</code> directory.
-      </p>
-      <p className="text-soft">
-        For special judge, set <code>checkerType</code> to <code>special_judge</code>, set{" "}
-        <code>checkerLanguage</code>, and include the checker source at <code>checker/Main.*</code>.
-      </p>
-      <p className="text-soft">
-        Group partial scores are optional. If you set `groups[].score`, every group must have it
-        and total score must be exactly 100. If omitted, the judge uses binary scoring (all groups
-        passed = 100).
-      </p>
+        {t("Group partial scores are optional. If you set `groups[].score`, every group must have it and total score must be exactly 100. If omitted, the judge uses binary scoring (all groups passed = 100).")}</p>
 
-      {error ? <p className="badge badge-red">{error}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
 
       <div className="button-row">
         <button type="submit" className="button" disabled={isUploading}>
-          {isUploading ? "Validating..." : "Validate ZIP Package"}
+          {isUploading ? t("Validating...") : t("Validate ZIP Package")}
         </button>
       </div>
 
       {result ? (
         <div className="panel stack">
-          <h3 className="panel-title">Validation Result</h3>
-          <p className="text-soft">File: {result.fileName}</p>
+          <h3 className="panel-title">{t("Validation Result")}</h3>
+          <p className="text-soft">{t("File: ")}{result.fileName}</p>
           <p className="text-soft">
-            ZIP size: {result.zipSizeBytes} bytes / Files: {result.fileCount}
+            {t("ZIP size: ")}{result.zipSizeBytes} {t(" bytes / Files: ")}{result.fileCount}
           </p>
           <p className="text-soft">
-            Samples: {result.samplePairs} pairs / Tests: {result.testGroupCount} groups,{" "}
-            {result.totalTestPairs} pairs
-          </p>
+            {t("Samples: ")}{result.samplePairs} {t(" pairs / Tests: ")}{result.testGroupCount} {t(" groups,")}{" "}
+            {result.totalTestPairs} {t(" pairs")}</p>
           <p className="text-soft">
-            Config: TL {result.config.timeLimitMs} ms / ML {result.config.memoryLimitMb} MB /{" "}
-            {result.config.scoringType} / {result.config.checkerType}
+            {t("Config: TL ")}{result.config.timeLimitMs} {t(" ms / ML ")}{result.config.memoryLimitMb} {t(" MB /")}{" "}
+            {t(result.config.scoringType)} / {t(result.config.checkerType)}
             {result.config.checkerLanguage ? `(${result.config.checkerLanguage})` : ""} /{" "}
-            {result.config.compareMode}
+            {t(result.config.compareMode)}
           </p>
           {result.warnings.length > 0 ? (
             <div className="stack">
-              <p className="field-label">Warnings</p>
+              <p className="field-label">{t("Warnings")}</p>
               {result.warnings.map((warning) => (
-                <p key={warning} className="text-soft">
-                  - {warning}
+                <p key={t(warning)} className="text-soft">
+                  - {t(warning)}
                 </p>
               ))}
             </div>
           ) : (
-            <p className="badge">No warnings.</p>
+            <p className="badge">{t("No warnings.")}</p>
           )}
         </div>
       ) : null}

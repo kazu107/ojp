@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContestEditorForm } from "@/components/contest-editor-form";
@@ -5,6 +7,7 @@ import { VisibilityActionButtons } from "@/components/visibility-action-buttons"
 import {
   canEditContestByViewer,
   getContestForViewer,
+  getContestStatus,
   getCurrentUser,
   listProblemsForListView,
 } from "@/lib/store";
@@ -16,6 +19,7 @@ interface EditContestPageProps {
 }
 
 export default async function EditContestPage({ params }: EditContestPageProps) {
+  const { t } = await getI18n();
   const { contestId } = await params;
   const me = await getCurrentUser();
   const contest = getContestForViewer(contestId, me.id);
@@ -30,8 +34,8 @@ export default async function EditContestPage({ params }: EditContestPageProps) 
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Edit Contest</h1>
-          <p className="page-subtitle">Update contest window, settings, and problem set.</p>
+          <h1 className="page-title">{t("Edit Contest")}</h1>
+          <p className="page-subtitle">{t("Update contest window, settings, and problem set.")}</p>
         </div>
       </section>
 
@@ -41,14 +45,14 @@ export default async function EditContestPage({ params }: EditContestPageProps) 
             <ContestEditorForm
               mode="edit"
               initialContest={contest}
+              structureLocked={getContestStatus(contest) !== "scheduled"}
               availableProblems={availableProblems}
             />
           </section>
           <section className="panel stack">
-            <h2 className="panel-title">Publish Settings</h2>
+            <h2 className="panel-title">{t("Publish Settings")}</h2>
             <p className="panel-subtitle">
-              Publish makes this contest public. Unpublish makes it private.
-            </p>
+              {t("Publish makes this contest public. Unpublish makes it private.")}</p>
             <VisibilityActionButtons
               resourceType="contest"
               resourceId={contest.id}
@@ -58,11 +62,10 @@ export default async function EditContestPage({ params }: EditContestPageProps) 
         </>
       ) : (
         <section className="panel stack">
-          <p className="badge badge-red">You do not have permission to edit this contest.</p>
+          <p className="badge badge-red">{t("You do not have permission to edit this contest.")}</p>
           <div className="button-row">
             <Link href={`/contests/${contest.id}`} className="button button-secondary">
-              Back to Contest
-            </Link>
+              {t("Back to Contest")}</Link>
           </div>
         </section>
       )}

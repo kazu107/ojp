@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SubmissionForm } from "@/components/submission-form";
@@ -5,6 +7,8 @@ import {
   getContestForViewer,
   getCurrentUser,
   getProblemForViewer,
+  getProblemForContestViewer,
+  getVirtualParticipationForViewer,
 } from "@/lib/store";
 
 interface SubmitPageProps {
@@ -13,14 +17,16 @@ interface SubmitPageProps {
   }>;
   searchParams: Promise<{
     contestId?: string;
+    virtualParticipationId?: string;
   }>;
 }
 
 export default async function SubmitPage({ params, searchParams }: SubmitPageProps) {
+  const { t } = await getI18n();
   const { problemId } = await params;
-  const { contestId } = await searchParams;
+  const { contestId, virtualParticipationId } = await searchParams;
   const me = await getCurrentUser();
-  const problem = getProblemForViewer(problemId, me.id);
+  const problem = contestId ? getProblemForContestViewer(problemId,contestId,me.id) : getProblemForViewer(problemId, me.id);
 
   if (!problem) {
     notFound();
@@ -30,22 +36,23 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
   if (contestId && !contest) {
     notFound();
   }
+  if (virtualParticipationId) {
+    const session = contestId ? await getVirtualParticipationForViewer(contestId) : null;
+    if (!session || session.id !== virtualParticipationId) notFound();
+  }
 
   return (
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Submit: {problem.title}</h1>
+          <h1 className="page-title">{t("Submit: ")}{problem.title}</h1>
           <p className="page-subtitle">
-            {contest
-              ? `コンテスト ${contest.title} への提出です。参加済みかつ開催中の場合のみ受理されます。`
-              : "提出後に非同期ジャッジを実行し、提出詳細画面でテストケース別結果を確認できます。"}
+            {virtualParticipationId ? t("Virtual submissions do not affect official standings or ratings.") : contest ? t("Contest submissions count only during the official window. After it ends, submissions are treated as practice.") : t("提出後に非同期ジャッジを実行し、提出詳細画面でテストケース別結果を確認できます。")}
           </p>
         </div>
         <div className="button-row">
-          <Link className="button button-secondary" href={`/problems/${problem.id}`}>
-            問題に戻る
-          </Link>
+          <Link className="button button-secondary" href={`/problems/${problem.id}${contestId?`?contestId=${contestId}${virtualParticipationId?`&virtualParticipationId=${virtualParticipationId}`:""}`:""}`}>
+            {t("問題に戻る")}</Link>
         </div>
       </section>
 
@@ -53,6 +60,7 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
         <SubmissionForm
           problemId={problem.id}
           contestId={contest?.id ?? null}
+          virtualParticipationId={virtualParticipationId ?? null}
         />
       </section>
     </div>

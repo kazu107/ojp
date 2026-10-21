@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { SubmissionLiveRefresh } from "@/components/submission-live-refresh";
 import { StatusBadge } from "@/components/status-badge";
@@ -62,6 +64,7 @@ function parseLimitFilter(raw?: string): number | undefined {
 export const dynamic = "force-dynamic";
 
 export default async function SubmissionsPage({ searchParams }: SubmissionsPageProps) {
+  const { t, locale } = await getI18n();
   const me = await getOptionalCurrentUser();
   const raw = await searchParams;
 
@@ -85,74 +88,73 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Submissions</h1>
+          <h1 className="page-title">{t("Submissions")}</h1>
           <p className="page-subtitle">
-            Filter by user/problem/contest/status/language. Source code is visible only to submitter and admin.
-          </p>
+            {t("Filter by user/problem/contest/status/language. Source code is visible only to submitter and admin.")}</p>
         </div>
       </section>
 
       <section className="panel stack">
-        <h2 className="panel-title">Filters</h2>
+        <h2 className="panel-title">{t("Filters")}</h2>
         {mineRequested && !me ? (
-          <p className="badge badge-red">Sign in is required to use &quot;Only me&quot; filter.</p>
+          <p className="badge badge-red">{t("Sign in is required to use \"Only me\" filter.")}</p>
         ) : null}
 
         <form method="GET" className="form">
           <div className="form-grid">
             <label className="field">
-              <span className="field-label">Mine</span>
+              <span className="field-label">{t("Mine")}</span>
               <select className="select" name="mine" defaultValue={raw.mine === "1" ? "1" : "0"}>
-                <option value="0">All</option>
-                <option value="1">Only me</option>
+                <option value="0">{t("All")}</option>
+                <option value="1">{t("Only me")}</option>
               </select>
             </label>
 
             <label className="field">
-              <span className="field-label">User ID</span>
-              <input className="input" name="userId" defaultValue={raw.userId ?? ""} placeholder="u2" />
+              <span className="field-label">{t("User ID")}</span>
+              <input className="input" name="userId" defaultValue={raw.userId ?? ""} placeholder={t("u2")} />
             </label>
 
             <label className="field">
-              <span className="field-label">Problem ID</span>
+              <span className="field-label">{t("Problem ID")}</span>
               <input
                 className="input"
                 name="problemId"
                 defaultValue={raw.problemId ?? ""}
-                placeholder="p1000"
+                placeholder={t("p1000")}
               />
             </label>
 
             <label className="field">
-              <span className="field-label">Contest ID</span>
+              <span className="field-label">{t("Contest ID")}</span>
               <input
                 className="input"
                 name="contestId"
                 defaultValue={raw.contestId ?? ""}
-                placeholder="c1000 or none"
+                placeholder={t("c1000 or none")}
               />
             </label>
 
             <label className="field">
-              <span className="field-label">Status</span>
+              <span className="field-label">{t("Status")}</span>
               <select
                 className="select"
                 name="status"
                 defaultValue={normalizeSubmissionStatus(raw.status) ?? ""}
               >
-                <option value="">All</option>
+                <option value="">{t("All")}</option>
                 {STATUS_FILTER_VALUES.map((status) => (
                   <option key={status} value={status}>
-                    {submissionStatusLabel(status)}
+                    {t(submissionStatusLabel(status))}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="field">
-              <span className="field-label">Language</span>
+              <span className="field-label">{t("Language")}</span>
               <select className="select" name="language" defaultValue={raw.language ?? ""}>
-                <option value="">All</option>
+                <option value="">{t("All")}</option>
                 {LANGUAGE_FILTER_VALUES.map((language) => (
                   <option key={language} value={language}>
                     {languageLabel(language)}
@@ -162,18 +164,16 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
             </label>
 
             <label className="field">
-              <span className="field-label">Limit</span>
+              <span className="field-label">{t("Limit")}</span>
               <input className="input" name="limit" defaultValue={raw.limit ?? ""} placeholder="50" />
             </label>
           </div>
 
           <div className="button-row">
             <button className="button" type="submit">
-              Apply
-            </button>
+              {t("Apply")}</button>
             <Link href="/submissions" className="button button-secondary">
-              Reset
-            </Link>
+              {t("Reset")}</Link>
           </div>
         </form>
       </section>
@@ -184,22 +184,22 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
           message="Some submissions are waiting for judge. The list refreshes automatically."
         />
         {submissions.length === 0 ? (
-          <p className="empty">No submissions found for the current filter.</p>
+          <p className="empty">{t("No submissions found for the current filter.")}</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>User</th>
-                  <th>Problem</th>
-                  <th>Difficulty</th>
-                  <th>Language</th>
-                  <th>Status</th>
-                  <th>Score</th>
-                  <th>Time</th>
-                  <th>Memory</th>
-                  <th>Submitted</th>
+                  <th>{t("ID")}</th>
+                  <th>{t("User")}</th>
+                  <th>{t("Problem")}</th>
+                  <th>{t("Difficulty")}</th>
+                  <th>{t("Language")}</th>
+                  <th>{t("Status")}</th>
+                  <th>{t("Score")}</th>
+                  <th>{t("Time")}</th>
+                  <th>{t("Memory")}</th>
+                  <th>{t("Submitted")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -226,7 +226,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                       <td>
                         {problem ? (
                           <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
-                            {difficultyLabel(problem.difficulty)}
+                            {t(difficultyLabel(problem.difficulty))}
                           </StatusBadge>
                         ) : (
                           "-"
@@ -235,13 +235,13 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                       <td>{languageLabel(submission.language)}</td>
                       <td>
                         <StatusBadge className={badgeClassForSubmission(submission.status)}>
-                          {submissionStatusLabel(submission.status)}
+                          {t(submissionStatusLabel(submission.status))}
                         </StatusBadge>
                       </td>
                       <td>{submission.score}</td>
-                      <td>{submission.totalTimeMs} ms</td>
-                      <td>{submission.peakMemoryKb} KB</td>
-                      <td>{formatDate(submission.submittedAt)}</td>
+                      <td>{submission.totalTimeMs} {t(" ms")}</td>
+                      <td>{submission.peakMemoryKb} {t(" KB")}</td>
+                      <td>{formatDate(submission.submittedAt, locale)}</td>
                     </tr>
                   );
                 })}

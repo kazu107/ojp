@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -17,6 +19,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function ContestsPage() {
+  const { t, locale } = await getI18n();
   const me = await getOptionalCurrentUser();
   const canCreateContest = me ? canCreateContestByRole(me.role) : false;
   const contests = listContestsForListView(me?.id ?? "guest");
@@ -25,34 +28,32 @@ export default async function ContestsPage() {
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Contests</h1>
+          <h1 className="page-title">{t("Contests")}</h1>
           <p className="page-subtitle">
-            コンテスト一覧です。状態遷移（scheduled/running/ended）と順位表公開設定を確認できます。
-          </p>
+            {t("コンテスト一覧です。状態遷移（scheduled/running/ended）と順位表公開設定を確認できます。")}</p>
         </div>
         <div className="button-row">
           {canCreateContest ? (
             <Link href="/contests/new" className="button">
-              新規コンテスト
-            </Link>
+              {t("新規コンテスト")}</Link>
           ) : null}
         </div>
       </section>
 
       <section className="panel">
         {contests.length === 0 ? (
-          <p className="empty">コンテストが作成されていません。</p>
+          <p className="empty">{t("コンテストが作成されていません。")}</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Title</th>
-                  <th>Status</th>
-                  <th>Visibility</th>
-                  <th>Window</th>
-                  <th>Problems</th>
-                  <th>Scoreboard</th>
+                  <th>{t("Title")}</th>
+                  <th>{t("Status")}</th>
+                  <th>{t("Visibility")}</th>
+                  <th>{t("Window")}</th>
+                  <th>{t("Problems")}</th>
+                  <th>{t("Scoreboard")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -67,19 +68,19 @@ export default async function ContestsPage() {
                       </td>
                       <td>
                         <StatusBadge className={badgeClassForContestStatus(status)}>
-                          {contestStatusLabel(status)}
+                          {t(contestStatusLabel(status))}
                         </StatusBadge>
                       </td>
                       <td>
                         <StatusBadge className={badgeClassForVisibility(contest.visibility)}>
-                          {visibilityLabel(contest.visibility)}
+                          {t(visibilityLabel(contest.visibility))}
                         </StatusBadge>
                       </td>
                       <td>
-                        {formatDate(contest.startAt)} - {formatDate(contest.endAt)}
+                        {formatDate(contest.startAt, locale)} - {formatDate(contest.endAt, locale)}
                       </td>
                       <td>{contest.problems.length}</td>
-                      <td>{contest.scoreboardVisibility}</td>
+                      <td>{t(contest.scoreboardVisibility)}</td>
                     </tr>
                   );
                 })}

@@ -158,6 +158,54 @@ a {
   font-family: var(--font-jp-mono), monospace;
 }
 
+.language-switcher {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.language-options {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: rgba(3, 8, 15, 0.4);
+}
+
+.language-options button {
+  padding: 0.35rem 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.language-options button[aria-pressed="true"] {
+  color: #111;
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.language-options button:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+.language-options button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.language-error {
+  display: block;
+  max-width: 16rem;
+  color: var(--danger);
+  font-size: 0.75rem;
+}
+
 .site-main {
   position: relative;
   z-index: 1;

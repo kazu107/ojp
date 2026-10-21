@@ -10,17 +10,27 @@ const PUBLIC_PAGE_PATTERNS: RegExp[] = [
   /^\/contests\/[^/]+$/,
   /^\/submissions$/,
   /^\/submissions\/[^/]+$/,
+  /^\/learn$/,
+  /^\/ratings$/,
+  /^\/learn\/[^/]+$/,
+  /^\/learn\/[^/]+\/chapters\/[^/]+$/,
 ];
 
 const PUBLIC_API_GET_PATTERNS: RegExp[] = [
   /^\/api\/health\/db$/,
+  /^\/api\/ratings$/,
   /^\/api\/problems$/,
   /^\/api\/problems\/[^/]+$/,
+  /^\/api\/problems\/[^/]+\/samples$/,
   /^\/api\/contests$/,
   /^\/api\/contests\/[^/]+$/,
   /^\/api\/contests\/[^/]+\/scoreboard$/,
   /^\/api\/submissions$/,
   /^\/api\/submissions\/[^/]+$/,
+  /^\/api\/learning\/courses$/,
+  /^\/api\/learning\/courses\/[^/]+$/,
+  /^\/api\/learning\/courses\/[^/]+\/items\/[^/]+$/,
+  /^\/api\/learning\/courses\/[^/]+\/progress$/,
 ];
 
 function matchesAny(pathname: string, patterns: RegExp[]): boolean {
@@ -42,14 +52,9 @@ export default auth((request) => {
   }
 
   const callback = encodeURIComponent(`${pathname}${search}`);
-  return new NextResponse(null, {
-    status: 307,
-    headers: {
-      Location: `/signin?callbackUrl=${callback}`,
-    },
-  });
+  return NextResponse.redirect(new URL(`/signin?callbackUrl=${callback}`, request.url), 307);
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|learning-runtime/pyodide/).*)"],
 };

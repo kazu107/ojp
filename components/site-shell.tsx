@@ -1,18 +1,24 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { AuthControls } from "@/components/auth-controls";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { SITE_SOCIAL_LINKS } from "@/lib/site-links";
 import { canCreateProblemByRole, getOptionalCurrentUser } from "@/lib/store";
 
 const links = [
   { href: "/", label: "Dashboard" },
   { href: "/problems", label: "Problems" },
+  { href: "/learn", label: "Learn" },
   { href: "/submissions", label: "Submissions" },
   { href: "/contests", label: "Contests" },
+  { href: "/ratings", label: "Ratings" },
   { href: "/me", label: "Profile" },
   { href: "/admin", label: "Admin" },
 ];
 
 export async function SiteShell({ children }: { children: React.ReactNode }) {
+  const { t } = await getI18n();
   const me = await getOptionalCurrentUser();
   const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
 
@@ -21,21 +27,20 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
       <header className="site-header">
         <div className="site-header-inner">
           <Link className="site-logo" href="/">
-            OJP
-            <span className="site-logo-sub">AtCoder-like Platform</span>
+            {t("OJP")}<span className="site-logo-sub">{t("AtCoder-like Platform")}</span>
           </Link>
-          <nav className="site-nav" aria-label="global">
+          <nav className="site-nav" aria-label={t("global")}>
             {links.map((link) => (
               <Link key={link.href} href={link.href} className="site-nav-link">
-                {link.label}
+                {t(link.label)}
               </Link>
             ))}
             {canCreateProblem ? (
               <Link href="/problems/new" className="site-nav-cta">
-                New Problem
-              </Link>
+                {t("New Problem")}</Link>
             ) : null}
             <AuthControls />
+            <LanguageSwitcher />
           </nav>
         </div>
       </header>
@@ -44,8 +49,8 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
       <footer className="site-footer">
         <div className="site-footer-inner">
           <div className="site-footer-copy">
-            <p className="site-footer-title">OJP</p>
-            <p className="site-footer-text">AtCoder-like Platform MVP</p>
+            <p className="site-footer-title">{t("OJP")}</p>
+            <p className="site-footer-text">{t("AtCoder-like Platform MVP")}</p>
           </div>
           <div className="site-footer-links">
             <a
@@ -54,16 +59,14 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
               target="_blank"
               rel="noreferrer"
             >
-              X / Twitter
-            </a>
+              {t("X / Twitter")}</a>
             <a
               className="site-footer-link"
               href={SITE_SOCIAL_LINKS.github}
               target="_blank"
               rel="noreferrer"
             >
-              GitHub
-            </a>
+              {t("GitHub")}</a>
           </div>
         </div>
       </footer>

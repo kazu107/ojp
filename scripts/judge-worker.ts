@@ -1,4 +1,6 @@
 import { getJudgeProcessMode, startDedicatedJudgeWorkerLoop } from "../lib/store";
+import { assertJudgeSandboxReady } from "../lib/judge-process";
+import { getJudgeSandboxMode } from "../lib/judge-sandbox";
 
 async function main() {
   const mode = getJudgeProcessMode();
@@ -7,7 +9,8 @@ async function main() {
     return;
   }
 
-  console.log("[judge-worker] starting dedicated judge worker loop");
+  await assertJudgeSandboxReady();
+  console.log(`[judge-worker] starting dedicated judge worker loop (sandbox=${getJudgeSandboxMode()})`);
   await startDedicatedJudgeWorkerLoop();
 
   await new Promise(() => {

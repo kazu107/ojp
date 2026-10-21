@@ -1,0 +1,289 @@
+.learning-eyebrow {
+  color: var(--accent-soft);
+  font-family: var(--font-jp-mono), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.7rem;
+}
+.learning-course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 1rem;
+}
+.learning-course-card {
+  border-top: 3px solid var(--accent);
+  background:
+    linear-gradient(135deg, rgba(255, 143, 47, 0.06), transparent 65%),
+    var(--panel);
+}
+.learning-course-card .button-row:last-child {
+  margin-top: auto;
+}
+.learning-progress {
+  width: 100%;
+  height: 0.6rem;
+  accent-color: var(--success);
+  border: 0;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.learning-progress::-webkit-progress-bar {
+  background: var(--bg);
+}
+.learning-progress::-webkit-progress-value {
+  background: var(--success);
+}
+.learning-progress-head,
+.learning-item-title,
+.learning-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.learning-outline {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.learning-outline li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.8rem;
+}
+.learning-chapter-heading {
+  margin-top: 0.65rem;
+}
+.learning-tab-bar {
+  position: sticky;
+  top: var(--learning-header-offset, 85px);
+  z-index: 8;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.7rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: rgba(8, 19, 32, 0.96);
+  scrollbar-width: thin;
+}
+.learning-tab {
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  white-space: nowrap;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--text-soft);
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+}
+.learning-tab.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(255, 143, 47, 0.12);
+}
+.learning-tab.is-complete:not(.is-active) {
+  border-color: rgba(92, 214, 168, 0.5);
+}
+.learning-tab-kind,
+.learning-caption {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.7;
+}
+.learning-item-panel {
+  min-height: 250px;
+  animation: learning-reveal 180ms ease-out;
+}
+.learning-item-panel:focus {
+  outline: none;
+}
+.learning-code-cell {
+  margin: 1.4rem 0;
+  padding: 1.1rem;
+  border: 1px solid #3e6686;
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  background: rgba(5, 13, 23, 0.7);
+  display: grid;
+  gap: 0.8rem;
+}
+.learning-cell-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.learning-output {
+  min-height: 3rem;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.8rem;
+  background: #06111c;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-family: var(--font-jp-mono), monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.markdown-block .learning-output {
+  white-space: pre-wrap;
+}
+.learning-output-error,
+.learning-error {
+  color: #ffb5b5;
+}
+.learning-question {
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1rem;
+  min-width: 0;
+}
+.learning-question legend {
+  padding: 0 0.5rem;
+  color: var(--accent-soft);
+}
+.learning-option {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0;
+  cursor: pointer;
+}
+.learning-option input[type="radio"],
+.learning-option input[type="checkbox"] {
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+.learning-quiz-feedback {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border-radius: 8px;
+  background: rgba(127, 188, 255, 0.06);
+}
+.learning-submission {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+.learning-editor-grid {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+}
+.learning-editor {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.learning-editor[disabled] {
+  opacity: 0.8;
+}
+.learning-editor-index {
+  position: sticky;
+  top: 165px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+.learning-index-button {
+  width: 100%;
+  text-align: left;
+  color: var(--text-soft);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.65rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.2rem;
+}
+.learning-index-button.is-active {
+  color: var(--text);
+  background: rgba(255, 143, 47, 0.08);
+  border-color: var(--panel-border);
+}
+.learning-index-item {
+  padding-left: 1.4rem;
+}
+.learning-editor-chapter {
+  display: grid;
+  gap: 0.3rem;
+}
+.learning-toolbar {
+  position: sticky;
+  top: var(--learning-header-offset, 85px);
+  z-index: 8;
+  padding: 0.8rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(8, 19, 32, 0.96);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.learning-divider {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--panel-border);
+}
+.learning-preview {
+  padding: 1rem;
+  border: 1px dashed var(--panel-border);
+  border-radius: 10px;
+}
+.learning-cell-settings {
+  padding: 0.8rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+.learning-cell-settings summary {
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+@keyframes learning-reveal {
+  from {
+    opacity: 0.6;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .learning-item-panel {
+    animation: none;
+  }
+}
+@media (max-width: 760px) {
+  .learning-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .learning-editor-index {
+    position: static;
+    max-height: 230px;
+  }
+  .learning-toolbar {
+    position: relative;
+    top: 0;
+  }
+  .learning-code-cell {
+    padding: 0.7rem;
+  }
+  .learning-outline li {
+    flex-wrap: wrap;
+  }
+}

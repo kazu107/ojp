@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,6 +11,7 @@ import { Language } from "@/lib/types";
 interface SubmissionFormProps {
   problemId: string;
   contestId?: string | null;
+  virtualParticipationId?: string | null;
 }
 
 const SUBMISSION_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
@@ -17,7 +20,9 @@ const DEFAULT_SUBMISSION_LANGUAGE: Language = "python";
 export function SubmissionForm({
   problemId,
   contestId = null,
+  virtualParticipationId = null,
 }: SubmissionFormProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const [language, setLanguage] = useState<Language>(DEFAULT_SUBMISSION_LANGUAGE);
   const [draftsByLanguage, setDraftsByLanguage] = useState<Record<Language, string>>(
@@ -41,6 +46,7 @@ export function SubmissionForm({
         body: JSON.stringify({
           problemId,
           contestId,
+          virtualParticipationId,
           language,
           sourceCode,
         }),
@@ -64,7 +70,7 @@ export function SubmissionForm({
   return (
     <form className="form" onSubmit={onSubmit}>
       <label className="field">
-        <span className="field-label">Language</span>
+        <span className="field-label">{t("Language")}</span>
         <select
           className="select"
           value={language}
@@ -72,14 +78,14 @@ export function SubmissionForm({
         >
           {SUBMISSION_LANGUAGES.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {t(item)}
             </option>
           ))}
         </select>
       </label>
 
       <div className="field">
-        <span className="field-label">Source Code</span>
+        <span className="field-label">{t("Source Code")}</span>
         <CodeEditor
           language={language}
           minHeight={320}
@@ -94,20 +100,19 @@ export function SubmissionForm({
       </div>
 
       <p className="text-soft">
-        提出は非同期ジャッジされます。対象問題に ZIP パッケージ（tests/config）が未設定の場合は
-        `internal_error` になります。
-      </p>
+        {t("提出は非同期ジャッジされます。対象問題に ZIP パッケージ（tests/config）が未設定の場合は `internal_error` になります。")}</p>
       {contestId ? (
         <p className="text-soft">
-          Contest submission mode: contestId={contestId}
+          {t("Contest submission mode: contestId=")}{contestId}
         </p>
       ) : null}
 
-      {error ? <p className="badge badge-red">{error}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
+      {virtualParticipationId ? <p className="text-soft">{t("Virtual submissions do not affect official standings or ratings.")}</p> : null}
 
       <div className="button-row">
         <button className="button" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "提出中..." : "提出する"}
+          {isSubmitting ? t("提出中...") : t("提出する")}
         </button>
       </div>
     </form>

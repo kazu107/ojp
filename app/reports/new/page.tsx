@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import { ReportForm } from "@/components/report-form";
 import { ReportTargetType } from "@/lib/types";
 
@@ -16,6 +18,7 @@ function parseTargetType(raw: string | undefined): ReportTargetType {
 }
 
 export default async function NewReportPage({ searchParams }: NewReportPageProps) {
+  const { t } = await getI18n();
   const params = await searchParams;
   const targetType = parseTargetType(params.targetType);
   const targetId = params.targetId ?? "";
@@ -24,10 +27,9 @@ export default async function NewReportPage({ searchParams }: NewReportPageProps
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Create Report</h1>
+          <h1 className="page-title">{t("Create Report")}</h1>
           <p className="page-subtitle">
-            不適切コンテンツや問題不備の通報を管理者に送信します。
-          </p>
+            {t("不適切コンテンツや問題不備の通報を管理者に送信します。")}</p>
         </div>
       </section>
       <section className="panel">

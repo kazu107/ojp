@@ -1,10 +1,14 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/lib/types";
+import { formatDate } from "@/lib/presentation";
 
 export function ProfileForm({ user }: { user: User }) {
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [bio, setBio] = useState(user.bio);
@@ -57,7 +61,7 @@ export function ProfileForm({ user }: { user: User }) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <label className="field">
-        <span className="field-label">Display Name</span>
+        <span className="field-label">{t("Display Name")}</span>
         <input
           className="input"
           value={displayName}
@@ -65,22 +69,19 @@ export function ProfileForm({ user }: { user: User }) {
           required
         />
         <span className="field-help">
-          Public name shown on submissions and rankings. It can be changed once every 30 days.
-          {!canChangeDisplayName && nextDisplayNameChangeAt
-            ? ` Next change: ${nextDisplayNameChangeAt.toLocaleString()}.`
-            : ""}
+          {t("Public name shown on submissions and rankings. It can be changed once every 30 days.")}{!canChangeDisplayName && nextDisplayNameChangeAt ? t(" Next change: {value0}.", { value0: formatDate(nextDisplayNameChangeAt.toISOString(), locale) }) : ""}
         </span>
       </label>
       <label className="field">
-        <span className="field-label">Bio</span>
+        <span className="field-label">{t("Bio")}</span>
         <textarea className="textarea" value={bio} onChange={(event) => setBio(event.target.value)} />
-        <span className="field-help">Profile text shown on your user page.</span>
+        <span className="field-help">{t("Profile text shown on your user page.")}</span>
       </label>
-      {error ? <p className="badge badge-red">{error}</p> : null}
-      {success ? <p className="badge badge-green">{success}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
+      {success ? <p className="badge badge-green">{t(success)}</p> : null}
       <div className="button-row">
         <button className="button" type="submit" disabled={isSaving || !trimmedDisplayName}>
-          {isSaving ? "Saving..." : "Save Profile"}
+          {isSaving ? t("Saving...") : t("Save Profile")}
         </button>
       </div>
     </form>

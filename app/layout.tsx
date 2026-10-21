@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Zen_Kaku_Gothic_New } from "next/font/google";
 import { SiteShell } from "@/components/site-shell";
+import { I18nProvider } from "@/components/i18n-provider";
+import { getI18n } from "@/lib/i18n/server";
 import "./globals.css";
+import "./learning.css";
 
 const jpSans = Zen_Kaku_Gothic_New({
   variable: "--font-jp-sans",
@@ -14,21 +17,21 @@ const mono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "OJP - AtCoder-like Platform MVP",
-  description:
-    "AtCoder風オンラインジャッジ/問題投稿/コンテスト運営のMVPプロトタイプ",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("OJP - Online Judge"), description: t("Online judge, problems, contests and learning materials.") };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { locale } = await getI18n();
   return (
-    <html lang="ja">
+    <html lang={locale}>
       <body className={`${jpSans.variable} ${mono.variable}`}>
-        <SiteShell>{children}</SiteShell>
+        <I18nProvider initialLocale={locale}><SiteShell>{children}</SiteShell></I18nProvider>
       </body>
     </html>
   );

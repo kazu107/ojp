@@ -1,6 +1,9 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import { auth, signOut } from "@/auth";
 
 export async function AuthControls() {
+  const { t } = await getI18n();
   const session = await auth();
   const sessionUser = session?.user as
     | {
@@ -19,8 +22,7 @@ export async function AuthControls() {
   if (!session?.user) {
     return (
       <a className="site-nav-cta" href="/signin">
-        Sign in
-      </a>
+        {t("Sign in")}</a>
     );
   }
 
@@ -35,8 +37,7 @@ export async function AuthControls() {
         }}
       >
         <button type="submit" className="site-nav-button">
-          Sign out
-        </button>
+          {t("Sign out")}</button>
       </form>
     </div>
   );

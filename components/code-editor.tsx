@@ -7,6 +7,9 @@ import { javascript } from "@codemirror/lang-javascript";
 import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { EditorView } from "@codemirror/view";
+import { EditorState } from "@codemirror/state";
+import { useMemo } from "react";
+import { useI18n } from "@/components/i18n-provider";
 import { Language } from "@/lib/types";
 
 type CodeEditorLanguage = Language | "markdown";
@@ -16,6 +19,8 @@ interface CodeEditorProps {
   onChange: (value: string) => void;
   language: CodeEditorLanguage;
   minHeight?: number;
+  readOnly?: boolean;
+  ariaLabel?: string;
 }
 
 const editorTheme = EditorView.theme(
@@ -81,14 +86,30 @@ export function CodeEditor({
   onChange,
   language,
   minHeight = 260,
+  readOnly = false,
+  ariaLabel,
 }: CodeEditorProps) {
+  const { t } = useI18n();
+  const extensions = useMemo(() => [
+    EditorView.lineWrapping,
+    languageExtension(language),
+    EditorView.contentAttributes.of({ "aria-label": ariaLabel ?? t(language === "markdown" ? "Markdown Editor" : "Source Code") }),
+    EditorState.phrases.of(Object.fromEntries([
+      "Find", "Replace", "Go to line", "go", "next", "previous", "all",
+      "match case", "regexp", "by word", "replace", "replace all", "close",
+      "current match", "on line", "replaced match on line $", "replaced $ matches",
+      "Selection deleted", "Completions", "Control character", "folded code", "unfold",
+    ].map((phrase) => [phrase, t(phrase)]))),
+  ], [ariaLabel, language, t]);
   return (
     <div className="code-editor-shell" style={{ minHeight }}>
       <CodeMirror
         value={value}
         height={`${minHeight}px`}
+        readOnly={readOnly}
+        editable={!readOnly}
         theme={editorTheme}
-        extensions={[EditorView.lineWrapping, languageExtension(language)]}
+        extensions={extensions}
         basicSetup={{
           lineNumbers: true,
           foldGutter: true,

@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RejudgeRequestForm } from "@/components/rejudge-request-form";
@@ -159,6 +161,7 @@ function buildDisplayResults(input: {
 }
 
 export default async function SubmissionDetailPage({ params }: SubmissionDetailPageProps) {
+  const { t, locale } = await getI18n();
   const { submissionId } = await params;
   const me = await getOptionalCurrentUser();
   const result = await getSubmissionWithAccess(submissionId, me?.id ?? "guest");
@@ -189,39 +192,36 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Submission {submission.id}</h1>
+          <h1 className="page-title">{t("Submission ")}{submission.id}</h1>
           <p className="page-subtitle">
-            提出の詳細結果です。テストケースごとの判定を確認できます。
-          </p>
+            {t("提出の詳細結果です。テストケースごとの判定を確認できます。")}</p>
         </div>
         <div className="button-row">
           {problem ? (
-            <Link className="button button-secondary" href={`/problems/${problem.id}`}>
-              問題へ戻る
-            </Link>
+            <Link className="button button-secondary" href={`/problems/${problem.id}${submission.contestId?`?contestId=${submission.contestId}${submission.virtualParticipationId?`&virtualParticipationId=${submission.virtualParticipationId}`:""}`:""}`}>
+              {t("問題へ戻る")}</Link>
           ) : null}
           <Link
             className="button button-danger"
             href={`/reports/new?targetType=submission&targetId=${submission.id}`}
           >
-            通報
-          </Link>
+            {t("通報")}</Link>
         </div>
       </section>
 
       <section className="panel stack">
+        {submission.contestId ? <p className="text-soft"><Link className="link" href={`/contests/${submission.contestId}`}>{t(submission.virtualParticipationId?"Virtual Participation":"Contests")}</Link></p> : null}
         <SubmissionLiveRefresh status={submission.status} />
         <div className="meta-inline">
           <StatusBadge className={badgeClassForSubmission(submission.status)}>
-            {detailVerdictLabel(submission.status)}
+            {t(detailVerdictLabel(submission.status))}
           </StatusBadge>
           <span className="text-soft">
-            Score: {submission.score} / Time: {submission.totalTimeMs} ms / Memory:{" "}
-            {submission.peakMemoryKb} KB
-          </span>
+            {t("Score: ")}{submission.score} {t(" / Time: ")}{submission.totalTimeMs} {t(" ms / Memory:")}{" "}
+            {submission.peakMemoryKb} {t(" KB")}</span>
         </div>
         <p className="text-soft">
-          Problem:{" "}
+          {t("Problem:")}{" "}
           {problem ? (
             <Link className="link" href={`/problems/${problem.id}`}>
               {problem.title}
@@ -231,31 +231,30 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
           )}{" "}
           {problem ? (
             <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
-              {difficultyLabel(problem.difficulty)}
+              {t(difficultyLabel(problem.difficulty))}
             </StatusBadge>
           ) : null}
         </p>
         <p className="text-soft">
-          User: {user?.displayName ?? submission.userId} ({submission.userId})
+          {t("User: ")}{user?.displayName ?? submission.userId} ({submission.userId})
         </p>
         <p className="text-soft">
-          Language: {languageLabel(submission.language)} / Submitted: {formatDate(submission.submittedAt)}
+          {t("Language: ")}{languageLabel(submission.language)} {t(" / Submitted: ")}{formatDate(submission.submittedAt, locale)}
         </p>
         <p className="text-soft">
-          Judge Start: {submission.judgeStartedAt ? formatDate(submission.judgeStartedAt) : "-"} /
-          Judged: {submission.judgedAt ? formatDate(submission.judgedAt) : "-"} / Judge Env:{" "}
+          {t("Judge Start: ")}{submission.judgeStartedAt ? formatDate(submission.judgeStartedAt, locale) : "-"} {t(" / Judged: ")}{submission.judgedAt ? formatDate(submission.judgedAt, locale) : "-"} {t(" / Judge Env:")}{" "}
           {submission.judgeEnvironmentVersion ?? "-"}
         </p>
       </section>
 
       <section className="panel stack">
-        <h2 className="panel-title">Test Results</h2>
+        <h2 className="panel-title">{t("Test Results")}</h2>
         <p className="text-soft">
-          Visibility mode: {testCaseVisibilityLabel(testCaseVisibility)}
-          {!canViewSource ? " (applied for non-owner viewers)" : ""}
+          {t("Visibility mode: ")}{t(testCaseVisibilityLabel(testCaseVisibility))}
+          {!canViewSource ? t(" (applied for non-owner viewers)") : ""}
         </p>
         {displayResults.length === 0 ? (
-          <p className="empty">No test result data is available.</p>
+          <p className="empty">{t("No test result data is available.")}</p>
         ) : (
           <div className="stack">
             {groupedResults.map((group) => (
@@ -263,13 +262,12 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                 <summary className="result-group-summary">
                   <span className="kpi">{group.groupName}</span>
                   <StatusBadge className={badgeClassForSubmission(group.verdict)}>
-                    {detailVerdictLabel(group.verdict)}
+                    {t(detailVerdictLabel(group.verdict))}
                   </StatusBadge>
-                  <span className="result-group-meta">Cases: {group.caseCount}</span>
+                  <span className="result-group-meta">{t("Cases: ")}{group.caseCount}</span>
                   <span className="result-group-meta">
-                    Time(max): {group.maxTimeMs} ms
-                  </span>
-                  <span className="result-group-meta">Memory: {group.peakMemoryKb} KB</span>
+                    {t("Time(max): ")}{group.maxTimeMs} {t(" ms")}</span>
+                  <span className="result-group-meta">{t("Memory: ")}{group.peakMemoryKb} {t(" KB")}</span>
                 </summary>
                 <div className="result-group-body">
                   {canExpandCaseDetails ? (
@@ -277,11 +275,11 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                       <table className="table">
                         <thead>
                           <tr>
-                            <th>Case</th>
-                            <th>Verdict</th>
-                            <th>Time</th>
-                            <th>Memory</th>
-                            <th>Message</th>
+                            <th>{t("Case")}</th>
+                            <th>{t("Verdict")}</th>
+                            <th>{t("Time")}</th>
+                            <th>{t("Memory")}</th>
+                            <th>{t("Message")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -290,12 +288,12 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                               <td>{result.testCaseName}</td>
                               <td>
                                 <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                                  {detailVerdictLabel(result.verdict)}
+                                  {t(detailVerdictLabel(result.verdict))}
                                 </StatusBadge>
                               </td>
-                              <td>{result.timeMs} ms</td>
-                              <td>{result.memoryKb} KB</td>
-                              <td>{result.message}</td>
+                              <td>{result.timeMs} {t(" ms")}</td>
+                              <td>{result.memoryKb} {t(" KB")}</td>
+                              <td>{t(result.message)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -303,8 +301,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                     </div>
                   ) : (
                     <p className="text-soft">
-                      Individual test cases are hidden by test case visibility policy.
-                    </p>
+                      {t("Individual test cases are hidden by test case visibility policy.")}</p>
                   )}
                 </div>
               </details>
@@ -314,29 +311,26 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
       </section>
 
       <section className="panel stack">
-        <h2 className="panel-title">Rejudge Request</h2>
+        <h2 className="panel-title">{t("Rejudge Request")}</h2>
         {canRequestRejudge ? (
           <>
             <p className="text-soft">
-              理由は必須で、`judge update / testcase fix / scoring bug / manual review` を選択できます。
-            </p>
+              {t("理由は必須で、`judge update / testcase fix / scoring bug / manual review` を選択できます。")}</p>
             <RejudgeRequestForm submissionId={submission.id} />
           </>
         ) : (
           <p className="empty">
-            再ジャッジ要求は、管理者・問題作成者・対象コンテスト主催者のみ可能です。
-          </p>
+            {t("再ジャッジ要求は、管理者・問題作成者・対象コンテスト主催者のみ可能です。")}</p>
         )}
       </section>
 
       <section className="panel stack">
-        <h2 className="panel-title">Source Code</h2>
+        <h2 className="panel-title">{t("Source Code")}</h2>
         {canViewSource ? (
           <pre className="code-block">{submission.sourceCode}</pre>
         ) : (
           <p className="empty">
-            ソースコード全文は提出者本人または管理者のみ閲覧できます。
-          </p>
+            {t("ソースコード全文は提出者本人または管理者のみ閲覧できます。")}</p>
         )}
       </section>
     </div>

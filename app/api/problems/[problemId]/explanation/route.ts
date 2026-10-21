@@ -8,6 +8,7 @@ import {
   canViewProblemExplanation,
   getOptionalCurrentUser,
   getProblemForViewer,
+  getProblemForContestViewer,
   HttpError,
   updateProblem,
 } from "@/lib/store";
@@ -18,12 +19,13 @@ interface ProblemExplanationRouteContext {
   }>;
 }
 
-export async function GET(_request: Request, { params }: ProblemExplanationRouteContext) {
+export async function GET(request: Request, { params }: ProblemExplanationRouteContext) {
   try {
     const { problemId } = await params;
     const user = await getOptionalCurrentUser();
     const viewerId = user?.id ?? "guest";
-    const problem = getProblemForViewer(problemId, viewerId);
+    const contestId=new URL(request.url).searchParams.get("contestId");
+    const problem = contestId?getProblemForContestViewer(problemId,contestId,viewerId):getProblemForViewer(problemId, viewerId);
     if (!problem) {
       return apiError(404, "problem not found");
     }

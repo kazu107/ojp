@@ -57,6 +57,7 @@ export async function GET(request: Request) {
       userId: submission.userId,
       problemId: submission.problemId,
       contestId: submission.contestId,
+      virtualParticipationId: submission.virtualParticipationId ?? null,
       language: submission.language,
       status: submission.status,
       score: submission.score,
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
     const submission = await createSubmission({
       problemId: parseString(body.problemId),
       contestId: parseOptionalString(body.contestId) ?? null,
+      virtualParticipationId: parseOptionalString(body.virtualParticipationId) ?? null,
       language: parseLanguage(body.language),
       sourceCode: parseString(body.sourceCode),
     });

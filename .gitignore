@@ -40,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated, pinned browser Python runtime (prepared before dev/build).
+/public/learning-runtime/pyodide/
+
+# Local deployment backups and validation artifacts must never be committed.
+/.codex/learning-deploy/
+/.codex/learning-validation/
+/.codex/i18n-work/
+/.codex/contest-work/

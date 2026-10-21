@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import {
-  parseNonNegativeNumber,
   parseOptionalString,
   parseString,
 } from "@/lib/api-helpers";
 import { apiError, errorResponse } from "@/lib/api-response";
-import { getContestById, HttpError, updateContest } from "@/lib/store";
+import { getEditableContestForCurrentUser, HttpError, updateContest } from "@/lib/store";
 import { ContestProblem } from "@/lib/types";
 
 interface ContestProblemsRouteContext {
@@ -26,7 +25,7 @@ function normalizeProblemsOrder(problems: ContestProblem[]): ContestProblem[] {
 export async function POST(request: Request, { params }: ContestProblemsRouteContext) {
   try {
     const { contestId } = await params;
-    const contest = getContestById(contestId);
+    const contest = await getEditableContestForCurrentUser(contestId);
     if (!contest) {
       return apiError(404, "contest not found");
     }
@@ -49,7 +48,7 @@ export async function POST(request: Request, { params }: ContestProblemsRouteCon
     const appended: ContestProblem = {
       problemId,
       label: nextLabel,
-      score: parseNonNegativeNumber(body.score, 100),
+      score: body.score === undefined ? 100 : body.score as number,
       orderIndex: contest.problems.length,
     };
 

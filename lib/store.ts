@@ -5,6 +5,7 @@ import {
   Contest,
   ContestProblem,
   ContestStatus,
+  ContestLiveData,
   CreateAnnouncementInput,
   CreateContestInput,
   CreateProblemInput,
@@ -23,6 +24,7 @@ import {
   UpdateProblemInput,
   User,
   UserRole,
+  VirtualParticipation,
   Visibility,
 } from "@/lib/types";
 import { Prisma } from "@prisma/client";
@@ -53,6 +55,9 @@ import {
 } from "@/lib/submission-status";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
+import { assertContestStructureEditable, calculateRatings, calculateStandings, canAccessContest,
+  contestStatus, validateContest, virtualIsRunning, ContestError } from "@/lib/contest";
+import { readVirtualParticipation, startVirtualParticipation, finishVirtualParticipation } from "@/lib/contest-virtual-store";
 
 const SUBMISSION_COOLDOWN_MS = 10_000;
 const SUBMISSION_LIMIT_WINDOW_MS = 60_000;
@@ -243,17 +248,22 @@ const globalStore = globalThis as unknown as {
   __ojpStore?: Store;
   __ojpStoreDbHydrationStarted?: boolean;
   __ojpStoreDbHydrated?: boolean;
+  __ojpStoreHydrationPromise?: Promise<void>;
   __ojpStorePersistIntervalStarted?: boolean;
   __ojpStoreRefreshIntervalStarted?: boolean;
   __ojpStoreLastPersistedSnapshotJson?: string;
   __ojpStorePersistInFlight?: boolean;
   __ojpStorePersistQueued?: boolean;
+  __ojpStorePersistPromise?: Promise<void>;
   __ojpDedicatedJudgeLoopStarted?: boolean;
   __ojpProblemPackageCacheOrder?: string[];
   __ojpSubmissionRuntimeCache?: Record<string, SubmissionRuntimeSummary>;
   __ojpSubmissionRuntimeCacheRefreshInFlight?: boolean;
   __ojpSubmissionRuntimeCacheLastRefreshAt?: number;
   __ojpStoreLastSeenDbUpdatedAt?: string;
+  __ojpRatingCache?: {signature:string;result:ReturnType<typeof calculateRatings>};
+  __ojpContestRuntimeRefresh?: Promise<void>;
+  __ojpContestRuntimeRefreshedAt?: number;
 };
 
 export class HttpError extends Error {
@@ -938,45 +948,29 @@ function rememberProblemPackageData(
 }
 
 async function persistStoreSnapshotNow(): Promise<void> {
-  if (!STORE_DB_SYNC_ENABLED) {
-    return;
-  }
-  if (!globalStore.__ojpStoreDbHydrated) {
-    return;
-  }
-  if (globalStore.__ojpStorePersistInFlight) {
+  if (!STORE_DB_SYNC_ENABLED || !globalStore.__ojpStoreDbHydrated) return;
+  if (globalStore.__ojpStorePersistPromise) {
     globalStore.__ojpStorePersistQueued = true;
-    return;
+    return globalStore.__ojpStorePersistPromise;
   }
-
   globalStore.__ojpStorePersistInFlight = true;
-  try {
-    const snapshot = captureStoreSnapshot(store);
-    const snapshotJson = JSON.stringify(snapshot);
-    if (snapshotJson === globalStore.__ojpStoreLastPersistedSnapshotJson) {
-      return;
-    }
-
-    await prisma.appState.upsert({
-      where: { id: STORE_STATE_ID },
-      update: { snapshot: snapshot as unknown as Prisma.InputJsonValue },
-      create: {
-        id: STORE_STATE_ID,
-        snapshot: snapshot as unknown as Prisma.InputJsonValue,
-      },
-    });
-    globalStore.__ojpStoreLastPersistedSnapshotJson = snapshotJson;
-  } catch (error) {
-    console.error("[store] failed to persist app state:", error);
-  } finally {
-    globalStore.__ojpStorePersistInFlight = false;
-    if (globalStore.__ojpStorePersistQueued) {
+  // Concurrent callers wait until their queued mutations have also been written.
+  globalStore.__ojpStorePersistPromise = (async () => {
+    do {
       globalStore.__ojpStorePersistQueued = false;
-      queueMicrotask(() => {
-        void persistStoreSnapshotNow();
-      });
-    }
-  }
+      const snapshot = captureStoreSnapshot(store);
+      const snapshotJson = JSON.stringify(snapshot);
+      if (snapshotJson !== globalStore.__ojpStoreLastPersistedSnapshotJson) {
+        await prisma.appState.upsert({where:{id:STORE_STATE_ID},
+          update:{snapshot:snapshot as unknown as Prisma.InputJsonValue},
+          create:{id:STORE_STATE_ID,snapshot:snapshot as unknown as Prisma.InputJsonValue}});
+        globalStore.__ojpStoreLastPersistedSnapshotJson = snapshotJson;
+      }
+    } while (globalStore.__ojpStorePersistQueued);
+  })();
+  try {await globalStore.__ojpStorePersistPromise;}
+  catch(error) {console.error("[store] failed to persist app state:",error);throw error;}
+  finally {globalStore.__ojpStorePersistInFlight=false;globalStore.__ojpStorePersistPromise=undefined;}
 }
 
 async function hydrateStoreFromDb(): Promise<void> {
@@ -1008,7 +1002,20 @@ async function hydrateStoreFromDb(): Promise<void> {
     globalStore.__ojpStoreDbHydrated = true;
   } catch (error) {
     console.error("[store] failed to hydrate app state:", error);
-    globalStore.__ojpStoreDbHydrated = true;
+    globalStore.__ojpStoreDbHydrated = false;
+    throw error;
+  }
+}
+
+async function ensureStoreReady(): Promise<void> {
+  if (!STORE_DB_SYNC_ENABLED || globalStore.__ojpStoreDbHydrated) return;
+  if (!globalStore.__ojpStoreHydrationPromise) {
+    globalStore.__ojpStoreHydrationPromise = hydrateStoreFromDb();
+  }
+  try { await globalStore.__ojpStoreHydrationPromise; }
+  catch (error) {
+    globalStore.__ojpStoreHydrationPromise = undefined;
+    throw error;
   }
 }
 
@@ -1052,7 +1059,7 @@ function startStorePersistenceLoop(): void {
   }
   globalStore.__ojpStorePersistIntervalStarted = true;
   const interval = setInterval(() => {
-    void persistStoreSnapshotNow();
+    void persistStoreSnapshotNow().catch(() => undefined);
   }, STORE_PERSIST_INTERVAL_MS);
   interval.unref?.();
 }
@@ -1223,9 +1230,10 @@ async function upsertSubmissionRuntimeState(input: {
 
 async function getSubmissionRuntimeState(
   submissionId: string,
+  fresh = false,
 ): Promise<SubmissionRuntimeSummary | null> {
   const cached = getSubmissionRuntimeCache()[submissionId];
-  if (cached) {
+  if (cached && !fresh) {
     return cached;
   }
   let row;
@@ -1382,18 +1390,6 @@ async function resetSubmissionRuntime(
   });
 }
 
-async function deleteSubmissionRuntimeState(submissionId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    await tx.submissionRuntimeTestResult.deleteMany({
-      where: { submissionId },
-    });
-    await tx.submissionRuntimeState.deleteMany({
-      where: { submissionId },
-    });
-  });
-  delete getSubmissionRuntimeCache()[submissionId];
-}
-
 const store = globalStore.__ojpStore ?? createInitialStore();
 
 if (!globalStore.__ojpStore) {
@@ -1408,7 +1404,8 @@ startStorePersistenceLoop();
 startStoreRefreshLoop();
 if (STORE_DB_SYNC_ENABLED && !globalStore.__ojpStoreDbHydrationStarted) {
   globalStore.__ojpStoreDbHydrationStarted = true;
-  void hydrateStoreFromDb();
+  globalStore.__ojpStoreHydrationPromise = hydrateStoreFromDb();
+  void globalStore.__ojpStoreHydrationPromise.catch(() => undefined);
 }
 
 function nextUserId(): string {
@@ -1533,14 +1530,16 @@ function toPackageJobRecord(row: {
 async function enqueueJudgeJobDb(
   submissionId: string,
   reason: JudgeJobReason,
-): Promise<void> {
-  await prisma.judgeJob.create({
-    data: {
-      id: nextJudgeJobId(),
-      submissionId,
-      reason,
-      status: "queued",
-    },
+): Promise<boolean> {
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`judge-enqueue:${submissionId}`}))::text`;
+    const active = await tx.judgeJob.findFirst({where:{submissionId,status:{in:["queued","running"]}},select:{id:true,status:true}});
+    if (active) {
+      if (reason === "rejudge" && active.status === "queued") await tx.judgeJob.update({where:{id:active.id},data:{reason}});
+      return false;
+    }
+    await tx.judgeJob.create({data:{id:nextJudgeJobId(),submissionId,reason,status:"queued"}});
+    return true;
   });
 }
 
@@ -1671,10 +1670,11 @@ async function enqueueMissingJudgeJobsDb(): Promise<number> {
   let requeued = 0;
   for (const row of rows) {
     const submissionId = row.submissionId;
-    const waitingSubmission = findSubmissionByIdInternal(submissionId);
+    let waitingSubmission = findSubmissionByIdInternal(submissionId);
     if (!waitingSubmission) {
-      await deleteSubmissionRuntimeState(submissionId);
-      continue;
+      await refreshStoreFromDbNow();
+      waitingSubmission = findSubmissionByIdInternal(submissionId);
+      if (!waitingSubmission) continue;
     }
     if (activeIds.has(submissionId)) {
       continue;
@@ -1682,8 +1682,7 @@ async function enqueueMissingJudgeJobsDb(): Promise<number> {
     if (waitingSubmission?.status === "pending") {
       waitingSubmission.status = "queued";
     }
-    await enqueueJudgeJobDb(submissionId, "normal");
-    requeued += 1;
+    if (await enqueueJudgeJobDb(submissionId, "normal")) requeued += 1;
   }
   return requeued;
 }
@@ -1867,6 +1866,7 @@ function collectWaitingSubmissionIds(): string[] {
 }
 
 function repairJudgeQueueInternal(): number {
+  if (JUDGE_PROCESS_MODE !== "inline") return 0;
   const waitingSubmissionIds = collectWaitingSubmissionIds();
   const queuedSubmissionIds = new Set<string>([
     ...store.judgeQueue.map((job) => job.submissionId),
@@ -1896,19 +1896,22 @@ function repairJudgeQueueInternal(): number {
     scheduleJudgeWorker();
   }
   if (requeued > 0) {
-    void persistStoreSnapshotNow();
+    void persistStoreSnapshotNow().catch(() => undefined);
   }
 
   return requeued;
 }
 
 async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReason): Promise<void> {
-  const submission = findSubmissionByIdInternal(submissionId);
-  if (!submission) {
-    await deleteSubmissionRuntimeState(submissionId);
-    return;
+  let submission = findSubmissionByIdInternal(submissionId);
+  if (!submission && STORE_DB_SYNC_ENABLED) {
+    await refreshStoreFromDbNow();
+    submission = findSubmissionByIdInternal(submissionId);
   }
-  const currentRuntime = (await getSubmissionRuntimeState(submissionId)) ?? defaultSubmissionRuntimeSummary(submission);
+  if (!submission) {
+    throw new HttpError("Submission metadata is not available for judging.",409);
+  }
+  const currentRuntime = (await getSubmissionRuntimeState(submissionId,true)) ?? defaultSubmissionRuntimeSummary(submission);
   if (!isWaitingSubmissionStatus(currentRuntime.status)) {
     return;
   }
@@ -2174,13 +2177,13 @@ function scheduleJudgeWorker(): void {
       store.judgeInFlightSubmissionIds.push(nextJob.submissionId);
     }
     try {
-      void persistStoreSnapshotNow();
+      void persistStoreSnapshotNow().catch(() => undefined);
       await runJudgeForSubmission(nextJob.submissionId, nextJob.reason);
     } finally {
       store.judgeInFlightSubmissionIds = store.judgeInFlightSubmissionIds.filter(
         (submissionId) => submissionId !== nextJob.submissionId,
       );
-      void persistStoreSnapshotNow();
+      void persistStoreSnapshotNow().catch(() => undefined);
     }
     setTimeout(() => {
       void tick();
@@ -2214,13 +2217,6 @@ function enqueueJudgeJob(submissionId: string, reason: JudgeJobReason = "normal"
     requestedAt,
   });
   scheduleJudgeWorker();
-}
-
-function sortBySubmittedAtAsc<T extends { submittedAt: string }>(items: T[]): T[] {
-  return [...items].sort(
-    (left, right) =>
-      new Date(left.submittedAt).getTime() - new Date(right.submittedAt).getTime(),
-  );
 }
 
 function assertAdmin(user: User): void {
@@ -2548,6 +2544,7 @@ function getSessionUserLike(session: unknown): SessionUserLike | null {
 }
 
 export async function getCurrentUser(): Promise<User> {
+  await ensureStoreReady();
   const session = await auth();
   const sessionUser = getSessionUserLike(session);
   if (!sessionUser) {
@@ -3194,23 +3191,17 @@ export function getContestForViewer(contestId: string, viewerId: string): Contes
 }
 
 export function getContestStatus(contest: Contest): ContestStatus {
-  const now = nowMs();
-  const start = new Date(contest.startAt).getTime();
-  const end = new Date(contest.endAt).getTime();
-  if (now < start) {
-    return "scheduled";
-  }
-  if (now <= end) {
-    return "running";
-  }
-  return "ended";
+  return contestStatus(contest);
 }
 
 export async function createContest(input: CreateContestInput): Promise<Contest> {
-  uniqueSlugOrThrow("contest", input.slug);
   const user = await getCurrentUser();
   assertActiveUser(user);
   assertContestOrganizerOrAdmin(user);
+  validateContest(input, store.problems, user);
+  uniqueSlugOrThrow("contest", input.slug);
+  if (input.rated && Date.parse(input.startAt) <= Date.now())
+    throw new ContestError("Rated contests must be configured before they start.");
 
   const timestamp = nowIso();
   const contest: Contest = {
@@ -3224,6 +3215,7 @@ export async function createContest(input: CreateContestInput): Promise<Contest>
     endAt: input.endAt,
     penaltyMinutes: input.penaltyMinutes,
     scoreboardVisibility: input.scoreboardVisibility,
+    rated: input.rated ?? false,
     problems: [...input.problems].sort((left, right) => left.orderIndex - right.orderIndex),
     participantUserIds: [user.id],
     createdAt: timestamp,
@@ -3231,6 +3223,7 @@ export async function createContest(input: CreateContestInput): Promise<Contest>
   };
 
   store.contests.unshift(contest);
+  await persistStoreSnapshotNow();
   return contest;
 }
 
@@ -3239,41 +3232,27 @@ export async function updateContest(
   input: UpdateContestInput,
 ): Promise<Contest> {
   const user = await getCurrentUser();
+  assertActiveUser(user);
   const contest = resolveContestIfExists(contestId);
   if (user.role !== "admin" && contest.organizerId !== user.id) {
     throw new HttpError("you cannot edit this contest", 403);
   }
 
-  if (typeof input.slug === "string") {
-    uniqueSlugOrThrow("contest", input.slug, contestId);
-    contest.slug = toSlug(input.slug);
-  }
-  if (typeof input.title === "string" && input.title.trim()) {
-    contest.title = input.title.trim();
-  }
-  if (typeof input.descriptionMarkdown === "string") {
-    contest.descriptionMarkdown = input.descriptionMarkdown.trim();
-  }
-  if (input.visibility) {
-    contest.visibility = input.visibility;
-  }
-  if (typeof input.startAt === "string") {
-    contest.startAt = input.startAt;
-  }
-  if (typeof input.endAt === "string") {
-    contest.endAt = input.endAt;
-  }
-  if (typeof input.penaltyMinutes === "number" && input.penaltyMinutes >= 0) {
-    contest.penaltyMinutes = input.penaltyMinutes;
-  }
-  if (input.scoreboardVisibility) {
-    contest.scoreboardVisibility = input.scoreboardVisibility;
-  }
-  if (Array.isArray(input.problems)) {
-    contest.problems = [...input.problems].sort((left, right) => left.orderIndex - right.orderIndex);
-  }
+  const next = {...contest, ...Object.fromEntries(Object.entries(input).filter(([,value]) => value !== undefined))};
+  validateContest(next, store.problems, user);
+  assertContestStructureEditable(contest, next);
+  uniqueSlugOrThrow("contest", next.slug, contestId);
+  Object.assign(contest, next, {slug:toSlug(next.slug), title:next.title.trim(),
+    problems:[...next.problems].sort((a,b) => a.orderIndex-b.orderIndex), updatedAt:nowIso()});
+  await persistStoreSnapshotNow();
+  return contest;
+}
 
-  contest.updatedAt = nowIso();
+export async function getEditableContestForCurrentUser(contestId: string): Promise<Contest> {
+  const user = await getCurrentUser();
+  assertActiveUser(user);
+  const contest = resolveContestIfExists(contestId);
+  if (!canEditContestByViewer(contest,user.id)) throw new HttpError("you cannot edit this contest",403);
   return contest;
 }
 
@@ -3281,6 +3260,7 @@ export async function joinContest(contestId: string): Promise<Contest> {
   const user = await getCurrentUser();
   assertActiveUser(user);
   const contest = resolveContestIfExists(contestId);
+  if (!canAccessContest(contest, user)) throw new HttpError("contest not found", 404);
   if (getContestStatus(contest) === "ended") {
     throw new HttpError("cannot join an ended contest", 403);
   }
@@ -3288,7 +3268,42 @@ export async function joinContest(contestId: string): Promise<Contest> {
     contest.participantUserIds.push(user.id);
   }
   contest.updatedAt = nowIso();
+  await persistStoreSnapshotNow();
   return contest;
+}
+
+export async function getVirtualParticipationForViewer(contestId: string): Promise<VirtualParticipation | null> {
+  const user = await getCurrentUser();
+  const contest = resolveContestIfExists(contestId);
+  if (!canAccessContest(contest,user)) throw new HttpError("contest not found",404);
+  return readVirtualParticipation(contestId,user.id);
+}
+
+export async function startVirtualContest(contestId: string): Promise<VirtualParticipation> {
+  const user = await getCurrentUser();
+  assertActiveUser(user);
+  const contest = resolveContestIfExists(contestId);
+  if (!canAccessContest(contest,user)) throw new HttpError("contest not found",404);
+  if (getContestStatus(contest) !== "ended") throw new ContestError("Virtual participation is available only after the contest ends.",409);
+  return startVirtualParticipation(contestId,user.id,Date.parse(contest.endAt)-Date.parse(contest.startAt));
+}
+
+export async function finishVirtualContest(contestId: string) {
+  const user = await getCurrentUser();
+  assertActiveUser(user);
+  const contest = resolveContestIfExists(contestId);
+  if (!canAccessContest(contest,user)) throw new HttpError("contest not found",404);
+  const session = await finishVirtualParticipation(contestId,user.id);
+  if (!session) throw new HttpError("Virtual participation not found.",404);
+  return session;
+}
+
+export function getProblemForContestViewer(problemId: string, contestId: string, viewerId: string): Problem | undefined {
+  const contest = getContestForViewer(contestId,viewerId);
+  if (!contest || !contest.problems.some(p => p.problemId === problemId)) return undefined;
+  if (getContestStatus(contest) === "scheduled" && !canEditContestByViewer(contest,viewerId)) return undefined;
+  const problem = getProblemById(problemId);
+  return problem ? maskProblemExplanationByViewer(problem,viewerId) : undefined;
 }
 
 interface ListSubmissionsOptions {
@@ -3304,11 +3319,11 @@ export function listSubmissionsForViewer(
   viewerId: string,
   options: ListSubmissionsOptions = {},
 ): Submission[] {
-  void viewerId;
   maybeRefreshSubmissionRuntimeCache();
   const filtered = [...store.submissions]
     .map((submission) => applySubmissionRuntimeSummary(submission))
     .filter((submission) => {
+    if (!canViewSubmissionRecord(submission,viewerId,!!options.contestId)) return false;
     if (options.userId && submission.userId !== options.userId) {
       return false;
     }
@@ -3347,6 +3362,7 @@ export function listSubmissionsForViewer(
 export function listRecentSubmissions(limit = 15): Submission[] {
   maybeRefreshSubmissionRuntimeCache();
   return [...store.submissions]
+    .filter(s => canViewSubmissionRecord(s,"guest",false))
     .map((submission) => applySubmissionRuntimeSummary(submission))
     .sort(
       (left, right) =>
@@ -3368,27 +3384,29 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   const problem = resolveProblemIfExists(input.problemId);
 
   let contestId: string | null = null;
+  let virtualParticipationId: string | null = null;
+  if (input.virtualParticipationId && !input.contestId) throw new ContestError("Virtual submissions require a contest.");
   if (input.contestId) {
     const contest = resolveContestIfExists(input.contestId);
+    if (!canAccessContest(contest,currentUser)) throw new HttpError("contest not found",404);
+    if (!contest.problems.some(p => p.problemId === problem.id)) throw new ContestError("problem is not included in this contest");
     const contestStatus = getContestStatus(contest);
-    if (contestStatus === "running") {
-      if (!contest.participantUserIds.includes(currentUser.id)) {
-        contest.participantUserIds.push(currentUser.id);
-        contest.updatedAt = nowIso();
-      }
-      const included = contest.problems.some(
-        (contestProblem) => contestProblem.problemId === problem.id,
-      );
-      if (!included) {
-        throw new HttpError("problem is not included in this contest", 400);
-      }
+    if (input.virtualParticipationId) {
+      const session = await readVirtualParticipation(contest.id,currentUser.id);
+      if (!session || session.id !== input.virtualParticipationId) throw new HttpError("Virtual participation not found.",404);
+      if (contestStatus !== "ended" || !virtualIsRunning(session)) throw new ContestError("Virtual participation has ended.",409);
+      contestId = contest.id;
+      virtualParticipationId = session.id;
+    } else if (contestStatus === "running") {
       contestId = contest.id;
     } else if (contestStatus === "scheduled") {
       throw new HttpError("contest submissions are allowed only while running", 403);
+    } else if (!getProblemForContestViewer(problem.id,contest.id,currentUser.id)) {
+      throw new HttpError("you cannot submit to this problem",403);
     }
   }
 
-  if (!contestId) {
+  if (!contestId && !input.contestId) {
     const canSubmitProblem = canViewVisibility(
       problem.visibility,
       problem.authorId,
@@ -3404,11 +3422,25 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   enforceSubmissionRateLimit(currentUser.id, problem.id, isAdminBypass(currentUser));
 
   const submittedAt = nowIso();
+  if (contestId) {
+    const contest = resolveContestIfExists(contestId);
+    if (virtualParticipationId) {
+      const session = await readVirtualParticipation(contestId,currentUser.id);
+      if (!session || !virtualIsRunning(session,Date.parse(submittedAt))) throw new ContestError("Virtual participation has ended.",409);
+    } else {
+      if (contestStatus(contest,Date.parse(submittedAt)) !== "running") throw new ContestError("contest submissions are allowed only while running",403);
+      if (!contest.participantUserIds.includes(currentUser.id)) {
+        contest.participantUserIds.push(currentUser.id);
+        contest.updatedAt = nowIso();
+      }
+    }
+  }
   const submission: Submission = {
     id: nextSubmissionId(),
     userId: currentUser.id,
     problemId: problem.id,
     contestId,
+    virtualParticipationId,
     language: input.language,
     sourceCode: input.sourceCode,
     status: "pending",
@@ -3423,11 +3455,7 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   };
 
   store.submissions.unshift(submission);
-  if (JUDGE_PROCESS_MODE === "inline") {
-    enqueueJudgeJob(submission.id, "normal");
-  } else {
-    await enqueueJudgeJobDb(submission.id, "normal");
-  }
+  await persistStoreSnapshotNow();
   await upsertSubmissionRuntimeState({
     submissionId: submission.id,
     status: "queued",
@@ -3438,143 +3466,78 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     judgedAt: null,
     judgeEnvironmentVersion: null,
   });
-  await persistStoreSnapshotNow();
-  return applySubmissionRuntimeSummary(submission, getSubmissionRuntimeCache()[submission.id]);
-}
-
-function getWrongBeforeAccepted(
-  orderedSubmissions: Submission[],
-  acceptedAt: string | null,
-): number {
-  if (!acceptedAt) {
-    return orderedSubmissions.filter(
-      (submission) =>
-        isFinalSubmissionStatus(submission.status) &&
-        !isAcceptedSubmissionStatus(submission.status) &&
-        submission.status !== "cancelled",
-    ).length;
+  if (JUDGE_PROCESS_MODE === "inline") {
+    enqueueJudgeJob(submission.id, "normal");
+  } else {
+    await enqueueJudgeJobDb(submission.id, "normal");
   }
-  return orderedSubmissions.filter(
-    (submission) =>
-      isFinalSubmissionStatus(submission.status) &&
-      !isAcceptedSubmissionStatus(submission.status) &&
-      submission.status !== "cancelled" &&
-      new Date(submission.submittedAt).getTime() < new Date(acceptedAt).getTime(),
-  ).length;
-}
-
-function cellPenaltyMinutes(
-  startAt: string,
-  acceptedAt: string,
-  wrongCount: number,
-  penalty: number,
-): number {
-  const elapsedMs = Math.max(0, new Date(acceptedAt).getTime() - new Date(startAt).getTime());
-  const elapsedMinutes = Math.floor(elapsedMs / 60000);
-  return elapsedMinutes + wrongCount * penalty;
+  return applySubmissionRuntimeSummary(submission, getSubmissionRuntimeCache()[submission.id]);
 }
 
 export function buildScoreboard(contestId: string): ScoreboardRow[] {
   const contest = resolveContestIfExists(contestId);
-  const contestProblems = [...contest.problems].sort((left, right) => left.orderIndex - right.orderIndex);
-  const contestStartMs = new Date(contest.startAt).getTime();
-  const contestEndMs = new Date(contest.endAt).getTime();
-  const inContestSubmissions = store.submissions
-    .map((submission) => applySubmissionRuntimeSummary(submission))
-    .filter(
-    (submission) => {
-      if (submission.contestId !== contestId) {
-        return false;
-      }
-      if (!isFinalSubmissionStatus(submission.status) || submission.status === "cancelled") {
-        return false;
-      }
-      const submittedAtMs = new Date(submission.submittedAt).getTime();
-      if (submittedAtMs < contestStartMs || submittedAtMs > contestEndMs) {
-        return false;
-      }
-      return true;
-    },
-  );
-  const participantIds = new Set<string>(contest.participantUserIds);
+  return calculateStandings(contest, store.submissions.map(s => applySubmissionRuntimeSummary(s)));
+}
 
-  const rows: ScoreboardRow[] = Array.from(participantIds).map((userId) => {
-    const cells = contestProblems.map((contestProblem) => {
-      const scoped = sortBySubmittedAtAsc(
-        inContestSubmissions.filter(
-          (submission) =>
-            submission.userId === userId && submission.problemId === contestProblem.problemId,
-        ),
-      );
+export async function getRatingStatistics() {
+  await ensureStoreReady();
+  await refreshContestRuntime();
+  return currentRatings();
+}
 
-      const accepted = scoped.find((submission) => isAcceptedSubmissionStatus(submission.status));
-      const acceptedAt = accepted?.submittedAt ?? null;
-      const wrongSubmissions = getWrongBeforeAccepted(scoped, acceptedAt);
-      const score = scoped.reduce((maxScore, submission) => Math.max(maxScore, submission.score), 0);
-
-      return {
-        label: contestProblem.label,
-        score,
-        acceptedAt,
-        wrongSubmissions,
-      };
-    });
-
-    const totalScore = cells.reduce((acc, cell) => acc + cell.score, 0);
-    const penalty = cells.reduce((acc, cell) => {
-      if (!cell.acceptedAt) {
-        return acc;
-      }
-      return (
-        acc +
-        cellPenaltyMinutes(
-          contest.startAt,
-          cell.acceptedAt,
-          cell.wrongSubmissions,
-          contest.penaltyMinutes,
-        )
-      );
-    }, 0);
-    const acceptedTimes = cells
-      .filter((cell) => cell.acceptedAt)
-      .map((cell) => new Date(cell.acceptedAt as string).getTime());
-    const lastAcceptedAt =
-      acceptedTimes.length > 0 ? new Date(Math.max(...acceptedTimes)).toISOString() : null;
-
-    return {
-      userId,
-      rank: 0,
-      totalScore,
-      penalty,
-      lastAcceptedAt,
-      cells,
-    };
-  });
-
-  rows.sort((left, right) => {
-    if (left.totalScore !== right.totalScore) {
-      return right.totalScore - left.totalScore;
+async function refreshContestRuntime() {
+  if (!STORE_DB_SYNC_ENABLED) return;
+  if (globalStore.__ojpContestRuntimeRefresh) return globalStore.__ojpContestRuntimeRefresh;
+  if (Date.now()-(globalStore.__ojpContestRuntimeRefreshedAt ?? 0)<1000) return;
+  const ids = store.submissions.filter(s => !!s.contestId).map(s => s.id);
+  globalStore.__ojpContestRuntimeRefresh = (async()=>{
+    const cache = getSubmissionRuntimeCache();
+    for(let index=0;index<ids.length;index+=500) {
+      const rows = await prisma.submissionRuntimeState.findMany({where:{submissionId:{in:ids.slice(index,index+500)}}});
+      for(const row of rows) cache[row.submissionId] = {status:normalizeSubmissionStatus(row.status) ?? "internal_error",
+        score:row.score,totalTimeMs:row.totalTimeMs,peakMemoryKb:row.peakMemoryKb,
+        judgeStartedAt:row.judgeStartedAt?.toISOString() ?? null,judgedAt:row.judgedAt?.toISOString() ?? null,judgeEnvironmentVersion:row.judgeEnvironmentVersion};
     }
-    if (left.penalty !== right.penalty) {
-      return left.penalty - right.penalty;
-    }
-    const leftLastAccepted = left.lastAcceptedAt
-      ? new Date(left.lastAcceptedAt).getTime()
-      : Number.POSITIVE_INFINITY;
-    const rightLastAccepted = right.lastAcceptedAt
-      ? new Date(right.lastAcceptedAt).getTime()
-      : Number.POSITIVE_INFINITY;
-    if (leftLastAccepted !== rightLastAccepted) {
-      return leftLastAccepted - rightLastAccepted;
-    }
-    return left.userId.localeCompare(right.userId);
-  });
+    globalStore.__ojpContestRuntimeRefreshedAt=Date.now();
+  })();
+  try {await globalStore.__ojpContestRuntimeRefresh;}
+  finally {globalStore.__ojpContestRuntimeRefresh=undefined;}
+}
 
-  rows.forEach((row, index) => {
-    row.rank = index + 1;
-  });
+function currentRatings() {
+  const rated = store.contests.filter(c => c.rated);
+  const ids = new Set(rated.map(c=>c.id));
+  const submissions = store.submissions.filter(s=>s.contestId && ids.has(s.contestId) && !s.virtualParticipationId)
+    .map(s=>applySubmissionRuntimeSummary(s));
+  const signature = JSON.stringify([store.contests.map(c=>[c.id,!!c.rated]),rated.map(c=>[c.id,c.title,c.visibility,c.startAt,c.endAt,c.penaltyMinutes,c.problems,c.participantUserIds,getContestStatus(c)]),
+    submissions.map(s=>[s.id,s.userId,s.problemId,s.contestId,s.status,s.score,s.submittedAt]),store.problems.map(p=>[p.id,p.authorId])]);
+  if (globalStore.__ojpRatingCache?.signature === signature) return globalStore.__ojpRatingCache.result;
+  const result = calculateRatings(store.contests,submissions,store.problems);
+  globalStore.__ojpRatingCache={signature,result};
+  return result;
+}
 
-  return rows;
+export async function getContestLiveData(contestId: string, user: User | null): Promise<ContestLiveData> {
+  const contest = getContestForViewer(contestId,user?.id ?? "guest");
+  if (!contest) throw new HttpError("contest not found",404);
+  await refreshContestRuntime();
+  const submissions = store.submissions.map(s => applySubmissionRuntimeSummary(s));
+  const ratings = currentRatings();
+  const board = buildVisibleScoreboard(contestId);
+  const session = user ? await readVirtualParticipation(contestId,user.id) : null;
+  const status = getContestStatus(contest);
+  const canOpen = status !== "scheduled" || (!!user && canEditContestByViewer(contest,user.id));
+  return {contestId, serverNow:nowIso(),startAt:contest.startAt,endAt:contest.endAt,status,
+    rated:!!contest.rated, joined:!!user && contest.participantUserIds.includes(user.id), visibility:contest.scoreboardVisibility,
+    canJoin:!!user && user.status === "active" && status !== "ended",
+    canVirtual:!!user && user.status === "active" && status === "ended",
+    detailLevel:board.detailLevel,
+    rows:board.rows.map(row => ({...row,displayName:findUser(row.userId)?.displayName ?? row.userId})),
+    ratingResult:ratings.results.get(contestId) ?? {status:"unrated",changes:[]},
+    problems:[...contest.problems].sort((a,b) => a.orderIndex-b.orderIndex).map(p => ({...p,
+      title:canOpen ? getProblemById(p.problemId)?.title ?? p.problemId : null,canOpen})),
+    virtual:session ? {session, rows:calculateStandings(contest,submissions,session).map(row=>({...row,displayName:findUser(row.userId)?.displayName ?? row.userId}))} : null,
+  };
 }
 
 export function canViewAnyScoreboard(contest: Contest): boolean {
@@ -3692,6 +3655,16 @@ export function canViewSubmissionSource(submission: Submission, viewerId: string
   return viewer?.role === "admin" || submission.userId === viewerId;
 }
 
+function canViewSubmissionRecord(submission: Submission, viewerId: string, direct = true): boolean {
+  const viewer = findUser(viewerId);
+  if (viewer?.role === "admin" || submission.userId === viewerId) return true;
+  if (submission.virtualParticipationId) return false;
+  const contest = submission.contestId ? getContestById(submission.contestId) : undefined;
+  if (contest) return canAccessContest(contest,viewer ?? null,direct);
+  const problem = getProblemById(submission.problemId);
+  return !!problem && canViewVisibility(problem.visibility,problem.authorId,viewerId,false,direct);
+}
+
 function maskSensitiveJudgeMessage(
   result: Submission["testResults"][number],
   canViewSource: boolean,
@@ -3806,11 +3779,11 @@ export async function getSubmissionWithAccess(
   viewerId: string,
 ): Promise<{ submission: Submission; canViewSource: boolean } | undefined> {
   const baseSubmission = getSubmissionById(submissionId);
-  if (!baseSubmission) {
+  if (!baseSubmission || !canViewSubmissionRecord(baseSubmission,viewerId)) {
     return undefined;
   }
 
-  const runtimeSummary = await getSubmissionRuntimeState(submissionId);
+  const runtimeSummary = await getSubmissionRuntimeState(submissionId,true);
   const runtimeResults = await listSubmissionRuntimeTestResults(submissionId);
   const submission = applySubmissionRuntimeSummary(
     {
@@ -4417,6 +4390,7 @@ export function getJudgeProcessMode(): "inline" | "web" | "worker" {
 }
 
 export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
+  await ensureStoreReady();
   if (JUDGE_PROCESS_MODE !== "worker") {
     return;
   }
@@ -4521,6 +4495,13 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     throw new HttpError("you do not have permission to request rejudge", 403);
   }
 
+  const runtime = await getSubmissionRuntimeState(submission.id,true);
+  const activeJob = JUDGE_PROCESS_MODE !== "inline" ? await prisma.judgeJob.findFirst({
+    where:{submissionId:submission.id,status:{in:["queued","running"]}},select:{id:true},
+  }) : null;
+  if (isWaitingSubmissionStatus(runtime?.status ?? submission.status) || activeJob || hasInFlightJudgeForSubmission(submission.id))
+    throw new HttpError("Cannot rejudge while this submission is still being judged.",409);
+
   enforceRejudgeRateLimit(actor.id, problem.id, isAdminBypass(actor));
 
   submission.status = "pending";
@@ -4552,18 +4533,18 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     metadata: { requestId: request.id, problemId: problem.id },
   });
 
-  if (JUDGE_PROCESS_MODE === "inline") {
-    enqueueJudgeJob(submission.id, "rejudge");
-  } else {
-    await enqueueJudgeJobDb(submission.id, "rejudge");
-  }
+  await persistStoreSnapshotNow();
   await resetSubmissionRuntime(submission.id, {
     status: "queued",
     judgeStartedAt: null,
     judgedAt: null,
     judgeEnvironmentVersion: null,
   });
-  await persistStoreSnapshotNow();
+  if (JUDGE_PROCESS_MODE === "inline") {
+    enqueueJudgeJob(submission.id, "rejudge");
+  } else {
+    await enqueueJudgeJobDb(submission.id, "rejudge");
+  }
 
   return {
     request,

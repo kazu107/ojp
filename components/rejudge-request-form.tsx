@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,6 +13,7 @@ const PRESET_REASONS = [
 ];
 
 export function RejudgeRequestForm({ submissionId }: { submissionId: string }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [reason, setReason] = useState(PRESET_REASONS[0]);
   const [detail, setDetail] = useState("");
@@ -47,29 +50,29 @@ export function RejudgeRequestForm({ submissionId }: { submissionId: string }) {
     <form className="form" onSubmit={onSubmit}>
       <div className="form-grid">
         <label className="field">
-          <span className="field-label">Reason preset</span>
+          <span className="field-label">{t("Reason preset")}</span>
           <select className="select" value={reason} onChange={(event) => setReason(event.target.value)}>
             {PRESET_REASONS.map((item) => (
               <option key={item} value={item}>
-                {item}
+                {t(item)}
               </option>
             ))}
           </select>
         </label>
         <label className="field">
-          <span className="field-label">Additional detail</span>
+          <span className="field-label">{t("Additional detail")}</span>
           <input
             className="input"
             value={detail}
             onChange={(event) => setDetail(event.target.value)}
-            placeholder="optional note"
+            placeholder={t("optional note")}
           />
         </label>
       </div>
-      {error ? <p className="badge badge-red">{error}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
       <div className="button-row">
         <button className="button button-secondary" type="submit" disabled={isSending}>
-          {isSending ? "Requesting..." : "Request Rejudge"}
+          {isSending ? t("Requesting...") : t("Request Rejudge")}
         </button>
       </div>
     </form>

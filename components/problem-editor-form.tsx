@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -213,6 +215,7 @@ function parseDifficultyInput(
 }
 
 export function ProblemEditorForm(props: ProblemEditorFormProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState<FormState>(
     props.mode === "edit" ? stateFromProblem(props.initialProblem) : emptyState(),
@@ -948,29 +951,25 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
             className={activeTab === "content" ? "button" : "button button-secondary"}
             onClick={() => setActiveTab("content")}
           >
-            問題文など
-          </button>
+            {t("問題文など")}</button>
           <button
             type="button"
             className={activeTab === "settings" ? "button" : "button button-secondary"}
             onClick={() => setActiveTab("settings")}
           >
-            問題の設定など
-          </button>
+            {t("問題の設定など")}</button>
           <button
             type="button"
             className={activeTab === "tests" ? "button" : "button button-secondary"}
             onClick={() => setActiveTab("tests")}
           >
-            テストケース
-          </button>
+            {t("テストケース")}</button>
           <button
             type="button"
             className={activeTab === "testrun" ? "button" : "button button-secondary"}
             onClick={() => setActiveTab("testrun")}
           >
-            テスト run
-          </button>
+            {t("テスト run")}</button>
         </div>
       </section>
 
@@ -978,29 +977,29 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         <section className="stack">
           <div className="form-grid">
             <label className="field">
-              <span className="field-label">Title</span>
+              <span className="field-label">{t("Title")}</span>
               <input
                 className="input"
                 required
                 value={form.title}
                 onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-                placeholder="A - Sample Problem"
+                placeholder={t("A - Sample Problem")}
               />
             </label>
             <label className="field">
-              <span className="field-label">Slug</span>
+              <span className="field-label">{t("Slug")}</span>
               <input
                 className="input"
                 required
                 value={form.slug}
                 onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
-                placeholder="a-sample-problem"
+                placeholder={t("a-sample-problem")}
               />
             </label>
           </div>
 
           <div className="field">
-            <span className="field-label">Statement (Markdown)</span>
+            <span className="field-label">{t("Statement (Markdown)")}</span>
             <CodeEditor
               language="markdown"
               minHeight={260}
@@ -1008,16 +1007,16 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               onChange={(value) => setForm((prev) => ({ ...prev, statementMarkdown: value }))}
             />
             <div className="markdown-preview">
-              <span className="field-label">Live Preview</span>
+              <span className="field-label">{t("Live Preview")}</span>
               <div className="panel stack">
-                <MarkdownBlock text={form.statementMarkdown || "_No preview yet._"} />
+                <MarkdownBlock text={form.statementMarkdown || t("_No preview yet._")} />
               </div>
             </div>
           </div>
 
           <div className="form-grid">
             <label className="field">
-              <span className="field-label">Input Description</span>
+              <span className="field-label">{t("Input Description")}</span>
               <textarea
                 className="textarea"
                 required
@@ -1028,7 +1027,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               />
             </label>
             <label className="field">
-              <span className="field-label">Output Description</span>
+              <span className="field-label">{t("Output Description")}</span>
               <textarea
                 className="textarea"
                 required
@@ -1042,7 +1041,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
           <div className="form-grid">
             <label className="field">
-              <span className="field-label">Constraints</span>
+              <span className="field-label">{t("Constraints")}</span>
               <textarea
                 className="textarea"
                 required
@@ -1053,7 +1052,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               />
             </label>
             <label className="field">
-              <span className="field-label">Explanation</span>
+              <span className="field-label">{t("Explanation")}</span>
               <textarea
                 className="textarea"
                 value={form.explanationMarkdown}
@@ -1070,7 +1069,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         <section className="stack">
           <div className="form-grid">
             <label className="field">
-              <span className="field-label">Visibility</span>
+              <span className="field-label">{t("Visibility")}</span>
               <select
                 className="select"
                 value={form.visibility}
@@ -1078,13 +1077,13 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                   setForm((prev) => ({ ...prev, visibility: event.target.value as Visibility }))
                 }
               >
-                <option value="public">Public</option>
-                <option value="unlisted">Unlisted</option>
-                <option value="private">Private</option>
+                <option value="public">{t("Public")}</option>
+                <option value="unlisted">{t("Unlisted")}</option>
+                <option value="private">{t("Private")}</option>
               </select>
             </label>
             <label className="field">
-              <span className="field-label">Explanation Visibility</span>
+              <span className="field-label">{t("Explanation Visibility")}</span>
               <select
                 className="select"
                 value={form.explanationVisibility}
@@ -1095,13 +1094,13 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                   }))
                 }
               >
-                <option value="always">always</option>
-                <option value="contest_end">contest_end</option>
-                <option value="private">private (default)</option>
+                <option value="always">{t("always")}</option>
+                <option value="contest_end">{t("contest_end")}</option>
+                <option value="private">{t("private (default)")}</option>
               </select>
             </label>
             <label className="field">
-              <span className="field-label">Difficulty (AtCoder rating)</span>
+              <span className="field-label">{t("Difficulty (AtCoder rating)")}</span>
               <input
                 className="input"
                 type="number"
@@ -1112,10 +1111,10 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                 }
                 placeholder="800"
               />
-              <p className="text-soft">Optional integer value (for example: 400, 800, 1200).</p>
+              <p className="text-soft">{t("Optional integer value (for example: 400, 800, 1200).")}</p>
             </label>
             <label className="field">
-              <span className="field-label">Time Limit (ms)</span>
+              <span className="field-label">{t("Time Limit (ms)")}</span>
               <input
                 className="input"
                 type="number"
@@ -1127,7 +1126,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               />
             </label>
             <label className="field">
-              <span className="field-label">Memory Limit (MB)</span>
+              <span className="field-label">{t("Memory Limit (MB)")}</span>
               <input
                 className="input"
                 type="number"
@@ -1139,7 +1138,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               />
             </label>
             <label className="field">
-              <span className="field-label">Test Case Visibility</span>
+              <span className="field-label">{t("Test Case Visibility")}</span>
               <select
                 className="select"
                 value={form.testCaseVisibility}
@@ -1150,13 +1149,12 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                   }))
                 }
               >
-                <option value="group_only">group_only</option>
-                <option value="case_index_only">case_index_only (default)</option>
-                <option value="case_name_visible">case_name_visible</option>
+                <option value="group_only">{t("group_only")}</option>
+                <option value="case_index_only">{t("case_index_only (default)")}</option>
+                <option value="case_name_visible">{t("case_name_visible")}</option>
               </select>
               <p className="text-soft">
-                Use `case_name_visible` only when needed to avoid leaking hidden test intent.
-              </p>
+                {t("Use `case_name_visible` only when needed to avoid leaking hidden test intent.")}</p>
             </label>
           </div>
         </section>
@@ -1165,14 +1163,13 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       {activeTab === "tests" ? (
         <section className="panel stack">
           <div>
-            <h2 className="panel-title">Judge Package</h2>
+            <h2 className="panel-title">{t("Judge Package")}</h2>
             <p className="panel-subtitle">
-              ZIP import / export と、サンプル・グループ・ケース・checker 設定をここで管理します。
-            </p>
+              {t("ZIP import / export と、サンプル・グループ・ケース・checker 設定をここで管理します。")}</p>
           </div>
 
           <label className="field">
-            <span className="field-label">Import ZIP</span>
+            <span className="field-label">{t("Import ZIP")}</span>
             <input
               className="input"
               type="file"
@@ -1185,9 +1182,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               }}
             />
             <p className="text-soft">
-              Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields,
-              and converts its tests into the editor below.
-            </p>
+              {t("Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields, and converts its tests into the editor below.")}</p>
           </label>
 
           <div className="button-row">
@@ -1201,14 +1196,13 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                       onClick={() => void loadExistingPackage()}
                       disabled={isLoadingExistingPackage || isInspectingPackage}
                     >
-                      {isLoadingExistingPackage ? "Loading Package Metadata..." : "Load Existing Package"}
+                      {isLoadingExistingPackage ? t("Loading Package Metadata...") : t("Load Existing Package")}
                     </button>
                     <a
                       className="button button-secondary"
                       href={`/api/problems/${props.initialProblem.id}/package`}
                     >
-                      Download Stored ZIP
-                    </a>
+                      {t("Download Stored ZIP")}</a>
                   </>
                 ) : null}
                 <button
@@ -1220,8 +1214,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                     setPackageError("");
                   }}
                 >
-                  Start Manual Package
-                </button>
+                  {t("Start Manual Package")}</button>
               </>
             ) : (
               <>
@@ -1234,8 +1227,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                     setPackageError("");
                   }}
                 >
-                  Reset to Blank
-                </button>
+                  {t("Reset to Blank")}</button>
                 <button
                   type="button"
                   className="button button-secondary"
@@ -1249,15 +1241,14 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                     setPackageError("");
                   }}
                 >
-                  Clear Package
-                </button>
+                  {t("Clear Package")}</button>
                 <button
                   type="button"
                   className="button button-secondary"
                   onClick={() => void downloadPackageZip()}
                   disabled={isExportingPackage}
                 >
-                  {isExportingPackage ? "Exporting..." : "Download ZIP"}
+                  {isExportingPackage ? t("Exporting...") : t("Download ZIP")}
                 </button>
                 {packageDraft.isPartial ? (
                   <button
@@ -1266,7 +1257,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                     onClick={() => void hydratePartialPackageDraftIfNeeded()}
                     disabled={isLoadingExistingPackage}
                   >
-                    {isLoadingExistingPackage ? "Loading All Cases..." : "Load All Cases"}
+                    {isLoadingExistingPackage ? t("Loading All Cases...") : t("Load All Cases")}
                   </button>
                 ) : null}
               </>
@@ -1275,11 +1266,11 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
           {isInspectingPackage ? (
             <p className="badge badge-blue">
-              {inspectProgressText || "Inspecting ZIP..."}
+              {t(inspectProgressText || "Inspecting ZIP...")}
             </p>
           ) : null}
-          {packageNotice ? <p className="badge badge-blue">{packageNotice}</p> : null}
-          {packageError ? <p className="badge badge-red">{packageError}</p> : null}
+          {packageNotice ? <p className="badge badge-blue">{t(packageNotice)}</p> : null}
+          {packageError ? <p className="badge badge-red">{t(packageError)}</p> : null}
 
           {packageDraft ? (
             <ProblemPackageDraftEditor
@@ -1291,15 +1282,12 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
           ) : (
             <div className="stack">
               <p className="empty">
-                {hasExistingStoredPackage
-                  ? "This problem already has a stored package. Load it only when you need to inspect or edit tests."
-                  : "No package is attached yet. Start from a blank manual package or import a ZIP."}
+                {hasExistingStoredPackage ? t("This problem already has a stored package. Load it only when you need to inspect or edit tests.") : t("No package is attached yet. Start from a blank manual package or import a ZIP.")}
               </p>
               {hasExistingStoredPackage ? (
                 <p className="text-soft">
-                  Stored ZIP: {props.initialProblem.latestPackageSummary?.fileName} (
-                  {Math.ceil((props.initialProblem.latestPackageSummary?.zipSizeBytes ?? 0) / 1024 / 1024)} MB)
-                </p>
+                  {t("Stored ZIP: ")}{props.initialProblem.latestPackageSummary?.fileName} (
+                  {Math.ceil((props.initialProblem.latestPackageSummary?.zipSizeBytes ?? 0) / 1024 / 1024)} {t(" MB)")}</p>
               ) : null}
             </div>
           )}
@@ -1309,28 +1297,27 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       {activeTab === "testrun" ? (
         <section className="panel stack">
           <div>
-            <h2 className="panel-title">Package Test Run</h2>
+            <h2 className="panel-title">{t("Package Test Run")}</h2>
             <p className="panel-subtitle">
-              現在のテストケースと special judge 設定を使って、保存前にコードを試せます。
-            </p>
+              {t("現在のテストケースと special judge 設定を使って、保存前にコードを試せます。")}</p>
           </div>
 
           <label className="field">
-            <span className="field-label">Language</span>
+            <span className="field-label">{t("Language")}</span>
             <select
               className="select"
               value={previewLanguage}
               onChange={(event) => setPreviewLanguage(event.target.value as Language)}
             >
-              <option value="cpp">cpp</option>
-              <option value="python">python</option>
-              <option value="java">java</option>
-              <option value="javascript">javascript</option>
+              <option value="cpp">{t("cpp")}</option>
+              <option value="python">{t("python")}</option>
+              <option value="java">{t("java")}</option>
+              <option value="javascript">{t("javascript")}</option>
             </select>
           </label>
 
           <div className="field">
-            <span className="field-label">Source Code</span>
+            <span className="field-label">{t("Source Code")}</span>
             <CodeEditor
               language={previewLanguage}
               minHeight={300}
@@ -1352,7 +1339,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                 onClick={() => void loadExistingPackage()}
                 disabled={isLoadingExistingPackage || isInspectingPackage}
               >
-                {isLoadingExistingPackage ? "Loading Package Metadata..." : "Load Existing Package First"}
+                {isLoadingExistingPackage ? t("Loading Package Metadata...") : t("Load Existing Package First")}
               </button>
             ) : null}
             <button
@@ -1361,22 +1348,22 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               onClick={() => void runPackagePreview()}
               disabled={isRunningPreview || !packageDraft}
             >
-              {isRunningPreview ? "Running..." : "Run Test"}
+              {isRunningPreview ? t("Running...") : t("Run Test")}
             </button>
           </div>
 
-          {previewError ? <p className="badge badge-red">{previewError}</p> : null}
-          {previewNotice ? <p className="badge badge-blue">{previewNotice}</p> : null}
+          {previewError ? <p className="badge badge-red">{t(previewError)}</p> : null}
+          {previewNotice ? <p className="badge badge-blue">{t(previewNotice)}</p> : null}
 
           {previewResult ? (
             <div className="stack">
               <div className="meta-inline">
                 <StatusBadge className={badgeClassForSubmission(previewResult.status)}>
-                  {submissionStatusLabel(previewResult.status)}
+                  {t(submissionStatusLabel(previewResult.status))}
                 </StatusBadge>
-                <span className="text-soft">Score: {previewResult.score}</span>
-                <span className="text-soft">Time: {previewResult.totalTimeMs} ms</span>
-                <span className="text-soft">Memory: {previewResult.peakMemoryKb} KB</span>
+                <span className="text-soft">{t("Score: ")}{previewResult.score}</span>
+                <span className="text-soft">{t("Time: ")}{previewResult.totalTimeMs} {t(" ms")}</span>
+                <span className="text-soft">{t("Memory: ")}{previewResult.peakMemoryKb} {t(" KB")}</span>
               </div>
               <div className="stack">
                 {groupPreviewResults(previewResult.testResults).map((group) => (
@@ -1384,22 +1371,22 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                     <summary className="result-group-summary">
                       <span className="kpi">{group.groupName}</span>
                       <StatusBadge className={badgeClassForSubmission(group.verdict)}>
-                        {submissionStatusLabel(group.verdict)}
+                        {t(submissionStatusLabel(group.verdict))}
                       </StatusBadge>
-                      <span className="result-group-meta">Cases: {group.caseCount}</span>
-                      <span className="result-group-meta">Time(max): {group.maxTimeMs} ms</span>
-                      <span className="result-group-meta">Memory: {group.peakMemoryKb} KB</span>
+                      <span className="result-group-meta">{t("Cases: ")}{group.caseCount}</span>
+                      <span className="result-group-meta">{t("Time(max): ")}{group.maxTimeMs} {t(" ms")}</span>
+                      <span className="result-group-meta">{t("Memory: ")}{group.peakMemoryKb} {t(" KB")}</span>
                     </summary>
                     <div className="result-group-body">
                       <div className="table-wrap">
                         <table className="table">
                           <thead>
                             <tr>
-                              <th>Case</th>
-                              <th>Verdict</th>
-                              <th>Time</th>
-                              <th>Memory</th>
-                              <th>Message</th>
+                              <th>{t("Case")}</th>
+                              <th>{t("Verdict")}</th>
+                              <th>{t("Time")}</th>
+                              <th>{t("Memory")}</th>
+                              <th>{t("Message")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1408,12 +1395,12 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                                 <td>{result.testCaseName}</td>
                                 <td>
                                   <StatusBadge className={badgeClassForSubmission(result.verdict)}>
-                                    {submissionStatusLabel(result.verdict)}
+                                    {t(submissionStatusLabel(result.verdict))}
                                   </StatusBadge>
                                 </td>
-                                <td>{result.timeMs} ms</td>
-                                <td>{result.memoryKb} KB</td>
-                                <td>{result.message}</td>
+                                <td>{result.timeMs} {t(" ms")}</td>
+                                <td>{result.memoryKb} {t(" KB")}</td>
+                                <td>{t(result.message)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1431,23 +1418,22 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       {saveProgress ? (
         <div className="panel stack">
           <p className="badge badge-blue">
-            {saveProgress.phase} ({saveProgress.percent}%)
+            {t(saveProgress.phase)} ({saveProgress.percent}%)
           </p>
           <progress max={100} value={saveProgress.percent} />
         </div>
       ) : null}
-      {error ? <p className="badge badge-red">{error}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
       {props.mode === "create" && createdProblemId ? (
         <div className="button-row">
           <Link className="button button-secondary" href={`/problems/${createdProblemId}/edit`}>
-            Open Created Problem
-          </Link>
+            {t("Open Created Problem")}</Link>
         </div>
       ) : null}
 
       <div className="button-row">
         <button className="button" type="submit" disabled={isSaving || isInspectingPackage}>
-          {isSaving ? "Saving..." : props.mode === "edit" ? "Update" : "Create"}
+          {isSaving ? t("Saving...") : props.mode === "edit" ? t("Update") : t("Create")}
         </button>
       </div>
     </form>

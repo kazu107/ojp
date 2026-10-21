@@ -103,6 +103,7 @@ export interface Contest {
   endAt: string;
   penaltyMinutes: number;
   scoreboardVisibility: ScoreboardVisibility;
+  rated?: boolean;
   problems: ContestProblem[];
   participantUserIds: string[];
   createdAt: string;
@@ -124,6 +125,7 @@ export interface Submission {
   userId: string;
   problemId: string;
   contestId: string | null;
+  virtualParticipationId?: string | null;
   language: Language;
   sourceCode: string;
   status: SubmissionStatus;
@@ -250,6 +252,7 @@ export interface CreateContestInput {
   endAt: string;
   penaltyMinutes: number;
   scoreboardVisibility: ScoreboardVisibility;
+  rated?: boolean;
   problems: ContestProblem[];
 }
 
@@ -258,8 +261,52 @@ export type UpdateContestInput = Partial<CreateContestInput>;
 export interface CreateSubmissionInput {
   problemId: string;
   contestId: string | null;
+  virtualParticipationId?: string | null;
   language: Language;
   sourceCode: string;
+}
+
+export interface VirtualParticipation {
+  id: string;
+  contestId: string;
+  userId: string;
+  startedAt: string;
+  endAt: string;
+  finishedAt: string | null;
+}
+
+export interface RatingChange {
+  contestId: string;
+  contestTitle: string;
+  endAt: string;
+  userId: string;
+  rank: number;
+  previousRating: number;
+  rating: number;
+  delta: number;
+}
+
+export interface ContestRatingResult {
+  status: "unrated" | "running" | "waiting_judge" | "insufficient_participants" | "calculated";
+  changes: RatingChange[];
+}
+
+export interface ContestLiveData {
+  contestId: string;
+  serverNow: string;
+  startAt: string;
+  endAt: string;
+  status: ContestStatus;
+  rated: boolean;
+  joined: boolean;
+  canJoin: boolean;
+  canVirtual: boolean;
+  detailLevel: "hidden" | "summary" | "full";
+  visibility: ScoreboardVisibility;
+  rows: Array<ScoreboardRow & {displayName:string}>;
+  ratingResult: ContestRatingResult;
+  problems: Array<ContestProblem & {title:string|null;canOpen:boolean}>;
+  virtual: {session:VirtualParticipation;rows:ScoreboardRow[]} | null;
 }
 
 export interface CreateAnnouncementInput {

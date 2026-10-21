@@ -311,3 +311,75 @@ model SubmissionRuntimeTestResult {
 
   @@index([submissionId, orderIndex])
 }
+
+// Learning data is independent of the legacy AppState snapshot and its user IDs.
+model LearningCourse {
+  id                 String   @id
+  authorId           String
+  title              String
+  slug               String   @unique
+  summary            String
+  visibility         Visibility @default(private)
+  draft              Json
+  editVersion        Int      @default(1)
+  publishedVersionId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  versions           LearningCourseVersion[]
+
+  @@index([authorId, updatedAt])
+}
+
+model LearningCourseVersion {
+  id          String   @id
+  courseId    String
+  title       String
+  summary     String
+  outline     Json
+  createdAt   DateTime @default(now())
+  course      LearningCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  items       LearningItem[]
+  progress    LearningProgress[]
+
+  @@index([courseId, createdAt])
+}
+
+model LearningItem {
+  versionId   String
+  itemId      String
+  content     Json
+  storageKey  String?
+  version     LearningCourseVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@id([versionId, itemId])
+}
+
+model LearningProgress {
+  userId       String
+  versionId    String
+  itemId       String
+  completedAt  DateTime?
+  score        Int     @default(0)
+  attempts     Int     @default(0)
+  lastAttemptAt DateTime?
+  submissionId String?
+  updatedAt    DateTime @updatedAt
+  version      LearningCourseVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, versionId, itemId])
+  @@index([userId, updatedAt])
+}
+
+// Legacy contest/user IDs live in AppState, so there are deliberately no foreign keys.
+model ContestVirtualParticipation {
+  id         String   @id
+  contestId  String
+  userId     String
+  startedAt  DateTime
+  endAt      DateTime
+  finishedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@unique([contestId, userId])
+  @@index([userId, startedAt])
+}

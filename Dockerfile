@@ -8,6 +8,8 @@ RUN apt-get update \
     g++ \
     python3 \
     default-jdk-headless \
+    bubblewrap \
+    util-linux \
     time \
     tini \
   && rm -rf /var/lib/apt/lists/*
@@ -25,7 +27,7 @@ RUN npm ci --include=dev
 COPY . .
 
 RUN npm run db:generate \
-  && npm run build
+  && STORE_DB_SYNC=0 npm run build
 
 ENV NODE_ENV=production
 

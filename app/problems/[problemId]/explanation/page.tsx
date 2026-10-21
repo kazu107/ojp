@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkdownBlock } from "@/components/markdown-block";
@@ -12,12 +14,14 @@ import {
   canViewProblemExplanation,
   getOptionalCurrentUser,
   getProblemForViewer,
+  getProblemForContestViewer,
 } from "@/lib/store";
 
 interface ProblemExplanationPageProps {
   params: Promise<{
     problemId: string;
   }>;
+  searchParams:Promise<{contestId?:string;virtualParticipationId?:string}>;
 }
 
 function hiddenExplanationMessage(
@@ -31,11 +35,15 @@ function hiddenExplanationMessage(
 
 export default async function ProblemExplanationPage({
   params,
+  searchParams,
 }: ProblemExplanationPageProps) {
+  const { t } = await getI18n();
   const { problemId } = await params;
+  const {contestId,virtualParticipationId}=await searchParams;
+  const contextQuery=contestId?`?contestId=${encodeURIComponent(contestId)}${virtualParticipationId?`&virtualParticipationId=${encodeURIComponent(virtualParticipationId)}`:""}`:"";
   const me = await getOptionalCurrentUser();
   const viewerId = me?.id ?? "guest";
-  const problem = getProblemForViewer(problemId, viewerId);
+  const problem = contestId?getProblemForContestViewer(problemId,contestId,viewerId):getProblemForViewer(problemId, viewerId);
   if (!problem) {
     notFound();
   }
@@ -47,35 +55,32 @@ export default async function ProblemExplanationPage({
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Explanation: {problem.title}</h1>
-          <p className="page-subtitle">解説専用ページです。公開条件に応じて内容が表示されます。</p>
+          <h1 className="page-title">{t("Explanation: ")}{problem.title}</h1>
+          <p className="page-subtitle">{t("解説専用ページです。公開条件に応じて内容が表示されます。")}</p>
         </div>
         <div className="button-row">
-          <Link href={`/problems/${problem.id}`} className="button button-secondary">
-            問題へ戻る
-          </Link>
-          <Link href={`/problems/${problem.id}/submit`} className="button">
-            提出する
-          </Link>
+          <Link href={`/problems/${problem.id}${contextQuery}`} className="button button-secondary">
+            {t("問題へ戻る")}</Link>
+          <Link href={`/problems/${problem.id}/submit${contextQuery}`} className="button">
+            {t("提出する")}</Link>
           {canEditProblem ? (
             <Link href={`/problems/${problem.id}/edit`} className="button button-secondary">
-              編集
-            </Link>
+              {t("編集")}</Link>
           ) : null}
         </div>
       </section>
 
       <section className="panel stack">
         <div className="meta-inline">
-          <span className="text-soft">Explanation Visibility: {explanationVisibilityLabel(problem.explanationVisibility)}</span>
+          <span className="text-soft">{t("Explanation Visibility: ")}{t(explanationVisibilityLabel(problem.explanationVisibility))}</span>
           <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
-            {difficultyLabel(problem.difficulty)}
+            {t(difficultyLabel(problem.difficulty))}
           </StatusBadge>
         </div>
         {canViewExplanation ? (
-          <MarkdownBlock text={problem.explanationMarkdown || "解説はまだありません。"} />
+          <MarkdownBlock text={problem.explanationMarkdown || t("解説はまだありません。")} />
         ) : (
-          <p className="badge badge-slate">{hiddenExplanationMessage(problem.explanationVisibility)}</p>
+          <p className="badge badge-slate">{t(hiddenExplanationMessage(problem.explanationVisibility))}</p>
         )}
       </section>
     </div>

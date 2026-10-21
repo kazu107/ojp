@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -19,6 +21,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function ProblemsPage() {
+  const { t, locale } = await getI18n();
   const me = await getOptionalCurrentUser();
   const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
   const problems = listProblemsForListView(me?.id ?? "guest");
@@ -35,35 +38,33 @@ export default async function ProblemsPage() {
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Problems</h1>
+          <h1 className="page-title">{t("Problems")}</h1>
           <p className="page-subtitle">
-            問題一覧です。公開範囲と制約情報を確認できます。
-          </p>
+            {t("問題一覧です。公開範囲と制約情報を確認できます。")}</p>
         </div>
         <div className="button-row">
           {canCreateProblem ? (
             <Link href="/problems/new" className="button">
-              新規作成
-            </Link>
+              {t("新規作成")}</Link>
           ) : null}
         </div>
       </section>
 
       <section className="panel">
         {problems.length === 0 ? (
-          <p className="empty">表示できる問題がありません。</p>
+          <p className="empty">{t("表示できる問題がありません。")}</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Title</th>
-                  <th>Difficulty</th>
-                  <th>Visibility</th>
-                  <th>Limits</th>
-                  <th>Author</th>
-                  <th>Updated</th>
-                  <th>Actions</th>
+                  <th>{t("Title")}</th>
+                  <th>{t("Difficulty")}</th>
+                  <th>{t("Visibility")}</th>
+                  <th>{t("Limits")}</th>
+                  <th>{t("Author")}</th>
+                  <th>{t("Updated")}</th>
+                  <th>{t("Actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,28 +80,25 @@ export default async function ProblemsPage() {
                     </td>
                     <td>
                       <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
-                        {difficultyLabel(problem.difficulty)}
+                        {t(difficultyLabel(problem.difficulty))}
                       </StatusBadge>
                     </td>
                     <td>
                       <StatusBadge className={badgeClassForVisibility(problem.visibility)}>
-                        {visibilityLabel(problem.visibility)}
+                        {t(visibilityLabel(problem.visibility))}
                       </StatusBadge>
                     </td>
                     <td>
-                      {problem.timeLimitMs} ms / {problem.memoryLimitMb} MB
-                    </td>
+                      {problem.timeLimitMs} {t(" ms / ")}{problem.memoryLimitMb} {t(" MB")}</td>
                     <td>{findUser(problem.authorId)?.displayName ?? problem.authorId}</td>
-                    <td>{formatDate(problem.updatedAt)}</td>
+                    <td>{formatDate(problem.updatedAt, locale)}</td>
                     <td>
                       <div className="button-row">
                         <Link className="link" href={`/problems/${problem.id}/submit`}>
-                          Submit
-                        </Link>
+                          {t("Submit")}</Link>
                         {me && canEditProblemByViewer(problem, me.id) ? (
                           <Link className="link" href={`/problems/${problem.id}/edit`}>
-                            Edit
-                          </Link>
+                            {t("Edit")}</Link>
                         ) : null}
                       </div>
                     </td>

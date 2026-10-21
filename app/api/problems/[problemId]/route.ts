@@ -10,6 +10,7 @@ import {
 import {
   getOptionalCurrentUser,
   getProblemForViewer,
+  getProblemForContestViewer,
   updateProblem,
 } from "@/lib/store";
 import { apiError, errorResponse } from "@/lib/api-response";
@@ -20,11 +21,12 @@ interface ProblemRouteContext {
   }>;
 }
 
-export async function GET(_request: Request, { params }: ProblemRouteContext) {
+export async function GET(request: Request, { params }: ProblemRouteContext) {
   try {
     const { problemId } = await params;
     const user = await getOptionalCurrentUser();
-    const problem = getProblemForViewer(problemId, user?.id ?? "guest");
+    const contestId = new URL(request.url).searchParams.get("contestId");
+    const problem = contestId ? getProblemForContestViewer(problemId,contestId,user?.id ?? "guest") : getProblemForViewer(problemId, user?.id ?? "guest");
     if (!problem) {
       return apiError(404, "problem not found");
     }

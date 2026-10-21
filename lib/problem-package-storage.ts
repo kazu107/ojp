@@ -63,7 +63,7 @@ export function isProblemPackageObjectStorageEnabled(): boolean {
 
 let cachedClient: S3Client | null = null;
 
-function getR2Client(): S3Client {
+export function getR2Client(): S3Client {
   if (cachedClient) {
     return cachedClient;
   }

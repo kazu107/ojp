@@ -1,4 +1,8 @@
+
+import { getI18n } from "@/lib/i18n/server";
+import { RatingSummary } from "@/components/rating-summary";
 import { ProfileForm } from "@/components/profile-form";
+import { LearningProfileSummary } from "@/components/learning-profile-summary";
 import { formatDate, languageLabel, submissionStatusLabel } from "@/lib/presentation";
 import {
   getCurrentUser,
@@ -25,6 +29,7 @@ function formatAverage(value: number): string {
 export const dynamic = "force-dynamic";
 
 export default async function MePage() {
+  const { t, locale } = await getI18n();
   const user = await getCurrentUser();
   const submissions = listSubmissionsForViewer(user.id, { userId: user.id });
   const problems = listProblemsForListView(user.id);
@@ -35,7 +40,8 @@ export default async function MePage() {
   const packagedAuthoredProblems = authoredProblems.filter((problem) => problem.latestPackageSummary);
   const organizedContests = contests.filter((contest) => contest.organizerId === user.id);
   const joinedContests = contests.filter((contest) => contest.participantUserIds.includes(user.id));
-  const contestSubmissions = submissions.filter((submission) => submission.contestId !== null);
+  const contestSubmissions = submissions.filter((submission) => submission.contestId !== null && !submission.virtualParticipationId);
+  const virtualSubmissions = submissions.filter((submission) => !!submission.virtualParticipationId);
   const practiceSubmissions = submissions.filter((submission) => submission.contestId === null);
   const acceptedSubmissions = submissions.filter((submission) => submission.status === "accepted");
   const judgedSubmissions = submissions.filter((submission) => submission.judgedAt);
@@ -81,109 +87,112 @@ export default async function MePage() {
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">Profile</h1>
+          <h1 className="page-title">{t("Profile")}</h1>
           <p className="page-subtitle">
-            プロフィール編集と、自分の提出・作成・参加状況の統計をまとめて確認できます。
-          </p>
+            {t("プロフィール編集と、自分の提出・作成・参加状況の統計をまとめて確認できます。")}</p>
         </div>
       </section>
 
       <section className="panel stack">
-        <p className="text-soft">Username: {user.username}</p>
-        <p className="text-soft">Display Name: {user.displayName}</p>
-        <p className="text-soft">Role: {user.role}</p>
-        <p className="text-soft">Status: {user.status}</p>
-        <p className="text-soft">Created: {formatDate(user.createdAt)}</p>
-        <p className="text-soft">Updated: {formatDate(user.updatedAt)}</p>
+        <p className="text-soft">{t("Username: ")}{user.username}</p>
+        <p className="text-soft">{t("Display Name: ")}{user.displayName}</p>
+        <p className="text-soft">{t("Role: ")}{t(user.role)}</p>
+        <p className="text-soft">{t("Status: ")}{t(user.status)}</p>
+        <p className="text-soft">{t("Created: ")}{formatDate(user.createdAt, locale)}</p>
+        <p className="text-soft">{t("Updated: ")}{formatDate(user.updatedAt, locale)}</p>
       </section>
 
       <section className="panel stack">
-        <h2 className="panel-title">Overview</h2>
+        <h2 className="panel-title">{t("Overview")}</h2>
         <div className="metric-grid">
           <article className="metric-card">
-            <p className="metric-label">Solved Problems</p>
+            <p className="metric-label">{t("Solved Problems")}</p>
             <p className="metric-value">{solvedProblemIds.size}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Submissions</p>
+            <p className="metric-label">{t("Submissions")}</p>
             <p className="metric-value">{submissions.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Accepted</p>
+            <p className="metric-label">{t("Accepted")}</p>
             <p className="metric-value">{acceptedSubmissions.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Acceptance Rate</p>
+            <p className="metric-label">{t("Acceptance Rate")}</p>
             <p className="metric-value">
               {submissions.length > 0 ? formatRate((acceptedSubmissions.length / submissions.length) * 100) : "-"}
             </p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Best Score Sum</p>
+            <p className="metric-label">{t("Best Score Sum")}</p>
             <p className="metric-value">{bestScoreSum}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Average Score</p>
+            <p className="metric-label">{t("Average Score")}</p>
             <p className="metric-value">{submissions.length > 0 ? formatAverage(averageScore) : "-"}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Average Time</p>
-            <p className="metric-value">{judgedSubmissions.length > 0 ? `${formatAverage(averageTimeMs)} ms` : "-"}</p>
+            <p className="metric-label">{t("Average Time")}</p>
+            <p className="metric-value">{judgedSubmissions.length > 0 ? t("{value0} ms", { value0: formatAverage(averageTimeMs) }) : "-"}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Peak Memory</p>
-            <p className="metric-value">{peakMemoryKb > 0 ? `${peakMemoryKb} KB` : "-"}</p>
+            <p className="metric-label">{t("Peak Memory")}</p>
+            <p className="metric-value">{peakMemoryKb > 0 ? t("{value0} KB", { value0: peakMemoryKb }) : "-"}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Practice Submissions</p>
+            <p className="metric-label">{t("Practice Submissions")}</p>
             <p className="metric-value">{practiceSubmissions.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Contest Submissions</p>
+            <p className="metric-label">{t("Contest Submissions")}</p>
             <p className="metric-value">{contestSubmissions.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Joined Contests</p>
+            <p className="metric-label">{t("Virtual Submissions")}</p>
+            <p className="metric-value">{virtualSubmissions.length}</p>
+          </article>
+          <article className="metric-card">
+            <p className="metric-label">{t("Joined Contests")}</p>
             <p className="metric-value">{joinedContests.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Organized Contests</p>
+            <p className="metric-label">{t("Organized Contests")}</p>
             <p className="metric-value">{organizedContests.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Authored Problems</p>
+            <p className="metric-label">{t("Authored Problems")}</p>
             <p className="metric-value">{authoredProblems.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Public Problems</p>
+            <p className="metric-label">{t("Public Problems")}</p>
             <p className="metric-value">{publicAuthoredProblems.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Packaged Problems</p>
+            <p className="metric-label">{t("Packaged Problems")}</p>
             <p className="metric-value">{packagedAuthoredProblems.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">First Submission</p>
-            <p className="metric-value">{firstSubmissionAt ? formatDate(firstSubmissionAt) : "-"}</p>
+            <p className="metric-label">{t("First Submission")}</p>
+            <p className="metric-value">{firstSubmissionAt ? formatDate(firstSubmissionAt, locale) : "-"}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Last Submission</p>
-            <p className="metric-value">{lastSubmissionAt ? formatDate(lastSubmissionAt) : "-"}</p>
+            <p className="metric-label">{t("Last Submission")}</p>
+            <p className="metric-value">{lastSubmissionAt ? formatDate(lastSubmissionAt, locale) : "-"}</p>
           </article>
         </div>
       </section>
 
       <section className="grid-2">
         <article className="panel stack">
-          <h2 className="panel-title">Language Breakdown</h2>
+          <h2 className="panel-title">{t("Language Breakdown")}</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Language</th>
-                  <th>Submissions</th>
-                  <th>Accepted</th>
-                  <th>Rate</th>
+                  <th>{t("Language")}</th>
+                  <th>{t("Submissions")}</th>
+                  <th>{t("Accepted")}</th>
+                  <th>{t("Rate")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,24 +210,24 @@ export default async function MePage() {
         </article>
 
         <article className="panel stack">
-          <h2 className="panel-title">Verdict Breakdown</h2>
+          <h2 className="panel-title">{t("Verdict Breakdown")}</h2>
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Status</th>
-                  <th>Count</th>
+                  <th>{t("Status")}</th>
+                  <th>{t("Count")}</th>
                 </tr>
               </thead>
               <tbody>
                 {verdictStats.length === 0 ? (
                   <tr>
-                    <td colSpan={2}>No submissions yet.</td>
+                    <td colSpan={2}>{t("No submissions yet.")}</td>
                   </tr>
                 ) : (
                   verdictStats.map((entry) => (
                     <tr key={entry.status}>
-                      <td>{submissionStatusLabel(entry.status)}</td>
+                      <td>{t(submissionStatusLabel(entry.status))}</td>
                       <td>{entry.count}</td>
                     </tr>
                   ))
@@ -232,6 +241,8 @@ export default async function MePage() {
       <section className="panel">
         <ProfileForm user={user} />
       </section>
+      <RatingSummary userId={user.id} />
+      <LearningProfileSummary user={user} />
     </div>
   );
 }

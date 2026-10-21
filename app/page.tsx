@@ -1,3 +1,5 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -24,6 +26,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  const { t, locale } = await getI18n();
   const me = await getOptionalCurrentUser();
   const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
   const problems = listPublicProblems();
@@ -37,44 +40,40 @@ export default async function HomePage() {
     <div className="page">
       <section className="page-head">
         <div>
-          <h1 className="page-title">OJP Dashboard</h1>
+          <h1 className="page-title">{t("OJP Dashboard")}</h1>
           <p className="page-subtitle">
-            MVP prototype based on `atcoder_like_platform_spec_draft.md`.
-            You can view recent submissions, contest status, and scoreboard activity here.
-          </p>
+            {t("MVP prototype based on `atcoder_like_platform_spec_draft.md`. You can view recent submissions, contest status, and scoreboard activity here.")}</p>
         </div>
         <div className="button-row">
           {canCreateProblem ? (
             <Link href="/problems/new" className="button">
-              Create Problem
-            </Link>
+              {t("Create Problem")}</Link>
           ) : null}
           <Link href="/submissions" className="button button-secondary">
-            View Submissions
-          </Link>
+            {t("View Submissions")}</Link>
         </div>
       </section>
 
       <section className="panel">
-        <h2 className="panel-title">Platform Snapshot</h2>
+        <h2 className="panel-title">{t("Platform Snapshot")}</h2>
         <p className="panel-subtitle">
-          Signed in as: <span className="kpi">{me?.displayName ?? "Guest"}</span>
+          {t("Signed in as: ")}<span className="kpi">{me?.displayName ?? t("Guest")}</span>
         </p>
         <div className="metric-grid">
           <article className="metric-card">
-            <p className="metric-label">Public Problems</p>
+            <p className="metric-label">{t("Public Problems")}</p>
             <p className="metric-value">{problems.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Contests</p>
+            <p className="metric-label">{t("Contests")}</p>
             <p className="metric-value">{contests.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Recent Submissions</p>
+            <p className="metric-label">{t("Recent Submissions")}</p>
             <p className="metric-value">{submissions.length}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Scoreboard Entries</p>
+            <p className="metric-label">{t("Scoreboard Entries")}</p>
             <p className="metric-value">{latestScoreboard.length}</p>
           </article>
         </div>
@@ -83,19 +82,19 @@ export default async function HomePage() {
       <section className="panel stack">
         <div className="page-head">
           <div>
-            <h2 className="panel-title">Announcements</h2>
-            <p className="panel-subtitle">Latest platform updates and moderation notices.</p>
+            <h2 className="panel-title">{t("Announcements")}</h2>
+            <p className="panel-subtitle">{t("Latest platform updates and moderation notices.")}</p>
           </div>
         </div>
         {announcements.length === 0 ? (
-          <p className="empty">No announcements.</p>
+          <p className="empty">{t("No announcements.")}</p>
         ) : (
           <div className="stack">
             {announcements.map((announcement) => (
               <article key={announcement.id} className="stack">
                 <div className="meta-inline">
                   <strong>{announcement.title}</strong>
-                  <span className="text-soft">{formatDate(announcement.createdAt)}</span>
+                  <span className="text-soft">{formatDate(announcement.createdAt, locale)}</span>
                 </div>
                 <p className="text-soft">{announcement.body}</p>
               </article>
@@ -108,24 +107,22 @@ export default async function HomePage() {
         <article className="panel stack">
           <div className="page-head">
             <div>
-              <h2 className="panel-title">Latest Submissions</h2>
+              <h2 className="panel-title">{t("Latest Submissions")}</h2>
               <p className="panel-subtitle">
-                Recent status transitions (AC / WA / TLE / ...) for the latest submissions.
-              </p>
+                {t("Recent status transitions (AC / WA / TLE / ...) for the latest submissions.")}</p>
             </div>
             <Link className="link" href="/submissions">
-              View all
-            </Link>
+              {t("View all")}</Link>
           </div>
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Problem</th>
-                  <th>Difficulty</th>
-                  <th>Status</th>
-                  <th>Time</th>
+                  <th>{t("ID")}</th>
+                  <th>{t("Problem")}</th>
+                  <th>{t("Difficulty")}</th>
+                  <th>{t("Status")}</th>
+                  <th>{t("Time")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -150,7 +147,7 @@ export default async function HomePage() {
                       <td>
                         {problem ? (
                           <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
-                            {difficultyLabel(problem.difficulty)}
+                            {t(difficultyLabel(problem.difficulty))}
                           </StatusBadge>
                         ) : (
                           "-"
@@ -158,10 +155,10 @@ export default async function HomePage() {
                       </td>
                       <td>
                         <StatusBadge className={badgeClassForSubmission(submission.status)}>
-                          {submissionStatusLabel(submission.status)}
+                          {t(submissionStatusLabel(submission.status))}
                         </StatusBadge>
                       </td>
-                      <td>{formatDate(submission.submittedAt)}</td>
+                      <td>{formatDate(submission.submittedAt, locale)}</td>
                     </tr>
                   );
                 })}
@@ -173,31 +170,29 @@ export default async function HomePage() {
         <article className="panel stack">
           <div className="page-head">
             <div>
-              <h2 className="panel-title">Contest State</h2>
-              <p className="panel-subtitle">Automatic state: scheduled / running / ended</p>
+              <h2 className="panel-title">{t("Contest State")}</h2>
+              <p className="panel-subtitle">{t("Automatic state: scheduled / running / ended")}</p>
             </div>
             <Link className="link" href="/contests">
-              View all
-            </Link>
+              {t("View all")}</Link>
           </div>
           {latestContest ? (
             <div className="stack">
               <div className="meta-inline">
                 <strong>{latestContest.title}</strong>
                 <StatusBadge className={badgeClassForContestStatus(getContestStatus(latestContest))}>
-                  {contestStatusLabel(getContestStatus(latestContest))}
+                  {t(contestStatusLabel(getContestStatus(latestContest)))}
                 </StatusBadge>
               </div>
               <p className="text-soft">{latestContest.descriptionMarkdown}</p>
               <p className="text-soft">
-                Start: {formatDate(latestContest.startAt)} / End: {formatDate(latestContest.endAt)}
+                {t("Start: ")}{formatDate(latestContest.startAt, locale)} {t(" / End: ")}{formatDate(latestContest.endAt, locale)}
               </p>
               <Link className="button button-secondary" href={`/contests/${latestContest.id}`}>
-                Open contest and scoreboard
-              </Link>
+                {t("Open contest and scoreboard")}</Link>
             </div>
           ) : (
-            <p className="empty">No contests available yet.</p>
+            <p className="empty">{t("No contests available yet.")}</p>
           )}
         </article>
       </section>

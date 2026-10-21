@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,6 +12,7 @@ interface ReportFormProps {
 }
 
 export function ReportForm({ targetType, targetId }: ReportFormProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const [reason, setReason] = useState("");
   const [detail, setDetail] = useState("");
@@ -48,31 +51,31 @@ export function ReportForm({ targetType, targetId }: ReportFormProps) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <p className="text-soft">
-        Target: {targetType}:{targetId}
+        {t("Target: ")}{t(targetType)}:{targetId}
       </p>
       <label className="field">
-        <span className="field-label">Reason</span>
+        <span className="field-label">{t("Reason")}</span>
         <input
           className="input"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="statement ambiguous / abusive content / other"
+          placeholder={t("statement ambiguous / abusive content / other")}
           required
         />
       </label>
       <label className="field">
-        <span className="field-label">Detail</span>
+        <span className="field-label">{t("Detail")}</span>
         <textarea
           className="textarea"
           value={detail}
           onChange={(event) => setDetail(event.target.value)}
-          placeholder="Describe what should be checked by moderators."
+          placeholder={t("Describe what should be checked by moderators.")}
         />
       </label>
-      {error ? <p className="badge badge-red">{error}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
       <div className="button-row">
         <button className="button" type="submit" disabled={isSending}>
-          {isSending ? "Sending..." : "Submit Report"}
+          {isSending ? t("Sending...") : t("Submit Report")}
         </button>
       </div>
     </form>

@@ -7,13 +7,15 @@ import {
   Visibility,
 } from "@/lib/types";
 
-export function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("ja-JP", {
+export function formatDate(iso: string, locale: "ja" | "en" = "ja"): string {
+  return new Intl.DateTimeFormat(locale === "ja" ? "ja-JP" : "en-GB", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Tokyo",
+    hourCycle: "h23",
   }).format(new Date(iso));
 }
 

@@ -5,6 +5,7 @@ import { isProblemPackageObjectStorageEnabled } from "@/lib/problem-package-stor
 import {
   getOptionalCurrentUser,
   getProblemForViewer,
+  getProblemForContestViewer,
   getProblemPackageData,
   getProblemPackageStorageRef,
   HttpError,
@@ -18,12 +19,13 @@ interface ProblemSamplesRouteContext {
 
 export const runtime = "nodejs";
 
-export async function GET(_request: Request, { params }: ProblemSamplesRouteContext) {
+export async function GET(request: Request, { params }: ProblemSamplesRouteContext) {
   try {
     const { problemId } = await params;
     const me = await getOptionalCurrentUser();
     const viewerId = me?.id ?? "guest";
-    const problem = getProblemForViewer(problemId, viewerId);
+    const contestId = new URL(request.url).searchParams.get("contestId");
+    const problem = contestId ? getProblemForContestViewer(problemId,contestId,viewerId) : getProblemForViewer(problemId, viewerId);
     if (!problem) {
       throw new HttpError("problem not found", 404);
     }

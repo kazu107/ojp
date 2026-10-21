@@ -1,17 +1,18 @@
+
+import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const { t } = await getI18n();
   return (
     <div className="page">
       <section className="panel stack">
-        <h1 className="page-title">Not Found</h1>
+        <h1 className="page-title">{t("Not Found")}</h1>
         <p className="page-subtitle">
-          指定されたリソースにアクセスできません。公開範囲設定により表示できない場合もあります。
-        </p>
+          {t("指定されたリソースにアクセスできません。公開範囲設定により表示できない場合もあります。")}</p>
         <div className="button-row">
           <Link href="/" className="button">
-            Dashboardへ戻る
-          </Link>
+            {t("Dashboardへ戻る")}</Link>
         </div>
       </section>
     </div>

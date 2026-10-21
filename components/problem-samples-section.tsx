@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/components/i18n-provider";
+
 
 import { useEffect, useState } from "react";
 import { ProblemSampleCase } from "@/lib/types";
@@ -14,6 +16,7 @@ export function ProblemSamplesSection({
   loadUrl,
   samplePairCount,
 }: ProblemSamplesSectionProps) {
+  const { t } = useI18n();
   const shouldAutoLoad = initialSamples.length === 0 && Boolean(loadUrl) && samplePairCount > 0;
   const [samples, setSamples] = useState<ProblemSampleCase[]>(initialSamples);
   const [isLoading, setIsLoading] = useState(shouldAutoLoad);
@@ -62,21 +65,21 @@ export function ProblemSamplesSection({
 
   return (
     <section className="panel stack">
-      <h2 className="panel-title">Samples</h2>
+      <h2 className="panel-title">{t("Samples")}</h2>
       {isLoading && samples.length === 0 ? (
-        <p className="badge badge-blue">Loading samples...</p>
+        <p className="badge badge-blue">{t("Loading samples...")}</p>
       ) : null}
-      {error ? <p className="badge badge-red">{error}</p> : null}
+      {error ? <p className="badge badge-red">{t(error)}</p> : null}
       {samples.map((sample) => (
         <article key={sample.name} className="package-case-editor stack">
           <p className="field-label">{sample.name}</p>
           <div className="form-grid">
             <div className="field">
-              <span className="field-label">Input</span>
+              <span className="field-label">{t("Input")}</span>
               <pre className="code-block">{sample.input}</pre>
             </div>
             <div className="field">
-              <span className="field-label">Output</span>
+              <span className="field-label">{t("Output")}</span>
               <pre className="code-block">{sample.output}</pre>
             </div>
           </div>

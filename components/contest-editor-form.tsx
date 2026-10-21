@@ -1,294 +1,381 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Contest, Problem, Visibility } from "@/lib/types";
+import { useI18n } from "@/components/i18n-provider";
+import type { Contest, ContestProblem, Problem, Visibility } from "@/lib/types";
 
-interface ContestEditorFormProps {
-  mode: "create" | "edit";
-  availableProblems: Problem[];
-  initialContest?: Contest;
+function localDate(value: string) {
+  return new Date(Date.parse(value) + 9 * 3600_000).toISOString().slice(0, 16);
 }
 
-interface FormState {
-  title: string;
-  slug: string;
-  descriptionMarkdown: string;
-  visibility: Visibility;
-  startAt: string;
-  endAt: string;
-  penaltyMinutes: number;
-  scoreboardVisibility: "hidden" | "partial" | "full";
-  problemIds: string[];
-}
-
-function toDatetimeLocal(value: string): string {
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  const adjusted = new Date(date.getTime() - offset * 60000);
-  return adjusted.toISOString().slice(0, 16);
-}
-
-function fromDatetimeLocal(value: string): string {
-  return new Date(value).toISOString();
-}
-
-function emptyFormState(problemIds: string[]): FormState {
-  const now = new Date();
-  const after2h = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-
-  return {
-    title: "",
-    slug: "",
-    descriptionMarkdown: "",
-    visibility: "public",
-    startAt: toDatetimeLocal(now.toISOString()),
-    endAt: toDatetimeLocal(after2h.toISOString()),
-    penaltyMinutes: 5,
-    scoreboardVisibility: "full",
-    problemIds,
-  };
-}
-
-function stateFromContest(contest: Contest): FormState {
-  return {
-    title: contest.title,
-    slug: contest.slug,
-    descriptionMarkdown: contest.descriptionMarkdown,
-    visibility: contest.visibility,
-    startAt: toDatetimeLocal(contest.startAt),
-    endAt: toDatetimeLocal(contest.endAt),
-    penaltyMinutes: contest.penaltyMinutes,
-    scoreboardVisibility: contest.scoreboardVisibility,
-    problemIds: contest.problems
-      .sort((left, right) => left.orderIndex - right.orderIndex)
-      .map((problem) => problem.problemId),
-  };
+function nextLabel(items: ContestProblem[]) {
+  for (let i = 0; i < 100; i++) {
+    const label = i < 26 ? String.fromCharCode(65 + i) : `P${i + 1}`;
+    if (!items.some((p) => p.label === label)) return label;
+  }
+  return "";
 }
 
 export function ContestEditorForm({
   mode,
   availableProblems,
   initialContest,
-}: ContestEditorFormProps) {
+  structureLocked = false,
+  initialDates,
+}: {
+  mode: "create" | "edit";
+  availableProblems: Problem[];
+  initialContest?: Contest;
+  structureLocked?: boolean;
+  initialDates?: { startAt: string; endAt: string };
+}) {
+  const { t } = useI18n();
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(() => {
-    if (mode === "edit" && initialContest) {
-      return stateFromContest(initialContest);
-    }
-    return emptyFormState(availableProblems.slice(0, 2).map((problem) => problem.id));
-  });
+  const [form, setForm] = useState(() => ({
+    title: initialContest?.title ?? "",
+    slug: initialContest?.slug ?? "",
+    descriptionMarkdown: initialContest?.descriptionMarkdown ?? "",
+    visibility: initialContest?.visibility ?? ("public" as Visibility),
+    startAt: localDate(
+      initialContest?.startAt ??
+        initialDates?.startAt ??
+        new Date(Date.now() + 3600_000).toISOString(),
+    ),
+    endAt: localDate(
+      initialContest?.endAt ??
+        initialDates?.endAt ??
+        new Date(Date.now() + 3 * 3600_000).toISOString(),
+    ),
+    penaltyMinutes: initialContest?.penaltyMinutes ?? 5,
+    scoreboardVisibility: initialContest?.scoreboardVisibility ?? "full",
+    rated: initialContest?.rated ?? false,
+    problems: [...(initialContest?.problems ?? [])].sort(
+      (a, b) => a.orderIndex - b.orderIndex,
+    ),
+  }));
   const [error, setError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-
-  const endpoint =
-    mode === "edit" && initialContest ? `/api/contests/${initialContest.id}` : "/api/contests";
-  const method = mode === "edit" ? "PATCH" : "POST";
-
-  const selectedProblems = useMemo(
-    () => availableProblems.filter((problem) => form.problemIds.includes(problem.id)),
-    [availableProblems, form.problemIds],
-  );
-
-  function toggleProblem(problemId: string) {
-    setForm((prev) => {
-      const exists = prev.problemIds.includes(problemId);
+  const [saving, setSaving] = useState(false);
+  function problemChange(index: number, change: Partial<ContestProblem>) {
+    setForm((current) => ({
+      ...current,
+      problems: current.problems.map((p, i) =>
+        i === index ? { ...p, ...change } : p,
+      ),
+    }));
+  }
+  function toggle(id: string) {
+    setForm((current) => ({
+      ...current,
+      problems: (current.problems.some((p) => p.problemId === id)
+        ? current.problems.filter((p) => p.problemId !== id)
+        : [
+            ...current.problems,
+            {
+              problemId: id,
+              label: nextLabel(current.problems),
+              score: 100,
+              orderIndex: current.problems.length,
+            },
+          ]
+      ).map((p, i) => ({ ...p, orderIndex: i })),
+    }));
+  }
+  function move(index: number, offset: number) {
+    setForm((current) => {
+      const next = [...current.problems];
+      [next[index], next[index + offset]] = [next[index + offset], next[index]];
       return {
-        ...prev,
-        problemIds: exists
-          ? prev.problemIds.filter((id) => id !== problemId)
-          : [...prev.problemIds, problemId],
+        ...current,
+        problems: next.map((p, i) => ({ ...p, orderIndex: i })),
       };
     });
   }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent) {
     event.preventDefault();
-    if (form.problemIds.length === 0) {
-      setError("最低1問は選択してください。");
-      return;
-    }
-
+    setSaving(true);
     setError("");
-    setIsSaving(true);
-
     try {
-      const payload = {
-        title: form.title,
-        slug: form.slug,
-        descriptionMarkdown: form.descriptionMarkdown,
-        visibility: form.visibility,
-        startAt: fromDatetimeLocal(form.startAt),
-        endAt: fromDatetimeLocal(form.endAt),
-        penaltyMinutes: form.penaltyMinutes,
-        scoreboardVisibility: form.scoreboardVisibility,
-        problems: form.problemIds.map((problemId, index) => ({
-          label: String.fromCharCode(65 + index),
-          problemId,
-          score: 100,
-          orderIndex: index,
-        })),
-      };
-
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
+      if (!form.problems.length)
+        throw new Error("Select between 1 and 100 contest problems.");
+      const response = await fetch(
+        mode === "edit"
+          ? `/api/contests/${initialContest!.id}`
+          : "/api/contests",
+        {
+          method: mode === "edit" ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+            startAt: structureLocked
+              ? initialContest!.startAt
+              : new Date(`${form.startAt}:00+09:00`).toISOString(),
+            endAt: structureLocked
+              ? initialContest!.endAt
+              : new Date(`${form.endAt}:00+09:00`).toISOString(),
+          }),
         },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const body = (await response.json()) as { error?: string };
-        throw new Error(body.error ?? "保存に失敗しました。");
-      }
-
-      const body = (await response.json()) as { contest: Contest };
+      );
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "保存に失敗しました。");
       router.push(`/contests/${body.contest.id}`);
       router.refresh();
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "予期しないエラーが発生しました。");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "予期しないエラーが発生しました。",
+      );
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   }
-
   return (
-    <form className="form" onSubmit={onSubmit}>
+    <form className="form" onSubmit={save}>
       <div className="form-grid">
         <label className="field">
-          <span className="field-label">タイトル</span>
+          <span className="field-label">{t("タイトル")}</span>
           <input
             className="input"
             required
+            maxLength={200}
             value={form.title}
-            onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-            placeholder="OJP Beginner Contest 002"
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
         </label>
         <label className="field">
-          <span className="field-label">Slug</span>
+          <span className="field-label">{t("Slug")}</span>
           <input
             className="input"
             required
+            maxLength={100}
             value={form.slug}
-            onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
-            placeholder="ojp-beginner-contest-002"
+            onChange={(e) => setForm({ ...form, slug: e.target.value })}
           />
         </label>
       </div>
-
       <label className="field">
-        <span className="field-label">説明</span>
+        <span className="field-label">{t("説明")}</span>
         <textarea
           className="textarea"
           value={form.descriptionMarkdown}
-          onChange={(event) =>
-            setForm((prev) => ({ ...prev, descriptionMarkdown: event.target.value }))
+          onChange={(e) =>
+            setForm({ ...form, descriptionMarkdown: e.target.value })
           }
         />
       </label>
-
+      {structureLocked ? (
+        <p className="text-soft">
+          {t(
+            "Timing, problem set, points, penalty and Rated settings are locked after the contest starts.",
+          )}
+        </p>
+      ) : null}
+      <p className="text-soft">
+        {t("Times use Japan Standard Time (UTC+09:00).")}
+      </p>
       <div className="form-grid">
         <label className="field">
-          <span className="field-label">Visibility</span>
-          <select
-            className="select"
-            value={form.visibility}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, visibility: event.target.value as Visibility }))
-            }
-          >
-            <option value="public">Public</option>
-            <option value="unlisted">Unlisted</option>
-            <option value="private">Private</option>
-          </select>
-        </label>
-        <label className="field">
-          <span className="field-label">開始時刻</span>
+          <span className="field-label">{t("開始日時")}</span>
           <input
             className="input"
             type="datetime-local"
+            required
+            disabled={structureLocked}
             value={form.startAt}
-            onChange={(event) => setForm((prev) => ({ ...prev, startAt: event.target.value }))}
+            onChange={(e) => setForm({ ...form, startAt: e.target.value })}
           />
         </label>
         <label className="field">
-          <span className="field-label">終了時刻</span>
+          <span className="field-label">{t("終了日時")}</span>
           <input
             className="input"
             type="datetime-local"
+            required
+            disabled={structureLocked}
             value={form.endAt}
-            onChange={(event) => setForm((prev) => ({ ...prev, endAt: event.target.value }))}
+            onChange={(e) => setForm({ ...form, endAt: e.target.value })}
           />
         </label>
-      </div>
-
-      <div className="form-grid">
         <label className="field">
-          <span className="field-label">Penalty (minutes)</span>
+          <span className="field-label">{t("Penalty (minutes)")}</span>
           <input
             className="input"
             type="number"
             min={0}
+            max={1440}
+            step={1}
+            disabled={structureLocked}
             value={form.penaltyMinutes}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, penaltyMinutes: Number(event.target.value) }))
+            onChange={(e) =>
+              setForm({ ...form, penaltyMinutes: Number(e.target.value) })
             }
           />
         </label>
         <label className="field">
-          <span className="field-label">Scoreboard Visibility</span>
+          <span className="field-label">{t("Visibility")}</span>
+          <select
+            className="select"
+            value={form.visibility}
+            onChange={(e) =>
+              setForm({ ...form, visibility: e.target.value as Visibility })
+            }
+          >
+            <option value="public">{t("Public")}</option>
+            <option value="unlisted">{t("Unlisted")}</option>
+            <option value="private">{t("Private")}</option>
+          </select>
+        </label>
+        <label className="field">
+          <span className="field-label">{t("Scoreboard")}</span>
           <select
             className="select"
             value={form.scoreboardVisibility}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                scoreboardVisibility: event.target.value as "hidden" | "partial" | "full",
-              }))
+            onChange={(e) =>
+              setForm({
+                ...form,
+                scoreboardVisibility: e.target.value as
+                  | "hidden"
+                  | "partial"
+                  | "full",
+              })
             }
           >
-            <option value="hidden">hidden</option>
-            <option value="partial">partial</option>
-            <option value="full">full</option>
+            <option value="full">{t("Full standings")}</option>
+            <option value="partial">
+              {t("Totals only until the contest ends")}
+            </option>
+            <option value="hidden">{t("Hidden until the contest ends")}</option>
           </select>
         </label>
       </div>
-
-      <fieldset className="field">
-        <legend className="field-label">問題セット</legend>
+      <label className="meta-inline">
+        <input
+          type="checkbox"
+          checked={form.rated}
+          disabled={structureLocked}
+          onChange={(e) => setForm({ ...form, rated: e.target.checked })}
+        />
+        {t("Rated contest (OJP Elo)")}
+      </label>
+      <p className="text-soft">
+        {t(
+          "Rated requires a public contest and at least two eligible participants. Organizers, problem authors and virtual participants are excluded.",
+        )}
+      </p>
+      <fieldset className="field" disabled={structureLocked}>
+        <legend className="field-label">{t("問題セット")}</legend>
         <div className="stack">
-          {availableProblems.map((problem) => {
-            const selected = form.problemIds.includes(problem.id);
-            return (
-              <label key={problem.id} className="field">
-                <span className="meta-inline">
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => toggleProblem(problem.id)}
-                  />
-                  <span>{problem.title}</span>
-                </span>
-              </label>
-            );
-          })}
+          {availableProblems.map((problem) => (
+            <label key={problem.id} className="meta-inline">
+              <input
+                type="checkbox"
+                aria-label={t("Select problem {title} ({id})", {
+                  title: problem.title,
+                  id: problem.id,
+                })}
+                checked={form.problems.some((p) => p.problemId === problem.id)}
+                onChange={() => toggle(problem.id)}
+              />
+              {problem.title}
+            </label>
+          ))}
         </div>
       </fieldset>
-
-      <p className="text-soft">
-        選択順で問題ラベルを `A`, `B`, `C` と割り当てます。現在:{" "}
-        {selectedProblems.map((problem) => problem.title).join(", ")}
-      </p>
-
-      {error ? <p className="badge badge-red">{error}</p> : null}
-
-      <div className="button-row">
-        <button className="button" type="submit" disabled={isSaving}>
-          {isSaving ? "保存中..." : mode === "edit" ? "更新する" : "作成する"}
-        </button>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>{t("Label")}</th>
+              <th>{t("Title")}</th>
+              <th>{t("Maximum Points")}</th>
+              <th>{t("Order")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {form.problems.map((p, index) => (
+              <tr key={p.problemId}>
+                <td>
+                  <input
+                    className="input"
+                    aria-label={t("Problem label {index}", {
+                      index: index + 1,
+                    })}
+                    maxLength={16}
+                    required
+                    disabled={structureLocked}
+                    value={p.label}
+                    onChange={(e) =>
+                      problemChange(index, { label: e.target.value })
+                    }
+                  />
+                </td>
+                <td>
+                  {availableProblems.find((item) => item.id === p.problemId)
+                    ?.title ?? p.problemId}
+                </td>
+                <td>
+                  <input
+                    className="input"
+                    aria-label={t("Maximum points {index}", {
+                      index: index + 1,
+                    })}
+                    type="number"
+                    min={1}
+                    max={1000000}
+                    step={1}
+                    required
+                    disabled={structureLocked}
+                    value={p.score}
+                    onChange={(e) =>
+                      problemChange(index, { score: Number(e.target.value) })
+                    }
+                  />
+                </td>
+                <td>
+                  <div className="button-row">
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={structureLocked || index === 0}
+                      onClick={() => move(index, -1)}
+                    >
+                      {t("Move Up")}
+                    </button>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={
+                        structureLocked || index === form.problems.length - 1
+                      }
+                      onClick={() => move(index, 1)}
+                    >
+                      {t("Move Down")}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+      <p className="text-soft">
+        {t(
+          "Problem scores (0-100) are scaled to the configured maximum points. Partial scores are retained to two decimal places.",
+        )}
+      </p>
+      {error ? (
+        <p className="badge badge-red" role="alert">
+          {t(error)}
+        </p>
+      ) : null}
+      <button className="button" type="submit" disabled={saving}>
+        {saving
+          ? t("保存中...")
+          : mode === "edit"
+            ? t("更新する")
+            : t("作成する")}
+      </button>
     </form>
   );
 }
