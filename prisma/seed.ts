@@ -1,8 +1,9 @@
+import { SUBMISSION_LANGUAGES as DEFAULT_SUBMISSION_LANGUAGES } from "../lib/languages";
 import { PrismaClient } from "@prisma/client";
 import { dumpStoreSnapshot } from "../lib/store";
 
 const prisma = new PrismaClient();
-const DEFAULT_SUBMISSION_LANGUAGES = ["cpp", "python", "java", "javascript"] as const;
+
 
 async function clearAll() {
   await prisma.appState.deleteMany();

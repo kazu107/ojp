@@ -1,3 +1,4 @@
+import { SUBMISSION_LANGUAGES as LANGUAGE_FILTER_VALUES } from "@/lib/languages";
 import { NextResponse } from "next/server";
 import {
   paginateItems,
@@ -12,7 +13,7 @@ import { Language, SubmissionStatus } from "@/lib/types";
 import { normalizeSubmissionStatus, SUBMISSION_STATUS_VALUES } from "@/lib/submission-status";
 
 const STATUS_FILTER_VALUES: SubmissionStatus[] = SUBMISSION_STATUS_VALUES;
-const LANGUAGE_FILTER_VALUES: Language[] = ["cpp", "python", "java", "javascript"];
+
 
 function parseStatusFilter(raw: string | null): SubmissionStatus | undefined {
   const normalized = normalizeSubmissionStatus(raw);

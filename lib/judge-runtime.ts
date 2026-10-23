@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { brainfuckNodeRunner } from "./brainfuck-node";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -78,6 +79,20 @@ function resolveLanguageCommands(language: Language, baseName = "Main", memoryLi
   compile?: CommandTemplate & { timeoutMs: number };
   execute: CommandTemplate;
 } {
+  if (language === "brainfuck") {
+    return {
+      sourceFileName: `${baseName}.bf`,
+      compile: {
+        commands: ["node"],
+        args: ["brainfuck-runtime.cjs", `${baseName}.bf`, "--check"],
+        timeoutMs: 10_000,
+      },
+      execute: {
+        commands: ["node"],
+        args: [`--max-old-space-size=${Math.max(8, Math.floor(memoryLimitMb))}`, "brainfuck-runtime.cjs", `${baseName}.bf`],
+      },
+    };
+  }
   if (language === "cpp") {
     return {
       sourceFileName: `${baseName}.cpp`,
@@ -456,6 +471,9 @@ export async function executePackageJudge(input: {
     const submissionCommands = resolveLanguageCommands(input.language, "Main", input.memoryLimitMb);
     const submissionSourcePath = path.join(submissionWorkspace, submissionCommands.sourceFileName);
     await writeFile(submissionSourcePath, input.sourceCode, "utf8");
+    if (input.language === "brainfuck") {
+      await writeFile(path.join(submissionWorkspace, "brainfuck-runtime.cjs"), brainfuckNodeRunner(), "utf8");
+    }
 
     await input.onPhaseChange?.("compiling");
     const submissionCompile = await compileProgram(submissionWorkspace, submissionCommands);

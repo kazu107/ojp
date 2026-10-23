@@ -12,6 +12,7 @@ import {
   CreateReportInput,
   CreateSubmissionInput,
   Language,
+  CheckerLanguage,
   Problem,
   RejudgeRequest,
   Report,
@@ -759,12 +760,12 @@ function normalizeStoreInPlace(target: Store): void {
   for (const packageData of Object.values(target.problemPackages)) {
     const legacyPackage = packageData as ProblemPackageExtracted & {
       checkerType?: "exact" | "special_judge";
-      checkerLanguage?: Language | null;
+      checkerLanguage?: CheckerLanguage | null;
       checkerSourceCode?: string | null;
       validation: ProblemPackageExtracted["validation"] & {
         config: ProblemPackageExtracted["validation"]["config"] & {
           checkerType?: "exact" | "special_judge";
-          checkerLanguage?: Language | null;
+          checkerLanguage?: CheckerLanguage | null;
         };
       };
     };

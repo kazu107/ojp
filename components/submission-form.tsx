@@ -1,4 +1,6 @@
 "use client";
+
+import { SUBMISSION_LANGUAGES } from "@/lib/languages";
 import { useI18n } from "@/components/i18n-provider";
 
 
@@ -14,7 +16,7 @@ interface SubmissionFormProps {
   virtualParticipationId?: string | null;
 }
 
-const SUBMISSION_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
+
 const DEFAULT_SUBMISSION_LANGUAGE: Language = "python";
 
 export function SubmissionForm({

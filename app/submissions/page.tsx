@@ -1,3 +1,4 @@
+import { SUBMISSION_LANGUAGES as LANGUAGE_FILTER_VALUES } from "@/lib/languages";
 
 import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
@@ -37,7 +38,7 @@ interface SubmissionsPageProps {
 }
 
 const STATUS_FILTER_VALUES: SubmissionStatus[] = SUBMISSION_STATUS_VALUES;
-const LANGUAGE_FILTER_VALUES: Language[] = ["cpp", "python", "java", "javascript"];
+
 
 function parseStatusFilter(raw?: string): SubmissionStatus | undefined {
   return normalizeSubmissionStatus(raw);

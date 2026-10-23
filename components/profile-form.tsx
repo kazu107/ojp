@@ -2,7 +2,7 @@
 import { useI18n } from "@/components/i18n-provider";
 
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/lib/types";
 import { formatDate } from "@/lib/presentation";
@@ -15,6 +15,7 @@ export function ProfileForm({ user }: { user: User }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const trimmedDisplayName = displayName.trim();
   const trimmedBio = bio.trim();
   const hasChanges = trimmedDisplayName !== user.displayName || trimmedBio !== user.bio.trim();
@@ -23,7 +24,14 @@ export function ProfileForm({ user }: { user: User }) {
     ? new Date(new Date(user.displayNameChangedAt).getTime() + 30 * 24 * 60 * 60 * 1000)
     : null;
   const canChangeDisplayName =
-    !nextDisplayNameChangeAt || nextDisplayNameChangeAt.getTime() <= Date.now();
+    !nextDisplayNameChangeAt || nextDisplayNameChangeAt.getTime() <= now;
+  const nextChangeTime = nextDisplayNameChangeAt?.getTime();
+  useEffect(() => {
+    if (nextChangeTime === undefined || nextChangeTime <= now) return;
+    const delay = Math.min(Math.max(0, nextChangeTime - Date.now() + 1), 2147483647);
+    const timer = setTimeout(() => setNow(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [nextChangeTime, now]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

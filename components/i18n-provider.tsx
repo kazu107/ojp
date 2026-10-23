@@ -20,7 +20,11 @@ export function I18nProvider({ initialLocale, children }: {
   const router = useRouter();
   const channelRef = useRef<BroadcastChannel | null>(null);
   const t = useMemo(() => createTranslator(locale), [locale]);
-  useEffect(() => { setLocale(initialLocale); }, [initialLocale]);
+  useEffect(() => {
+    let disposed = false;
+    queueMicrotask(() => { if (!disposed) setLocale(initialLocale); });
+    return () => { disposed = true; };
+  }, [initialLocale]);
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;

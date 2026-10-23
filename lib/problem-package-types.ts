@@ -1,6 +1,6 @@
 import {
   ExplanationVisibility,
-  Language,
+  CheckerLanguage,
   TestCaseVisibility,
   Visibility,
 } from "@/lib/types";
@@ -32,7 +32,7 @@ export interface ProblemPackageEditorGroup {
 export interface ProblemPackageEditorDraft {
   sourceLabel: string;
   checkerType: ProblemPackageCheckerType;
-  checkerLanguage: Language;
+  checkerLanguage: CheckerLanguage;
   checkerSourceCode: string;
   compareMode: ProblemPackageCompareMode;
   zipSizeBytes: number;
@@ -72,7 +72,7 @@ export interface ProblemPackageInspectResult {
       memoryLimitMb: number;
       scoringType: ProblemPackageScoringType;
       checkerType: ProblemPackageCheckerType;
-      checkerLanguage: Language | null;
+      checkerLanguage: CheckerLanguage | null;
       compareMode: ProblemPackageCompareMode;
       problem: {
         slug: string | null;

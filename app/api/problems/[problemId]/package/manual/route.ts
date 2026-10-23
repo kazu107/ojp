@@ -20,7 +20,7 @@ import {
   ProblemPackageEditorGroup,
   ProblemPackageEditorSampleCase,
 } from "@/lib/problem-package-types";
-import { Language } from "@/lib/types";
+import { CheckerLanguage } from "@/lib/types";
 
 interface ProblemPackageManualRouteContext {
   params: Promise<{
@@ -42,7 +42,8 @@ function parseCheckerType(raw: unknown): ProblemPackageCheckerType {
   return "exact";
 }
 
-function parseCheckerLanguage(raw: unknown): Language {
+function parseCheckerLanguage(raw: unknown): CheckerLanguage {
+  if (raw === "brainfuck") throw new Error("config.checkerLanguage must be one of: cpp, python, java, javascript");
   if (raw === "cpp" || raw === "python" || raw === "java" || raw === "javascript") {
     return raw;
   }

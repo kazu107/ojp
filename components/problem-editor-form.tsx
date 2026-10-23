@@ -9,6 +9,7 @@ import { CodeEditor } from "@/components/code-editor";
 import { MarkdownBlock } from "@/components/markdown-block";
 import { ProblemPackageDraftEditor } from "@/components/problem-package-draft-editor";
 import { CHECKER_SOURCE_TEMPLATES } from "@/lib/checker-source-templates";
+import { SUBMISSION_LANGUAGES } from "@/lib/languages";
 import { inspectProblemPackageClient } from "@/lib/problem-package-client-inspect";
 import { buildProblemPackageZipBlob } from "@/lib/problem-package-client-zip";
 import { StatusBadge } from "@/components/status-badge";
@@ -427,7 +428,9 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     ) {
       return;
     }
-    void loadExistingPackage();
+    let disposed = false;
+    queueMicrotask(() => { if (!disposed) void loadExistingPackage(); });
+    return () => { disposed = true; };
   }, [
     hasExistingStoredPackage,
     isInspectingPackage,
@@ -1309,10 +1312,9 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
               value={previewLanguage}
               onChange={(event) => setPreviewLanguage(event.target.value as Language)}
             >
-              <option value="cpp">{t("cpp")}</option>
-              <option value="python">{t("python")}</option>
-              <option value="java">{t("java")}</option>
-              <option value="javascript">{t("javascript")}</option>
+              {SUBMISSION_LANGUAGES.map((language) => (
+                <option key={language} value={language}>{t(language)}</option>
+              ))}
             </select>
           </label>
 

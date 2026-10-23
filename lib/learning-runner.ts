@@ -3,9 +3,11 @@ import {
   LEARNING_MAX_OUTPUT,
   LEARNING_PREPARATION_MS,
 } from "./learning";
+import { runBrainfuck } from "./brainfuck.js";
+import { LEARNING_RUNTIME_LANGUAGES, type LearningRuntimeLanguage } from "./languages";
 
 export interface LearningRunRequest {
-  language: "python" | "javascript";
+  language: LearningRuntimeLanguage;
   source: string;
   stdin: string;
 }
@@ -36,6 +38,7 @@ export function validLearningRunMessage(
 
 // This source runs only in an opaque-origin worker, never in the application window.
 const workerSource = `
+const runBrainfuck = ${runBrainfuck.toString()};
 const send = self.postMessage.bind(self);
 let outputLength = 0;
 const maxOutput = ${LEARNING_MAX_OUTPUT};
@@ -75,6 +78,20 @@ self.onmessage = async ({ data }) => {
       const console = { log: (...values) => output("stdout", values.join(" ") + "\\n"), error: (...values) => output("stderr", values.join(" ") + "\\n") };
       const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
       await new AsyncFunction("console", "input", "print", data.source)(console, () => lines[position++] ?? null, console.log);
+    } else if (data.language === "brainfuck") {
+      send({ type: "running" });
+      const input = encoder.encode(data.stdin);
+      const bytes = new Uint8Array(1024);
+      const decoder = new TextDecoder();
+      let position = 0, length = 0, byteCount = 0;
+      const flush = () => { if (length) output("stdout", decoder.decode(bytes.subarray(0, length), { stream: true })); length = 0; };
+      try {
+        runBrainfuck(data.source, () => input[position++] ?? 0, (value) => {
+          if (++byteCount > maxOutput) throw new Error("Output limit exceeded (64 KiB).");
+          bytes[length++] = value;
+          if (length === bytes.length) flush();
+        });
+      } finally { flush(); output("stdout", decoder.decode()); }
     } else throw new Error("Unsupported runtime language.");
     send({ type: "done", error: null });
   } catch (error) { send({ type: "done", error: String(error?.message ?? error).slice(0, maxOutput) }); }
@@ -118,7 +135,7 @@ function finish(error) {
 addEventListener("message", (event) => {
   if (event.source !== parent || event.data?.token !== token || event.data.type !== "run" || worker) return;
   const request = event.data;
-  if (!["python", "javascript"].includes(request.language) || typeof request.source !== "string" || request.source.length > 262144 || typeof request.stdin !== "string" || request.stdin.length > 65536) return finish("Invalid run request.");
+  if (!${JSON.stringify(LEARNING_RUNTIME_LANGUAGES)}.includes(request.language) || typeof request.source !== "string" || request.source.length > 262144 || typeof request.stdin !== "string" || request.stdin.length > 65536) return finish("Invalid run request.");
   workerURL = URL.createObjectURL(new Blob([workerText], { type: "text/javascript" }));
   try { worker = new Worker(workerURL); }
   catch (error) { return finish(String(error)); }

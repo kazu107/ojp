@@ -57,6 +57,25 @@ test("code cells reject missing, duplicate, reserved IDs and unsupported languag
     /support/,
   );
 });
+test("Brainfuck lessons validate stable cells and round trip through learning ZIP", async () => {
+  const draft = sampleLearningDraft();
+  draft.chapters[0].items[0].markdown = "```brainfuck run id=bf-echo\n,[.,]\n```";
+  draft.chapters[0].items[0].cells = { "bf-echo": { stdin: "Hello\n", readOnly: false } };
+  const checked = validateLearningDraft(draft);
+  assert.equal(getRunnableCells(checked.chapters[0].items[0].markdown)[0].language, "brainfuck");
+  const zip = new JSZip();
+  for (const chapter of checked.chapters) for (const item of chapter.items) {
+    zip.file(`lessons/${item.id}.md`, item.markdown);
+  }
+  zip.file("course.json", JSON.stringify({
+    formatVersion: 1, ...checked,
+    chapters: checked.chapters.map((chapter) => ({ ...chapter,
+      items: chapter.items.map((item) => ({ ...item, markdown: "", markdownFile: `lessons/${item.id}.md` })),
+    })),
+  }));
+  assert.deepEqual(await importLearningZip(await zip.generateAsync({ type: "uint8array" })), checked);
+});
+
 test("learning outline and learner quiz never expose correct answers or explanations", () => {
   const draft = sampleLearningDraft();
   assert.ok(!JSON.stringify(learningOutline(draft)).includes("answerId"));

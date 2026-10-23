@@ -1,4 +1,7 @@
 "use client";
+
+import { LEARNING_RUNTIME_LANGUAGES } from "@/lib/languages";
+import { BRAINFUCK_HELLO_WORLD } from "@/lib/brainfuck.js";
 import { useI18n } from "@/components/i18n-provider";
 
 
@@ -618,7 +621,7 @@ export function LearningCourseEditor({ initial }: Props) {
                 }}
               />
             </label>
-            {(["python", "javascript"] as const).map((language) => (
+            {LEARNING_RUNTIME_LANGUAGES.map((language) => (
               <button
                 type="button"
                 className="button button-secondary"
@@ -626,7 +629,7 @@ export function LearningCourseEditor({ initial }: Props) {
                 onClick={() => {
                   const cellId = `cell-${uid().slice(0, 8)}`;
                   updateItem({
-                    markdown: `${item.markdown}\n\n\`\`\`${language} run id=${cellId}\n${language === "python" ? 'print("Hello, OJP!")' : 'console.log("Hello, OJP!");'}\n\`\`\`\n`,
+                    markdown: `${item.markdown}\n\n\`\`\`${language} run id=${cellId}\n${language === "brainfuck" ? BRAINFUCK_HELLO_WORLD : language === "python" ? 'print("Hello, OJP!")' : 'console.log("Hello, OJP!");'}\n\`\`\`\n`,
                     cells: {
                       ...item.cells,
                       [cellId]: { stdin: "", readOnly: false },

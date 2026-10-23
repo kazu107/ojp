@@ -42,6 +42,8 @@ export function languageLabel(language: Language): string {
       return "Java";
     case "javascript":
       return "JavaScript";
+    case "brainfuck":
+      return "Brainfuck";
     default:
       return language;
   }

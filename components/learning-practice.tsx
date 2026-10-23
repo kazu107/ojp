@@ -1,4 +1,6 @@
 "use client";
+
+import { SUBMISSION_LANGUAGES, isSubmissionLanguage } from "@/lib/languages";
 import { useI18n } from "@/components/i18n-provider";
 
 
@@ -49,27 +51,32 @@ export function LearningPractice({
   const [pastId, setPastId] = useState("");
   const key = `${storagePrefix}:practice`;
   useEffect(() => {
+    let disposed = false;
+    queueMicrotask(() => {
+    if (disposed) return;
     try {
       const saved = JSON.parse(localStorage.getItem(key) ?? "{}");
       const next = { ...SOURCE_CODE_TEMPLATES };
-      for (const value of ["cpp", "python", "java", "javascript"] as Language[])
+      for (const value of SUBMISSION_LANGUAGES)
         if (
           typeof saved.drafts?.[value] === "string" &&
           saved.drafts[value].length <= 262144
         )
           next[value] = saved.drafts[value];
       setDrafts(next);
-      if (["cpp", "python", "java", "javascript"].includes(saved.language))
+      if (isSubmissionLanguage(saved.language))
         setLanguage(saved.language);
       if (typeof saved.submissionId === "string")
         void learningRequest<{ submission: Submission }>(
           `/api/submissions/${encodeURIComponent(saved.submissionId)}`,
         )
-          .then((result) => setSubmission(result.submission))
+          .then((result) => { if (!disposed) setSubmission(result.submission); })
           .catch(() => {});
     } catch {
       /* Optional browser persistence. */
     }
+    });
+    return () => { disposed = true; };
   }, [key]);
   function persist(
     nextDrafts: typeof drafts,
@@ -190,7 +197,7 @@ export function LearningPractice({
               persist(drafts, value);
             }}
           >
-            {(["cpp", "python", "java", "javascript"] as Language[]).map(
+            {SUBMISSION_LANGUAGES.map(
               (value) => (
                 <option key={value} value={value}>
                   {value}

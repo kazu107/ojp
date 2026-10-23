@@ -1,9 +1,11 @@
 import { config } from "dotenv";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { assertJudgeSandboxReady, getJudgeResourceLimits, runJudgeCommand } from "../lib/judge-process";
 import { getJudgeSandboxMode } from "../lib/judge-sandbox";
+import { brainfuckNodeRunner } from "../lib/brainfuck-node";
+import { BRAINFUCK_HELLO_WORLD } from "../lib/brainfuck.js";
 
 config({ path: ".env.local", quiet: true });
 config({ quiet: true });
@@ -33,6 +35,14 @@ async function main() {
       console.log(`${name}: ${available ? "available" : "unavailable"}`);
       missingTools ||= !available;
     }
+    await writeFile(path.join(cwd, "brainfuck-runtime.cjs"), brainfuckNodeRunner());
+    await writeFile(path.join(cwd, "Main.bf"), BRAINFUCK_HELLO_WORLD);
+    const brainfuck = await runJudgeCommand(process.execPath, ["brainfuck-runtime.cjs", "Main.bf"], {
+      cwd, stdin: "", timeoutMs: 5000, captureMemory: false,
+    });
+    const available = brainfuck.exitCode === 0 && brainfuck.stdout === "Hello World!\n";
+    console.log(`Brainfuck: ${available ? "available" : "unavailable"}`);
+    missingTools ||= !available;
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }

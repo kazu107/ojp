@@ -1,6 +1,6 @@
-import { Language } from "@/lib/types";
+import { CheckerLanguage } from "@/lib/types";
 
-export const CHECKER_SOURCE_TEMPLATES: Record<Language, string> = {
+export const CHECKER_SOURCE_TEMPLATES: Record<CheckerLanguage, string> = {
   cpp: [
     "#include <bits/stdc++.h>",
     "using namespace std;",

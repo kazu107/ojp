@@ -48,6 +48,7 @@ enum Language {
   python
   java
   javascript
+  brainfuck
 }
 
 enum ScoreboardVisibility {

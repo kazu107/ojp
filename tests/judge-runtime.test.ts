@@ -22,7 +22,7 @@ function packageData(checkerSourceCode?: string) {
   return validateProblemPackage("sum.zip", zip.toBuffer());
 }
 
-const programs: Record<Language, string> = {
+const programs: Record<Exclude<Language, "brainfuck">, string> = {
   javascript: "console.log(require('node:fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number).reduce((a, b) => a + b, 0))",
   python: "import sys\nprint(sum(map(int, sys.stdin.read().split())))\n",
   cpp: "#include <iostream>\nint main() { long long a, b; std::cin >> a >> b; std::cout << a + b << '\\n'; }\n",

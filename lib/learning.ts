@@ -2,6 +2,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import type { Root, Code } from "mdast";
 import type { Visibility } from "./types";
+import { isLearningRuntimeLanguage, type LearningRuntimeLanguage } from "./languages";
 
 export type LearningItemKind = "lesson" | "quiz" | "problem";
 export interface CellSettings {
@@ -73,7 +74,7 @@ export interface LearningProgressView {
 }
 export interface RunnableCell {
   id: string;
-  language: "python" | "javascript";
+  language: LearningRuntimeLanguage;
   source: string;
 }
 export const LEARNING_MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -103,9 +104,9 @@ export function visitMarkdownCodes(root: Root, callback: (node: Code) => void) {
 export function runnableCell(node: Code): RunnableCell | null {
   const meta = node.meta?.trim().split(/\s+/) ?? [];
   if (!meta.includes("run")) return null;
-  if (node.lang !== "python" && node.lang !== "javascript") {
+  if (!isLearningRuntimeLanguage(node.lang)) {
     throw new LearningError(
-      "Runnable cells support python or javascript only.",
+      "Runnable cells support python, javascript or brainfuck only.",
     );
   }
   const id = meta.find((part) => part.startsWith("id="))?.slice(3);

@@ -9,6 +9,7 @@ import type { Root } from "mdast";
 import { runnableCell, visitMarkdownCodes } from "@/lib/learning";
 import type { CellSettings } from "@/lib/learning";
 import { LearningCodeCell } from "@/components/learning-code-cell";
+import { isLearningRuntimeLanguage } from "@/lib/languages";
 
 function remarkLearningCells() {
   return (tree: Root) => {
@@ -43,7 +44,7 @@ function LearningPre({ node, children, ...props }: ComponentProps<"pre"> & Extra
     const { cells, storagePrefix } = context;
     const id = code.properties["data-cell-id"];
     const language = code.properties["data-cell-language"];
-    if (language === "python" || language === "javascript") {
+    if (isLearningRuntimeLanguage(language)) {
       const source = String(code.properties["data-cell-source"] ?? "");
       const previewKey = storagePrefix.startsWith("ojp:learn:preview:")
         ? JSON.stringify([source, cells[id]])

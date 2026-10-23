@@ -1,6 +1,8 @@
 import { Language } from "@/lib/types";
+import { BRAINFUCK_HELLO_WORLD } from "./brainfuck.js";
 
 export const SOURCE_CODE_TEMPLATES: Record<Language, string> = {
+  brainfuck: BRAINFUCK_HELLO_WORLD,
   cpp: [
     "#include <bits/stdc++.h>",
     "using namespace std;",

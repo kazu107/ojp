@@ -26,7 +26,8 @@ export type SubmissionStatus =
   | "internal_error"
   | "cancelled";
 
-export type Language = "cpp" | "python" | "java" | "javascript";
+export type Language = import("./languages").SubmissionLanguage;
+export type { CheckerLanguage } from "./languages";
 
 export type ScoreboardVisibility = "hidden" | "partial" | "full";
 export type TestCaseVisibility = "group_only" | "case_index_only" | "case_name_visible";

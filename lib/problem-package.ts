@@ -13,7 +13,7 @@ import {
 } from "@/lib/problem-package-types";
 import {
   ExplanationVisibility,
-  Language,
+  CheckerLanguage,
   TestCaseVisibility,
   Visibility,
 } from "@/lib/types";
@@ -48,7 +48,7 @@ interface ConfigSummary {
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
-  checkerLanguage: Language | null;
+  checkerLanguage: CheckerLanguage | null;
   compareMode: ProblemPackageCompareMode;
   problem: {
     slug: string | null;
@@ -93,7 +93,7 @@ export interface ProblemPackageExtracted {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
-  checkerLanguage: Language | null;
+  checkerLanguage: CheckerLanguage | null;
   checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
   samples: ProblemPackageSampleCase[];
@@ -104,7 +104,7 @@ export interface ProblemPackageManifest {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
-  checkerLanguage: Language | null;
+  checkerLanguage: CheckerLanguage | null;
   compareMode: ProblemPackageCompareMode;
   sampleCases: ProblemPackageSampleCase[];
 }
@@ -125,7 +125,7 @@ export interface ParsedConfig {
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
-  checkerLanguage: Language | null;
+  checkerLanguage: CheckerLanguage | null;
   checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
   problemSettings: {
@@ -234,7 +234,7 @@ function parseCheckerType(raw: unknown): ProblemPackageCheckerType {
   throw new Error("config.checkerType must be one of: exact, special_judge");
 }
 
-function parseCheckerLanguage(raw: unknown): Language {
+function parseCheckerLanguage(raw: unknown): CheckerLanguage {
   if (raw === "cpp" || raw === "python" || raw === "java" || raw === "javascript") {
     return raw;
   }
@@ -294,7 +294,7 @@ function resolveCompareMode(config: Record<string, unknown>): ProblemPackageComp
   return "exact";
 }
 
-export function checkerSourceFileName(language: Language): string {
+export function checkerSourceFileName(language: CheckerLanguage): string {
   switch (language) {
     case "cpp":
       return "checker/Main.cpp";
@@ -393,7 +393,7 @@ export function parseConfig(configJson: unknown): ParsedConfig {
   const config = configJson as Record<string, unknown>;
 
   const checkerType = parseCheckerType(config.checkerType);
-  let checkerLanguage: Language | null = null;
+  let checkerLanguage: CheckerLanguage | null = null;
   if (checkerType === "special_judge") {
     checkerLanguage = parseCheckerLanguage(config.checkerLanguage);
   }
@@ -1272,7 +1272,7 @@ export function buildEditorDraftFromExtracted(
 export function buildProblemPackageFromEditorDraft(input: {
   sourceLabel?: string;
   checkerType?: ProblemPackageCheckerType;
-  checkerLanguage?: Language;
+  checkerLanguage?: CheckerLanguage;
   checkerSourceCode?: string;
   timeLimitMs: number;
   memoryLimitMb: number;

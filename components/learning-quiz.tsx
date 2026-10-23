@@ -26,6 +26,9 @@ export function LearningQuiz({
   const [error, setError] = useState("");
   const key = `${storagePrefix}:quiz`;
   useEffect(() => {
+    let disposed = false;
+    queueMicrotask(() => {
+    if (disposed) return;
     try {
       const saved = JSON.parse(localStorage.getItem(key) ?? "{}");
       const next: Record<string, string> = {};
@@ -36,6 +39,8 @@ export function LearningQuiz({
     } catch {
       /* Ignore unavailable browser storage. */
     }
+    });
+    return () => { disposed = true; };
   }, [key, item.questions]);
   function select(question: string, answer: string) {
     const next = { ...answers, [question]: answer };

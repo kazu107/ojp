@@ -8,7 +8,7 @@ import {
 } from "@/lib/problem-package-types";
 import {
   ExplanationVisibility,
-  Language,
+  CheckerLanguage,
   TestCaseVisibility,
   Visibility,
 } from "@/lib/types";
@@ -63,7 +63,8 @@ function parseCheckerType(raw: unknown): "exact" | "special_judge" {
   return "exact";
 }
 
-function parseCheckerLanguage(raw: unknown): Language {
+function parseCheckerLanguage(raw: unknown): CheckerLanguage {
+  if (raw === "brainfuck") throw new Error("config.checkerLanguage must be one of: cpp, python, java, javascript");
   if (raw === "cpp" || raw === "python" || raw === "java" || raw === "javascript") {
     return raw;
   }
@@ -198,7 +199,7 @@ function buildPrefillFromStatement(
   };
 }
 
-function checkerSourceFileName(language: Language): string {
+function checkerSourceFileName(language: CheckerLanguage): string {
   switch (language) {
     case "cpp":
       return "checker/Main.cpp";

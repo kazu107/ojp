@@ -1,3 +1,4 @@
+import { SUBMISSION_LANGUAGES as ALLOWED_LANGUAGES } from "@/lib/languages";
 import {
   ExplanationVisibility,
   Language,
@@ -5,7 +6,7 @@ import {
   Visibility,
 } from "@/lib/types";
 
-const ALLOWED_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
+
 const ALLOWED_VISIBILITIES: Visibility[] = ["public", "unlisted", "private"];
 const ALLOWED_TEST_CASE_VISIBILITIES: TestCaseVisibility[] = [
   "group_only",

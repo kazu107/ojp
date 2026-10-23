@@ -44,11 +44,14 @@ export function LearningCodeCell({ cell, settings, storagePrefix }: Props) {
   const initialized = useRef(false);
 
   useEffect(() => {
+    let disposed = false;
     if (storagePrefix.startsWith("ojp:learn:preview:")) {
       return () => {
         dispose.current?.();
       };
     }
+    queueMicrotask(() => {
+    if (disposed) return;
     try {
       const saved = JSON.parse(localStorage.getItem(key) ?? "null");
       if (
@@ -65,7 +68,9 @@ export function LearningCodeCell({ cell, settings, storagePrefix }: Props) {
       /* Browser storage can be unavailable or full. */
     }
     initialized.current = true;
+    });
     return () => {
+      disposed = true;
       dispose.current?.();
     };
   }, [key, settings?.readOnly, storagePrefix]);

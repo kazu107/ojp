@@ -7,6 +7,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { EditorView } from "@codemirror/view";
+import { brainfuckLanguage } from "@/lib/brainfuck-editor";
 import { EditorState } from "@codemirror/state";
 import { useMemo } from "react";
 import { useI18n } from "@/components/i18n-provider";
@@ -66,6 +67,7 @@ const editorTheme = EditorView.theme(
 );
 
 function languageExtension(language: CodeEditorLanguage) {
+  if (language === "brainfuck") return brainfuckLanguage;
   if (language === "cpp") {
     return cpp();
   }

@@ -4070,5 +4070,17 @@
   "Cancel": {
     "ja": "キャンセル",
     "en": "Cancel"
+  },
+  "brainfuck": {
+    "ja": "Brainfuck",
+    "en": "Brainfuck"
+  },
+  "Brainfuck": {
+    "ja": "Brainfuck",
+    "en": "Brainfuck"
+  },
+  "Runnable cells support python, javascript or brainfuck only.": {
+    "ja": "実行欄はPython、JavaScript、Brainfuckに対応しています。",
+    "en": "Runnable cells support python, javascript or brainfuck only."
   }
 }

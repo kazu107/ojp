@@ -106,9 +106,9 @@ problem.zip
 
 ## 5. 提出とジャッジ
 
-- 提出言語は C++17、Python 3、Java、JavaScript (Node.js) です。
+- 提出言語は C++17、Python 3、Java、JavaScript (Node.js)、Brainfuckです。
 - CodeMirror のコードエディター、言語別テンプレート、構文色分けがあります。
-- C++ / Java はコンパイルし、Python は `py_compile`、JavaScript は `node --check` で事前チェックします。
+- C++ / Java はコンパイルし、Python は `py_compile`、JavaScript は `node --check`、Brainfuckは角括弧の対応を事前チェックします。
 - `pending -> queued -> compiling -> running -> judging` を経て、AC / WA / TLE / MLE / RE / CE / IE などに確定します。
 - package のない問題への提出はIEになります。
 - 通常提出は同じ利用者・問題で10秒のクールダウン、利用者ごとに1分20件の制限があります。管理者は制限を回避します。
@@ -355,3 +355,14 @@ Windowsでの回帰テストは13件成功、Linux固有の7件はskipです。�
 - 本番のコンテスト・レーティング・問題・教材の日英ページ、レーティングAPI、DBヘルス、匿名操作制限、Python WASM配信、GitHub/GoogleのOAuth開始を確認しました。本人によるOAuth認証完了と本番のログイン後の作成操作は今回未確認です。GitHubへのpushは行っていません。
 
 README・本書・コンテスト仕様を更新し、新規ソースもGitに追加しています。AppStateの全書き込みの競合保証、packageの固定版、完全なジャッジ隔離等の基盤課題は引き続き残ります。
+
+## 20. Brainfuck追加 (2026-10-23)
+
+- 通常提出・コンテスト提出・保存前テストrun・教材の実行欄にBrainfuckを追加しました。言語の選択肢、テンプレート、構文色付け、提出のフィルター、プロフィール統計にも反映しています。
+- 8bit・30,000セル・EOFは0・範囲外ポインターはエラーとする共通インタープリターを、ジャッジのNode.jsプロセスと教材の隔離Workerで使用します。ソースをJavaScriptとして評価しません。checker言語は従来の4言語です。
+- Brainfuck関連16件、教材20件、翻訳6件、コンテスト16件、運用6件、既存ジャッジのWindows対象13件を確認しました。重複実行を除く計77件が成功し、Linux等を必要とする7件はスキップです。型チェック・lint・ビルドも確認しています。
+- 教材の実行テストは生成されたiframeスクリプトとWorkerコードをNode.jsで実行したものです。描画は日英のReact描画テストで確認しています。本番ブラウザを操作した確認は行っていません。Dockerが応答しなかったため、今回のLinuxコンテナ確認は未実施です。
+- 本番DB更新・Herokuデプロイは行っていません。既存DBにはバックアップ・復元確認後に `npm run db:brainfuck` を一度適用し、webとworkerを更新します。enumへの追加だけで、全体の `db:push` やseedは不要です。
+- 依存監査では既存のNext.js 16.3.8にCritical 1件が報告されています。この作業ではNext.jsの更新は行っていません。CodeMirrorの言語基盤は既存の解決済みバージョンを直接依存へ明示しただけで、既存パッケージのバージョンは変更していません。
+
+仕様・教材の記法・導入方法は [Brainfuck](brainfuck.md) を参照してください。

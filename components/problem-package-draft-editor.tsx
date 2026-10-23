@@ -13,7 +13,7 @@ import {
   ProblemPackageCheckerType,
   ProblemPackageEditorDraft,
 } from "@/lib/problem-package-types";
-import { Language } from "@/lib/types";
+import { CheckerLanguage } from "@/lib/types";
 import type { Translator } from "@/lib/i18n/shared";
 
 interface ProblemPackageDraftEditorProps {
@@ -314,7 +314,7 @@ export function ProblemPackageDraftEditor({
               value={draft.checkerLanguage}
               onChange={(event) =>
                 patchDraft((current) => {
-                  const nextLanguage = event.target.value as Language;
+                  const nextLanguage = event.target.value as CheckerLanguage;
                   return {
                     ...current,
                     checkerLanguage: nextLanguage,

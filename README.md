@@ -91,7 +91,7 @@
 - 公開範囲: `public / unlisted / private`
 - 提出状態:
   `pending / queued / compiling / running / judging / accepted / wrong_answer / time_limit_exceeded / memory_limit_exceeded / runtime_error / compilation_error / internal_error / cancelled`
-- 初期対応言語: `C++ / Python / Java / JavaScript`
+- 提出言語: `C++ / Python / Java / JavaScript / Brainfuck`
 - 順位表: 問題ごとの最高点 + ペナルティで集計
 - 順位表公開: `hidden / partial / full`
 - 提出詳細の公開粒度:
@@ -582,7 +582,7 @@ object storage なしでも小規模運用できます。
 
 ## Learning Mode
 
-ヘッダーの `Learn` から、Markdown教材・ブラウザ内のPython/JavaScript実行欄・確認クイズ・既存問題の練習を章内タブで切り替えられます。作成者用のライブプレビュー、下書き／公開版、進捗保存、教材ZIP取り込み・書き出しに対応します。
+ヘッダーの `Learn` から、Markdown教材・ブラウザ内のPython/JavaScript/Brainfuck実行欄・確認クイズ・既存問題の練習を章内タブで切り替えられます。作成者用のライブプレビュー、下書き／公開版、進捗保存、教材ZIP取り込み・書き出しに対応します。
 
 初回導入時に学習用テーブルだけを追加してください（既存の問題・提出テーブルは変更しません）。
 
@@ -600,6 +600,23 @@ npm run build
 npm run template:learning-zip
 npm run test:learning
 ```
+
+## Brainfuck
+
+通常提出、問題作成・編集時のテストrun、教材内のブラウザ実行で使用できます。色付きエディターとHello Worldテンプレート、提出の言語フィルター・プロフィール統計にも対応します。追加の外部ランタイムは不要です。
+
+セルは8bit符号なし整数（0〜255で循環）、ゼロ初期化した30,000セル、ポインターの範囲外はRE、EOF入力は0です。入出力はバイト単位で、数値入力を自動で整数に変換しません。提出では問題の時間・メモリ制限と既存の出力制限、教材では10秒・64 KiBの制限を適用します。構文不正は提出ではCEです。checkerはファイル引数を使うため、従来の4言語のみ対応します。
+
+既存DBには再デプロイ前に次の追加SQLを一度適用してください（言語enumへの値追加のみ。既存の提出・テストケースは変更しません）。本番ではバックアップ・復元確認を行い、全体の `db:push` やseedは実行しないでください。webとworkerの両方を更新します。
+
+```bash
+npm run db:generate
+npm run db:brainfuck
+npm run build
+npm run test:brainfuck
+```
+
+詳しい仕様・教材記法・例は [Brainfuckの説明](docs/brainfuck.md) を参照してください。
 
 ## コンテスト・レーティング
 

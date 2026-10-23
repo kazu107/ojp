@@ -1,3 +1,4 @@
+import { SUBMISSION_LANGUAGES as PROFILE_LANGUAGES } from "@/lib/languages";
 
 import { getI18n } from "@/lib/i18n/server";
 import { RatingSummary } from "@/components/rating-summary";
@@ -10,10 +11,9 @@ import {
   listProblemsForListView,
   listSubmissionsForViewer,
 } from "@/lib/store";
-import { Language } from "@/lib/types";
 import { SUBMISSION_STATUS_VALUES } from "@/lib/submission-status";
 
-const PROFILE_LANGUAGES: Language[] = ["cpp", "python", "java", "javascript"];
+
 
 function formatRate(value: number): string {
   return `${value.toFixed(1)}%`;
