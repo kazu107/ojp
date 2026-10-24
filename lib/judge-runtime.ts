@@ -74,11 +74,139 @@ async function runWithFallback(
   };
 }
 
-function resolveLanguageCommands(language: Language, baseName = "Main", memoryLimitMb = 512): {
+function resolveLanguageCommands(
+  language: Language,
+  baseName = "Main",
+  memoryLimitMb = 512,
+): {
   sourceFileName: string;
   compile?: CommandTemplate & { timeoutMs: number };
   execute: CommandTemplate;
 } {
+  const nativeCommand = process.platform === "win32" ? "main.exe" : "./main";
+  if (language === "c") {
+    return {
+      sourceFileName: `${baseName}.c`,
+      compile: {
+        commands: ["gcc", "clang"],
+        args: [`${baseName}.c`, "-O2", "-std=c17", "-o", "main", "-lm"],
+        timeoutMs: 20000,
+      },
+      execute: { commands: [nativeCommand], args: [] },
+    };
+  }
+  if (language === "rust") {
+    return {
+      sourceFileName: `${baseName}.rs`,
+      compile: {
+        commands: ["rustc"],
+        args: [
+          "--edition=2021",
+          "-C",
+          "opt-level=2",
+          "-C",
+          "codegen-units=1",
+          `${baseName}.rs`,
+          "-o",
+          "main",
+        ],
+        timeoutMs: 30000,
+      },
+      execute: { commands: [nativeCommand], args: [] },
+    };
+  }
+  if (language === "go") {
+    return {
+      sourceFileName: `${baseName}.go`,
+      compile: {
+        commands: ["go"],
+        args: ["build", "-p=1", "-o", "main", `${baseName}.go`],
+        timeoutMs: 60000,
+      },
+      execute: { commands: [nativeCommand], args: [] },
+    };
+  }
+  if (language === "csharp") {
+    return {
+      sourceFileName: `${baseName}.cs`,
+      compile: {
+        commands: ["mcs"],
+        args: [
+          "-optimize+",
+          "-langversion:7.2",
+          "-r:System.Numerics.dll",
+          "-out:main.exe",
+          `${baseName}.cs`,
+        ],
+        timeoutMs: 20000,
+      },
+      execute: { commands: ["mono"], args: ["main.exe"] },
+    };
+  }
+  if (language === "kotlin") {
+    return {
+      sourceFileName: `${baseName}.kt`,
+      // Debian's kotlinc preloader duplicates compiler jars in memory; load the compiler directly.
+      compile: {
+        commands: ["java"],
+        args: [
+          "-Xmx128m",
+          "-XX:+UseSerialGC",
+          "-XX:MaxMetaspaceSize=96m",
+          "-XX:ReservedCodeCacheSize=24m",
+          "-XX:TieredStopAtLevel=1",
+          "-XX:ActiveProcessorCount=1",
+          "-Dkotlin.home=/usr/share/kotlin/kotlinc",
+          "-cp",
+          "/usr/share/kotlin/kotlinc/lib/*",
+          "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+          "-kotlin-home",
+          "/usr/share/kotlin/kotlinc",
+          "-jvm-target",
+          "1.8",
+          `${baseName}.kt`,
+          "-d",
+          "main.jar",
+        ],
+        timeoutMs: 60000,
+      },
+      execute: {
+        commands: ["java"],
+        args: [
+          "-XX:ActiveProcessorCount=1",
+          `-Xmx${Math.max(8, Math.floor(memoryLimitMb))}m`,
+          "-cp",
+          "main.jar:/usr/share/kotlin/kotlinc/lib/kotlin-stdlib.jar:/usr/share/kotlin/kotlinc/lib/kotlin-stdlib-jdk7.jar:/usr/share/kotlin/kotlinc/lib/kotlin-stdlib-jdk8.jar",
+          `${baseName}Kt`,
+        ],
+      },
+    };
+  }
+  if (language === "ruby") {
+    return {
+      sourceFileName: `${baseName}.rb`,
+      compile: {
+        commands: ["ruby"],
+        args: ["--disable-gems", "-c", `${baseName}.rb`],
+        timeoutMs: 10000,
+      },
+      execute: {
+        commands: ["ruby"],
+        args: ["--disable-gems", `${baseName}.rb`],
+      },
+    };
+  }
+  if (language === "pypy") {
+    return {
+      sourceFileName: `${baseName}.py`,
+      compile: {
+        commands: ["pypy3"],
+        args: ["-m", "py_compile", `${baseName}.py`],
+        timeoutMs: 10000,
+      },
+      execute: { commands: ["pypy3"], args: [`${baseName}.py`] },
+    };
+  }
   if (language === "brainfuck") {
     return {
       sourceFileName: `${baseName}.bf`,
@@ -89,7 +217,11 @@ function resolveLanguageCommands(language: Language, baseName = "Main", memoryLi
       },
       execute: {
         commands: ["node"],
-        args: [`--max-old-space-size=${Math.max(8, Math.floor(memoryLimitMb))}`, "brainfuck-runtime.cjs", `${baseName}.bf`],
+        args: [
+          `--max-old-space-size=${Math.max(8, Math.floor(memoryLimitMb))}`,
+          "brainfuck-runtime.cjs",
+          `${baseName}.bf`,
+        ],
       },
     };
   }
@@ -133,11 +265,17 @@ function resolveLanguageCommands(language: Language, baseName = "Main", memoryLi
       },
       execute: {
         commands: ["java"],
-        args: ["-XX:ActiveProcessorCount=1", `-Xmx${Math.max(8, Math.floor(memoryLimitMb))}m`, baseName],
+        args: [
+          "-XX:ActiveProcessorCount=1",
+          `-Xmx${Math.max(8, Math.floor(memoryLimitMb))}m`,
+          baseName,
+        ],
       },
     };
   }
 
+  if (language !== "javascript")
+    throw new Error(`Unsupported judge language: ${String(language)}`);
   return {
     sourceFileName: `${baseName}.js`,
     compile: {
@@ -147,7 +285,10 @@ function resolveLanguageCommands(language: Language, baseName = "Main", memoryLi
     },
     execute: {
       commands: ["node"],
-      args: [`--max-old-space-size=${Math.max(8, Math.floor(memoryLimitMb))}`, `${baseName}.js`],
+      args: [
+        `--max-old-space-size=${Math.max(8, Math.floor(memoryLimitMb))}`,
+        `${baseName}.js`,
+      ],
     },
   };
 }
@@ -159,7 +300,10 @@ function scoreFromGroups(
   if (scoringType === "binary") {
     return judgedGroupStates.every((state) => state.accepted) ? 100 : 0;
   }
-  return judgedGroupStates.reduce((acc, state) => (state.accepted ? acc + state.score : acc), 0);
+  return judgedGroupStates.reduce(
+    (acc, state) => (state.accepted ? acc + state.score : acc),
+    0,
+  );
 }
 
 function overallVerdict(results: Submission["testResults"]): SubmissionStatus {
@@ -212,8 +356,12 @@ async function compileProgram(
       message: "compile timeout",
     };
   }
-  if (compileResult.memoryLimitExceeded || compileResult.outputLimitExceeded ||
-      compileResult.processLimitExceeded || compileResult.workspaceLimitExceeded) {
+  if (
+    compileResult.memoryLimitExceeded ||
+    compileResult.outputLimitExceeded ||
+    compileResult.processLimitExceeded ||
+    compileResult.workspaceLimitExceeded
+  ) {
     return {
       ok: false,
       verdict: "compilation_error",
@@ -247,7 +395,12 @@ async function runSpecialJudgeCase(input: {
   const checked = await runWithFallback(
     {
       commands: input.checkerRuntime.commands,
-      args: [...input.checkerRuntime.args, input.inputPath, input.answerPath, input.contestantOutputPath],
+      args: [
+        ...input.checkerRuntime.args,
+        input.inputPath,
+        input.answerPath,
+        input.contestantOutputPath,
+      ],
     },
     {
       cwd: input.checkerWorkspace,
@@ -258,7 +411,10 @@ async function runSpecialJudgeCase(input: {
       readOnlyFiles: [
         { source: input.inputPath, destination: "/cases/input.txt" },
         { source: input.answerPath, destination: "/cases/answer.txt" },
-        { source: input.contestantOutputPath, destination: "/cases/output.txt" },
+        {
+          source: input.contestantOutputPath,
+          destination: "/cases/output.txt",
+        },
       ],
     },
   );
@@ -277,9 +433,16 @@ async function runSpecialJudgeCase(input: {
       message: "special judge timeout",
     };
   }
-  if (checkResult.memoryLimitExceeded || checkResult.outputLimitExceeded ||
-      checkResult.processLimitExceeded || checkResult.workspaceLimitExceeded) {
-    return { verdict: "internal_error", message: "special judge resource limit exceeded" };
+  if (
+    checkResult.memoryLimitExceeded ||
+    checkResult.outputLimitExceeded ||
+    checkResult.processLimitExceeded ||
+    checkResult.workspaceLimitExceeded
+  ) {
+    return {
+      verdict: "internal_error",
+      message: "special judge resource limit exceeded",
+    };
   }
   if (checkResult.exitCode === 0) {
     return {
@@ -295,7 +458,9 @@ async function runSpecialJudgeCase(input: {
   }
   return {
     verdict: "internal_error",
-    message: detail || `special judge failed with exit code ${String(checkResult.exitCode)}`,
+    message:
+      detail ||
+      `special judge failed with exit code ${String(checkResult.exitCode)}`,
   };
 }
 
@@ -319,7 +484,10 @@ async function materializeInlineTestCaseFiles(input: {
   };
 }
 
-async function filesEqualExact(leftPath: string, rightPath: string): Promise<boolean> {
+async function filesEqualExact(
+  leftPath: string,
+  rightPath: string,
+): Promise<boolean> {
   const left = createReadStream(leftPath);
   const right = createReadStream(rightPath);
   const leftIterator = left[Symbol.asyncIterator]();
@@ -352,7 +520,11 @@ async function filesEqualExact(leftPath: string, rightPath: string): Promise<boo
         return false;
       }
 
-      if (!leftBuffer.subarray(0, compareLength).equals(rightBuffer.subarray(0, compareLength))) {
+      if (
+        !leftBuffer
+          .subarray(0, compareLength)
+          .equals(rightBuffer.subarray(0, compareLength))
+      ) {
         return false;
       }
 
@@ -427,7 +599,9 @@ export async function executePackageJudge(input: {
   packageSource?: LazyProblemPackageSource;
   existingResults?: Submission["testResults"];
   nextTestResultId: () => string;
-  onPhaseChange?: (status: "compiling" | "running" | "judging") => void | Promise<void>;
+  onPhaseChange?: (
+    status: "compiling" | "running" | "judging",
+  ) => void | Promise<void>;
   onTestResult?: (params: {
     result: Submission["testResults"][number];
     totalTimeMs: number;
@@ -468,15 +642,29 @@ export async function executePackageJudge(input: {
   try {
     const submissionWorkspace = path.join(workspace, "submission");
     await mkdir(submissionWorkspace, { recursive: true });
-    const submissionCommands = resolveLanguageCommands(input.language, "Main", input.memoryLimitMb);
-    const submissionSourcePath = path.join(submissionWorkspace, submissionCommands.sourceFileName);
+    const submissionCommands = resolveLanguageCommands(
+      input.language,
+      "Main",
+      input.memoryLimitMb,
+    );
+    const submissionSourcePath = path.join(
+      submissionWorkspace,
+      submissionCommands.sourceFileName,
+    );
     await writeFile(submissionSourcePath, input.sourceCode, "utf8");
     if (input.language === "brainfuck") {
-      await writeFile(path.join(submissionWorkspace, "brainfuck-runtime.cjs"), brainfuckNodeRunner(), "utf8");
+      await writeFile(
+        path.join(submissionWorkspace, "brainfuck-runtime.cjs"),
+        brainfuckNodeRunner(),
+        "utf8",
+      );
     }
 
     await input.onPhaseChange?.("compiling");
-    const submissionCompile = await compileProgram(submissionWorkspace, submissionCommands);
+    const submissionCompile = await compileProgram(
+      submissionWorkspace,
+      submissionCommands,
+    );
     if (!submissionCompile.ok) {
       return {
         status: submissionCompile.verdict,
@@ -528,12 +716,20 @@ export async function executePackageJudge(input: {
       checkerWorkspace = path.join(workspace, "checker");
       await mkdir(checkerWorkspace, { recursive: true });
       const checkerCommands = resolveLanguageCommands(
-        packageMeta.checkerLanguage, "Main", getJudgeResourceLimits().checkerMemoryMb,
+        packageMeta.checkerLanguage,
+        "Main",
+        getJudgeResourceLimits().checkerMemoryMb,
       );
-      const checkerSourcePath = path.join(/* turbopackIgnore: true */ checkerWorkspace, checkerCommands.sourceFileName);
+      const checkerSourcePath = path.join(
+        /* turbopackIgnore: true */ checkerWorkspace,
+        checkerCommands.sourceFileName,
+      );
       await writeFile(checkerSourcePath, packageMeta.checkerSourceCode, "utf8");
 
-      const checkerCompile = await compileProgram(checkerWorkspace, checkerCommands);
+      const checkerCompile = await compileProgram(
+        checkerWorkspace,
+        checkerCommands,
+      );
       if (!checkerCompile.ok) {
         return {
           status: "internal_error",
@@ -563,8 +759,14 @@ export async function executePackageJudge(input: {
     const existingResults = input.existingResults ?? [];
     const results: Submission["testResults"] = [...existingResults];
     const judgedGroupStates: Array<{ score: number; accepted: boolean }> = [];
-    let totalTimeMs = existingResults.reduce((max, result) => Math.max(max, result.timeMs), 0);
-    let peakMemoryKb = existingResults.reduce((max, result) => Math.max(max, result.memoryKb), 0);
+    let totalTimeMs = existingResults.reduce(
+      (max, result) => Math.max(max, result.timeMs),
+      0,
+    );
+    let peakMemoryKb = existingResults.reduce(
+      (max, result) => Math.max(max, result.memoryKb),
+      0,
+    );
     let existingIndex = 0;
 
     for (const group of packageMeta.groups) {
@@ -591,13 +793,21 @@ export async function executePackageJudge(input: {
         await mkdir(caseWorkspace, { recursive: true });
         try {
           const testCaseFiles = input.packageSource
-            ? await input.packageSource.materializeTestCaseFiles(group.name, caseName, caseWorkspace)
+            ? await input.packageSource.materializeTestCaseFiles(
+                group.name,
+                caseName,
+                caseWorkspace,
+              )
             : await (async () => {
-                const testCase = input.packageData!.groups
-                  .find((candidate) => candidate.name === group.name)
+                const testCase = input
+                  .packageData!.groups.find(
+                    (candidate) => candidate.name === group.name,
+                  )
                   ?.tests.find((candidate) => candidate.name === caseName);
                 if (!testCase) {
-                  throw new Error(`test case not found: ${group.name}/${caseName}`);
+                  throw new Error(
+                    `test case not found: ${group.name}/${caseName}`,
+                  );
                 }
                 return materializeInlineTestCaseFiles({
                   testCase,
@@ -629,15 +839,23 @@ export async function executePackageJudge(input: {
           } else if (runResult.timedOut) {
             verdict = "time_limit_exceeded";
             message = "Time limit exceeded.";
-          } else if (runResult.memoryLimitExceeded || runResult.memoryKb > input.memoryLimitMb * 1024) {
+          } else if (
+            runResult.memoryLimitExceeded ||
+            runResult.memoryKb > input.memoryLimitMb * 1024
+          ) {
             verdict = "memory_limit_exceeded";
             message = "Memory limit exceeded.";
           } else if (runResult.outputLimitExceeded) {
             verdict = "runtime_error";
             message = "Output limit exceeded.";
-          } else if (runResult.processLimitExceeded || runResult.workspaceLimitExceeded) {
+          } else if (
+            runResult.processLimitExceeded ||
+            runResult.workspaceLimitExceeded
+          ) {
             verdict = "runtime_error";
-            message = runResult.processLimitExceeded ? "Process limit exceeded." : "Workspace limit exceeded.";
+            message = runResult.processLimitExceeded
+              ? "Process limit exceeded."
+              : "Workspace limit exceeded.";
           } else if (runResult.exitCode !== 0) {
             verdict = "runtime_error";
             message = runResult.stderr || "Runtime error.";

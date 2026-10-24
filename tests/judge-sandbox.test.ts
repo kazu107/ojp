@@ -16,12 +16,17 @@ test("environment is allowlisted rather than inherited", () => {
     DATABASE_URL: "test-only-secret", R2_SECRET_ACCESS_KEY: "test-only-secret",
     AUTH_SECRET: "test-only-secret", NODE_OPTIONS: "--require forbidden.js",
     PYTHONPATH: "/private/site-packages", LD_PRELOAD: "/private/injection.so",
+    GOPROXY: "https://private.invalid", GOENV: "/private/go.env", CGO_ENABLED: "1", RUBYOPT: "-r/private/secret.rb", MONO_ENV_OPTIONS: "--config /private/config",
   });
-  for (const name of ["DATABASE_URL", "R2_SECRET_ACCESS_KEY", "AUTH_SECRET", "NODE_OPTIONS", "PYTHONPATH", "LD_PRELOAD"]) {
+  for (const name of ["DATABASE_URL", "R2_SECRET_ACCESS_KEY", "AUTH_SECRET", "NODE_OPTIONS", "PYTHONPATH", "LD_PRELOAD", "RUBYOPT", "MONO_ENV_OPTIONS"]) {
     assert.equal(env[name], undefined, name);
   }
   assert.equal(env.HOME, "/workspace");
   assert.equal(env.PYTHONNOUSERSITE, "1");
+  assert.equal(env.GOPROXY, "off");
+  assert.equal(env.GOENV, "off");
+  assert.equal(env.CGO_ENABLED, "0");
+  assert.equal(env.GOMAXPROCS, "1");
 });
 
 test("bubblewrap mounts only runtime, own workspace, and explicitly allowed case files", () => {

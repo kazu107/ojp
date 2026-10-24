@@ -44,6 +44,13 @@ export function languageLabel(language: Language): string {
       return "JavaScript";
     case "brainfuck":
       return "Brainfuck";
+    case "c": return "C";
+    case "rust": return "Rust";
+    case "go": return "Go";
+    case "csharp": return "C# (Mono)";
+    case "kotlin": return "Kotlin";
+    case "ruby": return "Ruby";
+    case "pypy": return "Python (PyPy3)";
     default:
       return language;
   }

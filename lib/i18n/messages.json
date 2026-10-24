@@ -1048,8 +1048,8 @@
     "en": "Main Navigation"
   },
   "go": {
-    "ja": "移動",
-    "en": "go"
+    "ja": "Go",
+    "en": "Go"
   },
   "Go to line": {
     "ja": "行に移動",
@@ -4082,5 +4082,57 @@
   "Runnable cells support python, javascript or brainfuck only.": {
     "ja": "実行欄はPython、JavaScript、Brainfuckに対応しています。",
     "en": "Runnable cells support python, javascript or brainfuck only."
+  },
+  "c": {
+    "ja": "C",
+    "en": "C"
+  },
+  "C": {
+    "ja": "C",
+    "en": "C"
+  },
+  "rust": {
+    "ja": "Rust",
+    "en": "Rust"
+  },
+  "Rust": {
+    "ja": "Rust",
+    "en": "Rust"
+  },
+  "Go": {
+    "ja": "Go",
+    "en": "Go"
+  },
+  "csharp": {
+    "ja": "C# (Mono)",
+    "en": "C# (Mono)"
+  },
+  "C# (Mono)": {
+    "ja": "C# (Mono)",
+    "en": "C# (Mono)"
+  },
+  "kotlin": {
+    "ja": "Kotlin",
+    "en": "Kotlin"
+  },
+  "Kotlin": {
+    "ja": "Kotlin",
+    "en": "Kotlin"
+  },
+  "ruby": {
+    "ja": "Ruby",
+    "en": "Ruby"
+  },
+  "Ruby": {
+    "ja": "Ruby",
+    "en": "Ruby"
+  },
+  "pypy": {
+    "ja": "Python (PyPy3)",
+    "en": "Python (PyPy3)"
+  },
+  "Python (PyPy3)": {
+    "ja": "Python (PyPy3)",
+    "en": "Python (PyPy3)"
   }
 }

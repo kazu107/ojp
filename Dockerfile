@@ -6,6 +6,15 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     g++ \
+    gcc \
+    rustc \
+    golang-go \
+    ruby \
+    kotlin \
+    mono-mcs \
+    mono-runtime \
+    libmono-system-numerics4.0-cil \
+    pypy3 \
     python3 \
     default-jdk-headless \
     bubblewrap \

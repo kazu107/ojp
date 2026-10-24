@@ -49,6 +49,13 @@ enum Language {
   java
   javascript
   brainfuck
+  c
+  rust
+  go
+  csharp
+  kotlin
+  ruby
+  pypy
 }
 
 enum ScoreboardVisibility {

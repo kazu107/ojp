@@ -6,6 +6,11 @@ import { java } from "@codemirror/lang-java";
 import { javascript } from "@codemirror/lang-javascript";
 import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
+import { rust } from "@codemirror/lang-rust";
+import { go } from "@codemirror/lang-go";
+import { StreamLanguage } from "@codemirror/language";
+import { csharp, kotlin } from "@codemirror/legacy-modes/mode/clike";
+import { ruby } from "@codemirror/legacy-modes/mode/ruby";
 import { EditorView } from "@codemirror/view";
 import { brainfuckLanguage } from "@/lib/brainfuck-editor";
 import { EditorState } from "@codemirror/state";
@@ -67,6 +72,13 @@ const editorTheme = EditorView.theme(
 );
 
 function languageExtension(language: CodeEditorLanguage) {
+  if (language === "c") return cpp();
+  if (language === "rust") return rust();
+  if (language === "go") return go();
+  if (language === "csharp") return StreamLanguage.define(csharp);
+  if (language === "kotlin") return StreamLanguage.define(kotlin);
+  if (language === "ruby") return StreamLanguage.define(ruby);
+  if (language === "pypy") return python();
   if (language === "brainfuck") return brainfuckLanguage;
   if (language === "cpp") {
     return cpp();

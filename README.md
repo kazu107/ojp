@@ -91,7 +91,7 @@
 - 公開範囲: `public / unlisted / private`
 - 提出状態:
   `pending / queued / compiling / running / judging / accepted / wrong_answer / time_limit_exceeded / memory_limit_exceeded / runtime_error / compilation_error / internal_error / cancelled`
-- 提出言語: `C++ / Python / Java / JavaScript / Brainfuck`
+- 提出言語・実行系: `C++ / Python / Java / JavaScript / Brainfuck / C / Rust / Go / C# (Mono) / Kotlin / Ruby / PyPy3`
 - 順位表: 問題ごとの最高点 + ペナルティで集計
 - 順位表公開: `hidden / partial / full`
 - 提出詳細の公開粒度:
@@ -600,6 +600,12 @@ npm run build
 npm run template:learning-zip
 npm run test:learning
 ```
+
+## 競プロ向け実行系の追加
+
+C、Rust、Go、C#（Mono）、Kotlin、Ruby、PyPy3を提出・テストrunに追加しました。エディター、テンプレート、フィルター、プロフィール統計も対応しています。教材の練習問題からも提出できます。教材内のブラウザ試し実行は従来の3言語です。
+
+既存DBには、バックアップ・復元確認後に `npm run db:competitive-languages` を一度実行し、SDKを含むDockerイメージでweb・workerの両方を更新します。追加のConfig Varsや、既存ZIPの再登録は不要です。バージョン、入口の規則、制限と検証手順は [提出言語と実行系](docs/judge-languages.md) を参照してください。
 
 ## Brainfuck
 

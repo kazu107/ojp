@@ -4,6 +4,7 @@ import AdmZip from "adm-zip";
 import { validateProblemPackage } from "../lib/problem-package";
 import { executePackageJudge } from "../lib/judge-runtime";
 import type { Language } from "../lib/types";
+import { SUBMISSION_LANGUAGES } from "../lib/languages";
 
 function packageData(checkerSourceCode?: string) {
   const zip = new AdmZip();
@@ -27,9 +28,16 @@ const programs: Record<Exclude<Language, "brainfuck">, string> = {
   python: "import sys\nprint(sum(map(int, sys.stdin.read().split())))\n",
   cpp: "#include <iostream>\nint main() { long long a, b; std::cin >> a >> b; std::cout << a + b << '\\n'; }\n",
   java: "import java.util.*; public class Main { public static void main(String[] args) { Scanner s = new Scanner(System.in); System.out.println(s.nextLong() + s.nextLong()); } }",
+  c: '#include <stdio.h>\nint main(void) { long long a, b; if (scanf("%lld%lld", &a, &b) == 2) printf("%lld\\n", a+b); return 0; }',
+  rust: 'use std::io::{self, Read}; fn main() { let mut s=String::new();io::stdin().read_to_string(&mut s).unwrap();let a:Vec<i64>=s.split_whitespace().map(|v| v.parse().unwrap()).collect();println!("{}",a[0]+a[1]); }',
+  go: 'package main\nimport("fmt";"os";"bufio")\nfunc main(){in:=bufio.NewReader(os.Stdin);var a,b int64;fmt.Fscan(in,&a,&b);fmt.Println(a+b)}',
+  csharp: "using System; class MainClass { static void Main() { var a=Console.In.ReadToEnd().Split((char[])null, StringSplitOptions.RemoveEmptyEntries); Console.WriteLine(long.Parse(a[0])+long.Parse(a[1])); } }",
+  kotlin: 'fun main() { val a=System.`in`.bufferedReader().readText().trim().split(Regex("\\\\s+")); println(a[0].toLong()+a[1].toLong()) }',
+  ruby: 'a=STDIN.read.split.map(&:to_i); puts a[0]+a[1]',
+  pypy: "import sys\nprint(sum(map(int, sys.stdin.read().split())))\n",
 };
 
-for (const language of ["javascript", "cpp", "python", "java"] as const) {
+for (const language of SUBMISSION_LANGUAGES.filter((value) => value !== "brainfuck")) {
   test(`normal ${language} submissions retain AC and group scoring`, {
     skip: process.platform !== "linux" && language !== "javascript",
   }, async () => {

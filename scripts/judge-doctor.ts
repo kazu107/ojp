@@ -27,12 +27,20 @@ async function main() {
       ["Python", "python3", ["--version"]],
       ["Java", "java", ["-version"]],
       ["JavaScript", process.execPath, ["--version"]],
+      ["C", "gcc", ["--version"]],
+      ["Rust", "rustc", ["--version"]],
+      ["Go", "go", ["version"]],
+      ["C# (Mono)", "mcs", ["--version"]],
+      ["Kotlin", "java", ["-Xmx128m", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1", "-Dkotlin.home=/usr/share/kotlin/kotlinc", "-cp", "/usr/share/kotlin/kotlinc/lib/*", "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler", "-version"]],
+      ["Ruby", "ruby", ["--version"]],
+      ["PyPy3", "pypy3", ["--version"]],
     ] as const) {
       const result = await runJudgeCommand(command, [...args], {
         cwd, stdin: "", timeoutMs: 5000, captureMemory: false,
       });
       const available = result.exitCode === 0 && !result.spawnErrorCode;
-      console.log(`${name}: ${available ? "available" : "unavailable"}`);
+      const version = (result.stdout || result.stderr).split(/\r?\n/).find((line) => line.trim() && !/warning|deprecated/i.test(line))?.trim();
+      console.log(`${name}: ${available ? "available" : "unavailable"}${version ? ` (${version})` : ""}`);
       missingTools ||= !available;
     }
     await writeFile(path.join(cwd, "brainfuck-runtime.cjs"), brainfuckNodeRunner());

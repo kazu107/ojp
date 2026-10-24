@@ -43,6 +43,13 @@ export function createJudgeEnvironment(
     MKL_NUM_THREADS: "1",
     NUMEXPR_NUM_THREADS: "1",
     UV_THREADPOOL_SIZE: "1",
+    GOMAXPROCS: "1",
+    GO111MODULE: "off",
+    GOENV: "off",
+    GOPROXY: "off",
+    GOSUMDB: "off",
+    CGO_ENABLED: "0",
+    MONO_THREADS_PER_CPU: "1",
   };
   if (process.platform === "win32") {
     env.SystemRoot = parent.SystemRoot ?? parent.SYSTEMROOT ?? "C:\\Windows";
@@ -93,6 +100,7 @@ export function buildBubblewrapArguments(input: {
   const systemPaths = input.systemPaths ?? [
     "/usr", "/bin", "/sbin", "/lib", "/lib64",
     "/etc/alternatives", "/etc/ld.so.cache", "/etc/localtime",
+    "/etc/mono",
     // Debian's JDK conf directory points outside /usr into its system configuration.
     ...readdirSync("/etc", { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && /^java-\d+-openjdk$/.test(entry.name))

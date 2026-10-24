@@ -4,6 +4,13 @@ export const SUBMISSION_LANGUAGES = [
   "java",
   "javascript",
   "brainfuck",
+  "c",
+  "rust",
+  "go",
+  "csharp",
+  "kotlin",
+  "ruby",
+  "pypy",
 ] as const;
 export type SubmissionLanguage = (typeof SUBMISSION_LANGUAGES)[number];
 
