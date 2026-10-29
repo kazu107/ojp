@@ -1,11 +1,13 @@
 
 import { getI18n } from "@/lib/i18n/server";
+import { redirect } from "next/navigation";
 import { ProblemEditorForm } from "@/components/problem-editor-form";
-import { canCreateProblemByRole, getCurrentUser } from "@/lib/store";
+import { canCreateProblemByRole, getOptionalCurrentUser } from "@/lib/store";
 
 export default async function NewProblemPage() {
   const { t } = await getI18n();
-  const me = await getCurrentUser();
+  const me = await getOptionalCurrentUser();
+  if (!me) redirect("/signin?callbackUrl=%2Fproblems%2Fnew");
   const canCreateProblem = canCreateProblemByRole(me.role);
 
   return (
