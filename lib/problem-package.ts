@@ -1,4 +1,5 @@
 ﻿import AdmZip from "adm-zip";
+import { parseInteractiveLimits, resolvePackageCheckerType, type InteractiveLimits } from "./interactive-config";
 
 import {
   ProblemPackageCompareMode,
@@ -48,6 +49,7 @@ interface ConfigSummary {
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   compareMode: ProblemPackageCompareMode;
   problem: {
@@ -79,6 +81,7 @@ export interface ProblemPackageTestCase {
 }
 
 export interface ProblemPackageSampleCase extends ProblemPackageTestCase {
+  interaction?: string;
   description: string;
 }
 
@@ -93,6 +96,7 @@ export interface ProblemPackageExtracted {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
@@ -104,6 +108,7 @@ export interface ProblemPackageManifest {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   compareMode: ProblemPackageCompareMode;
   sampleCases: ProblemPackageSampleCase[];
@@ -125,6 +130,7 @@ export interface ParsedConfig {
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   checkerSourceCode: string | null;
   compareMode: ProblemPackageCompareMode;
@@ -176,7 +182,12 @@ function normalizePackageText(text: string): string {
   return stripUtf8Bom(text).replace(/\r\n?/g, "\n");
 }
 
-export function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string): void {
+export function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string, checkerType?: ProblemPackageCheckerType): void {
+  if (checkerType === "interactive") {
+    if (inSet.size === 0 && scope !== "samples") throw new Error(`${scope} must include .in files`);
+    if (diffSet(outSet, inSet).length) throw new Error(`${scope} has an .out without .in`);
+    return;
+  }
   if (inSet.size === 0 || outSet.size === 0) {
     throw new Error(`${scope} must include both .in and .out files`);
   }
@@ -222,16 +233,6 @@ function parseScoringType(raw: unknown): ProblemPackageScoringType | undefined {
     return "sum_of_groups";
   }
   throw new Error("config.scoringType must be one of: binary, sum_of_groups");
-}
-
-function parseCheckerType(raw: unknown): ProblemPackageCheckerType {
-  if (raw === undefined || raw === null || raw === "" || raw === "exact") {
-    return "exact";
-  }
-  if (raw === "special_judge" || raw === "custom_checker") {
-    return "special_judge";
-  }
-  throw new Error("config.checkerType must be one of: exact, special_judge");
 }
 
 function parseCheckerLanguage(raw: unknown): CheckerLanguage {
@@ -294,19 +295,9 @@ function resolveCompareMode(config: Record<string, unknown>): ProblemPackageComp
   return "exact";
 }
 
-export function checkerSourceFileName(language: CheckerLanguage): string {
-  switch (language) {
-    case "cpp":
-      return "checker/Main.cpp";
-    case "python":
-      return "checker/Main.py";
-    case "java":
-      return "checker/Main.java";
-    case "javascript":
-      return "checker/Main.js";
-    default:
-      return "checker/Main.txt";
-  }
+export function checkerSourceFileName(language: CheckerLanguage, checkerType?: ProblemPackageCheckerType): string {
+  const extension = { cpp: "cpp", python: "py", java: "java", javascript: "js" }[language];
+  return (checkerType === "interactive" ? "interactor" : "checker") + "/Main." + extension;
 }
 
 function parseConfigGroup(value: unknown, index: number): ParsedConfigGroup {
@@ -392,10 +383,10 @@ export function parseConfig(configJson: unknown): ParsedConfig {
 
   const config = configJson as Record<string, unknown>;
 
-  const checkerType = parseCheckerType(config.checkerType);
+  const checkerType = resolvePackageCheckerType(config);
   let checkerLanguage: CheckerLanguage | null = null;
-  if (checkerType === "special_judge") {
-    checkerLanguage = parseCheckerLanguage(config.checkerLanguage);
+  if (checkerType !== "exact") {
+    checkerLanguage = parseCheckerLanguage(config.interactorLanguage ?? config.checkerLanguage);
   }
 
   const problemSettings: ParsedConfig["problemSettings"] = {};
@@ -479,6 +470,7 @@ export function parseConfig(configJson: unknown): ParsedConfig {
     memoryLimitMb: parsePositiveNumber(config.memoryLimitMb, "config.memoryLimitMb"),
     scoringType,
     checkerType,
+    interactive: checkerType === "interactive" ? parseInteractiveLimits(config.interactive) : undefined,
     checkerLanguage,
     checkerSourceCode: null,
     compareMode: resolveCompareMode(config),
@@ -505,14 +497,14 @@ function parseConfigFromEntry(
   }
 
   const config = parseConfig(parsed);
-  if (config.checkerType !== "special_judge" || !config.checkerLanguage) {
+  if (config.checkerType === "exact" || !config.checkerLanguage) {
     return config;
   }
 
-  const checkerEntry = entryByPath.get(checkerSourceFileName(config.checkerLanguage));
+  const checkerEntry = entryByPath.get(checkerSourceFileName(config.checkerLanguage, config.checkerType));
   if (!checkerEntry) {
     throw new Error(
-      `${checkerSourceFileName(config.checkerLanguage)} is required for special_judge`,
+      `${checkerSourceFileName(config.checkerLanguage, config.checkerType)} is required for special_judge`,
     );
   }
 
@@ -534,6 +526,7 @@ function buildSampleCases(
   configSamples: ParsedConfigSample[],
   entryByPath: ReadonlyMap<string, AdmZip.IZipEntry>,
   sampleIn: ReadonlySet<string>,
+  checkerType?: ProblemPackageCheckerType,
 ): ProblemPackageSampleCase[] {
   const configuredByName = new Map(configSamples.map((sample) => [sample.name, sample]));
   const orderedNames = [
@@ -550,14 +543,16 @@ function buildSampleCases(
       }
       const inEntry = entryByPath.get(samplePath(caseName, "in"));
       const outEntry = entryByPath.get(samplePath(caseName, "out"));
-      if (!inEntry || !outEntry) {
+      const interaction = entryByPath.get(`samples/${caseName}.interaction`);
+      if ((!inEntry || !outEntry) && !(checkerType === "interactive" && interaction)) {
         throw new Error(`samples/${caseName}.in/.out is required`);
       }
       return {
         name: caseName,
         description: configuredByName.get(caseName)?.description ?? "",
-        input: normalizePackageText(inEntry.getData().toString("utf8")),
-        output: normalizePackageText(outEntry.getData().toString("utf8")),
+        input: inEntry ? normalizePackageText(inEntry.getData().toString("utf8")) : "",
+        interaction: interaction ? normalizePackageText(interaction.getData().toString("utf8")) : undefined,
+        output: outEntry ? normalizePackageText(outEntry.getData().toString("utf8")) : "",
       };
     });
 }
@@ -596,7 +591,7 @@ function buildTestGroups(
   for (const [index, groupName] of orderedGroupNames.entries()) {
     const inSet = testIn.get(groupName) ?? new Set<string>();
     const outSet = testOut.get(groupName) ?? new Set<string>();
-    validatePairs(inSet, outSet, `tests/${groupName}`);
+    validatePairs(inSet, outSet, `tests/${groupName}`, config.checkerType);
 
     const configured = configByName.get(groupName);
     const discoveredCases = [...inSet].sort(naturalNameCompare);
@@ -605,13 +600,13 @@ function buildTestGroups(
     const tests = caseNames.map((caseName) => {
       const inEntry = entryByPath.get(casePath(groupName, caseName, "in"));
       const outEntry = entryByPath.get(casePath(groupName, caseName, "out"));
-      if (!inEntry || !outEntry) {
+      if (!inEntry || (!outEntry && config.checkerType !== "interactive")) {
         throw new Error(`tests/${groupName}/${caseName}.in/.out is required by config.groups`);
       }
       return {
         name: caseName,
         input: normalizePackageText(inEntry.getData().toString("utf8")),
-        output: normalizePackageText(outEntry.getData().toString("utf8")),
+        output: outEntry ? normalizePackageText(outEntry.getData().toString("utf8")) : "",
       };
     });
 
@@ -694,6 +689,8 @@ export function validateProblemPackage(
   const testOut = new Map<string, Set<string>>();
 
   for (const filePath of entryByPath.keys()) {
+    const interactionMatch = /^samples\/(.+)\.interaction$/.exec(filePath);
+    if (interactionMatch) { sampleIn.add(interactionMatch[1]); sampleOut.add(interactionMatch[1]); }
     const sampleMatch = /^samples\/(.+)\.(in|out)$/.exec(filePath);
     if (sampleMatch) {
       const [, baseName, extension] = sampleMatch;
@@ -716,15 +713,15 @@ export function validateProblemPackage(
     }
   }
 
-  validatePairs(sampleIn, sampleOut, "samples");
+  const config = parseConfigFromEntry(entryByPath);
+  validatePairs(sampleIn, sampleOut, "samples", config.checkerType);
 
   const groupNames = new Set<string>([...testIn.keys(), ...testOut.keys()]);
   if (groupNames.size === 0) {
     throw new Error("tests/<group-name>/*.in and *.out are required");
   }
 
-  const config = parseConfigFromEntry(entryByPath);
-  const samples = buildSampleCases(config.samples, entryByPath, sampleIn);
+  const samples = buildSampleCases(config.samples, entryByPath, sampleIn, config.checkerType);
   const { groups, warnings: groupWarnings } = buildTestGroups(config, entryByPath, testIn, testOut);
   const warnings = [...config.warnings, ...groupWarnings];
   const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
@@ -742,6 +739,7 @@ export function validateProblemPackage(
       memoryLimitMb: config.memoryLimitMb,
       scoringType: config.scoringType,
       checkerType: config.checkerType,
+      interactive: config.interactive,
       checkerLanguage: config.checkerLanguage,
       compareMode: config.compareMode,
       problem: {
@@ -757,6 +755,7 @@ export function validateProblemPackage(
       samples: samples.map((sample) => ({
         name: sample.name,
         description: sample.description,
+        interaction: sample.interaction,
       })),
       groups: config.groups.map((group) => ({
         name: group.name,
@@ -771,6 +770,7 @@ export function validateProblemPackage(
     validation,
     scoringType: config.scoringType,
     checkerType: config.checkerType,
+    interactive: config.interactive,
     checkerLanguage: config.checkerLanguage,
     checkerSourceCode: config.checkerSourceCode,
     compareMode: config.compareMode,
@@ -859,6 +859,8 @@ function openProblemPackageArchive(
   const testOut = new Map<string, Set<string>>();
 
   for (const filePath of entryByPath.keys()) {
+    const interactionMatch = /^samples\/(.+)\.interaction$/.exec(filePath);
+    if (interactionMatch) { sampleIn.add(interactionMatch[1]); sampleOut.add(interactionMatch[1]); }
     const sampleMatch = /^samples\/(.+)\.(in|out)$/.exec(filePath);
     if (sampleMatch) {
       const [, baseName, extension] = sampleMatch;
@@ -881,7 +883,8 @@ function openProblemPackageArchive(
     }
   }
 
-  validatePairs(sampleIn, sampleOut, "samples");
+  const config = parseConfigFromEntry(entryByPath);
+  validatePairs(sampleIn, sampleOut, "samples", config.checkerType);
 
   const groupNames = new Set<string>([...testIn.keys(), ...testOut.keys()]);
   if (groupNames.size === 0) {
@@ -893,7 +896,7 @@ function openProblemPackageArchive(
     zipBuffer,
     files,
     entryByPath,
-    config: parseConfigFromEntry(entryByPath),
+    config,
     sampleIn,
     sampleOut,
     testIn,
@@ -934,7 +937,7 @@ function buildTestGroupDraftManifest(
   for (const [groupIndex, groupName] of orderedGroupNames.entries()) {
     const inSet = testIn.get(groupName) ?? new Set<string>();
     const outSet = testOut.get(groupName) ?? new Set<string>();
-    validatePairs(inSet, outSet, `tests/${groupName}`);
+    validatePairs(inSet, outSet, `tests/${groupName}`, config.checkerType);
 
     const configured = configByName.get(groupName);
     const discoveredCases = [...inSet].sort(naturalNameCompare);
@@ -962,11 +965,12 @@ export function buildEditorDraftManifestFromZip(
   zipBuffer: Buffer,
 ): ProblemPackageEditorDraft {
   const archive = openProblemPackageArchive(fileName, zipBuffer);
-  const samples = buildSampleCases(archive.config.samples, archive.entryByPath, archive.sampleIn).map(
+  const samples = buildSampleCases(archive.config.samples, archive.entryByPath, archive.sampleIn, archive.config.checkerType).map(
     (sample, sampleIndex): ProblemPackageEditorSampleCase => ({
       id: `sample-${sampleIndex + 1}`,
       name: sample.name,
       description: sample.description,
+      interaction: sample.interaction,
       input: sample.input,
       output: sample.output,
     }),
@@ -980,6 +984,7 @@ export function buildEditorDraftManifestFromZip(
   return {
     sourceLabel: fileName,
     checkerType: archive.config.checkerType,
+    interactive: archive.config.interactive,
     checkerLanguage: archive.config.checkerLanguage ?? "python",
     checkerSourceCode: archive.config.checkerSourceCode ?? "",
     compareMode: archive.config.compareMode,
@@ -1001,6 +1006,7 @@ export function inspectProblemPackageManifestFromZip(
     archive.config.samples,
     archive.entryByPath,
     archive.sampleIn,
+    archive.config.checkerType,
   );
   const { groups, warnings: groupWarnings } = buildTestGroupDraftManifest(
     archive.config,
@@ -1024,6 +1030,7 @@ export function inspectProblemPackageManifestFromZip(
         memoryLimitMb: archive.config.memoryLimitMb,
         scoringType: archive.config.scoringType,
         checkerType: archive.config.checkerType,
+        interactive: archive.config.interactive,
         checkerLanguage: archive.config.checkerLanguage,
         compareMode: archive.config.compareMode,
         problem: {
@@ -1039,6 +1046,7 @@ export function inspectProblemPackageManifestFromZip(
         samples: sampleCases.map((sample) => ({
           name: sample.name,
           description: sample.description,
+          interaction: sample.interaction,
         })),
         groups: groups.map((group) => ({
           name: group.name,
@@ -1050,6 +1058,7 @@ export function inspectProblemPackageManifestFromZip(
     },
     scoringType: archive.config.scoringType,
     checkerType: archive.config.checkerType,
+    interactive: archive.config.interactive,
     checkerLanguage: archive.config.checkerLanguage,
     compareMode: archive.config.compareMode,
     sampleCases,
@@ -1073,14 +1082,14 @@ export function readProblemPackageTestCaseFromZip(
 
   const inEntry = archive.entryByPath.get(casePath(normalizedGroupName, normalizedCaseName, "in"));
   const outEntry = archive.entryByPath.get(casePath(normalizedGroupName, normalizedCaseName, "out"));
-  if (!inEntry || !outEntry) {
+  if (!inEntry || (!outEntry && archive.config.checkerType !== "interactive")) {
     throw new Error(`tests/${normalizedGroupName}/${normalizedCaseName}.in/.out is required`);
   }
 
   return {
     name: normalizedCaseName,
     input: normalizePackageText(inEntry.getData().toString("utf8")),
-    output: normalizePackageText(outEntry.getData().toString("utf8")),
+    output: outEntry ? normalizePackageText(outEntry.getData().toString("utf8")) : "",
   };
 }
 
@@ -1240,6 +1249,7 @@ export function buildEditorDraftFromExtracted(
   return {
     sourceLabel: extracted.validation.fileName,
     checkerType: extracted.checkerType,
+    interactive: extracted.interactive,
     checkerLanguage: extracted.checkerLanguage ?? "python",
     checkerSourceCode: extracted.checkerSourceCode ?? "",
     compareMode: extracted.compareMode,
@@ -1250,6 +1260,7 @@ export function buildEditorDraftFromExtracted(
       id: `sample-${sampleIndex + 1}`,
       name: sample.name,
       description: sample.description,
+      interaction: sample.interaction,
       input: sample.input,
       output: sample.output,
     })),
@@ -1272,6 +1283,7 @@ export function buildEditorDraftFromExtracted(
 export function buildProblemPackageFromEditorDraft(input: {
   sourceLabel?: string;
   checkerType?: ProblemPackageCheckerType;
+  interactive?: InteractiveLimits;
   checkerLanguage?: CheckerLanguage;
   checkerSourceCode?: string;
   timeLimitMs: number;
@@ -1339,12 +1351,12 @@ export function buildProblemPackageFromEditorDraft(input: {
 
   const scoringType = buildScoringTypeFromEditorGroups(groups);
   const checkerType = input.checkerType ?? "exact";
-  const checkerLanguage = checkerType === "special_judge" ? input.checkerLanguage ?? "python" : null;
+  const checkerLanguage = checkerType !== "exact" ? input.checkerLanguage ?? "python" : null;
   const checkerSourceCode =
-    checkerType === "special_judge"
+    checkerType !== "exact"
       ? normalizePackageText((input.checkerSourceCode ?? "").trim())
       : null;
-  if (checkerType === "special_judge" && !checkerSourceCode) {
+  if (checkerType !== "exact" && !checkerSourceCode) {
     throw new Error("checker source code is required for special judge");
   }
   const seenSampleNames = new Set<string>();
@@ -1364,6 +1376,7 @@ export function buildProblemPackageFromEditorDraft(input: {
             typeof sample.description === "string"
               ? normalizePackageText(sample.description)
               : "",
+          interaction: typeof sample.interaction === "string" ? normalizePackageText(sample.interaction) : undefined,
           input: normalizePackageText(sample.input),
           output: normalizePackageText(sample.output),
         };
@@ -1374,7 +1387,7 @@ export function buildProblemPackageFromEditorDraft(input: {
   const fileName = input.sourceLabel?.trim() || "manual-package";
   const zipSizeBytes = parseNonNegativeInteger(input.zipSizeBytes ?? 0, "zipSizeBytes");
   const totalTestPairs = groups.reduce((acc, group) => acc + group.tests.length, 0);
-  const computedFileCount = 2 + (samples.length + totalTestPairs) * 2 + (checkerType === "special_judge" ? 1 : 0);
+  const computedFileCount = 2 + (samples.length + totalTestPairs) * 2 + (checkerType !== "exact" ? 1 : 0);
   const requestedFileCount =
     input.fileCount === undefined || input.fileCount === null || input.fileCount <= 0
       ? computedFileCount
@@ -1398,6 +1411,7 @@ export function buildProblemPackageFromEditorDraft(input: {
         memoryLimitMb,
         scoringType,
         checkerType,
+    interactive: checkerType === "interactive" ? parseInteractiveLimits(input.interactive) : undefined,
         checkerLanguage,
         compareMode,
         problem: {
@@ -1410,6 +1424,7 @@ export function buildProblemPackageFromEditorDraft(input: {
         samples: samples.map((sample) => ({
           name: sample.name,
           description: sample.description,
+          interaction: sample.interaction,
         })),
         groups: groups.map((group) => ({
           name: group.name,
@@ -1421,6 +1436,7 @@ export function buildProblemPackageFromEditorDraft(input: {
     },
     scoringType,
     checkerType,
+    interactive: checkerType === "interactive" ? parseInteractiveLimits(input.interactive) : undefined,
     checkerLanguage,
     checkerSourceCode,
     compareMode,
@@ -1507,6 +1523,7 @@ export function buildProblemPackageZip(input: {
   const extracted = buildProblemPackageFromEditorDraft({
     sourceLabel: input.draft.sourceLabel,
     checkerType: input.draft.checkerType,
+    interactive: input.draft.interactive,
     checkerLanguage: input.draft.checkerLanguage,
     checkerSourceCode: input.draft.checkerSourceCode,
     compareMode: input.draft.compareMode,
@@ -1523,7 +1540,10 @@ export function buildProblemPackageZip(input: {
     timeLimitMs: input.timeLimitMs,
     memoryLimitMb: input.memoryLimitMb,
     scoringType: extracted.scoringType,
+    judgeType: extracted.checkerType === "interactive" ? "interactive" : "batch",
+    interactorLanguage: extracted.checkerType === "interactive" ? extracted.checkerLanguage : undefined,
     checkerType: extracted.checkerType,
+    interactive: extracted.interactive,
     checkerLanguage: extracted.checkerLanguage,
     compareMode: extracted.compareMode,
     problem: {
@@ -1536,6 +1556,7 @@ export function buildProblemPackageZip(input: {
     samples: extracted.samples.map((sample) => ({
       name: sample.name,
       description: sample.description,
+      interaction: sample.interaction,
     })),
     groups: extracted.groups.map((group) =>
       extracted.scoringType === "sum_of_groups"
@@ -1565,6 +1586,9 @@ export function buildProblemPackageZip(input: {
   zip.addFile("config.json", Buffer.from(`${JSON.stringify(config, null, 2)}\n`, "utf8"));
 
   for (const sample of extracted.samples) {
+    if (extracted.checkerType === "interactive" && sample.interaction !== undefined) {
+      zip.addFile(`samples/${sample.name}.interaction`, Buffer.from(sample.interaction, "utf8"));
+    }
     zip.addFile(`samples/${sample.name}.in`, Buffer.from(sample.input, "utf8"));
     zip.addFile(`samples/${sample.name}.out`, Buffer.from(sample.output, "utf8"));
   }
@@ -1572,17 +1596,17 @@ export function buildProblemPackageZip(input: {
   for (const group of extracted.groups) {
     for (const testCase of group.tests) {
       zip.addFile(`tests/${group.name}/${testCase.name}.in`, Buffer.from(testCase.input, "utf8"));
-      zip.addFile(`tests/${group.name}/${testCase.name}.out`, Buffer.from(testCase.output, "utf8"));
+      if (extracted.checkerType !== "interactive") zip.addFile(`tests/${group.name}/${testCase.name}.out`, Buffer.from(testCase.output, "utf8"));
     }
   }
 
   if (
-    extracted.checkerType === "special_judge" &&
+    extracted.checkerType !== "exact" &&
     extracted.checkerLanguage &&
     extracted.checkerSourceCode
   ) {
     zip.addFile(
-      checkerSourceFileName(extracted.checkerLanguage),
+      checkerSourceFileName(extracted.checkerLanguage, extracted.checkerType),
       Buffer.from(extracted.checkerSourceCode, "utf8"),
     );
   }

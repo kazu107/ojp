@@ -7,7 +7,7 @@ import {
 
 export type ProblemPackageScoringType = "binary" | "sum_of_groups";
 export type ProblemPackageCompareMode = "exact" | "ignore_trailing_spaces";
-export type ProblemPackageCheckerType = "exact" | "special_judge";
+export type ProblemPackageCheckerType = "exact" | "special_judge" | "interactive";
 
 export interface ProblemPackageEditorTestCase {
   id: string;
@@ -20,6 +20,7 @@ export interface ProblemPackageEditorTestCase {
 export interface ProblemPackageEditorSampleCase
   extends ProblemPackageEditorTestCase {
   description: string;
+  interaction?: string;
 }
 
 export interface ProblemPackageEditorGroup {
@@ -30,6 +31,7 @@ export interface ProblemPackageEditorGroup {
 }
 
 export interface ProblemPackageEditorDraft {
+  interactive?: import("./interactive-config").InteractiveLimits;
   sourceLabel: string;
   checkerType: ProblemPackageCheckerType;
   checkerLanguage: CheckerLanguage;
@@ -72,6 +74,7 @@ export interface ProblemPackageInspectResult {
       memoryLimitMb: number;
       scoringType: ProblemPackageScoringType;
       checkerType: ProblemPackageCheckerType;
+      interactive?: import("./interactive-config").InteractiveLimits;
       checkerLanguage: CheckerLanguage | null;
       compareMode: ProblemPackageCompareMode;
       problem: {

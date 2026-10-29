@@ -14,6 +14,7 @@ interface SubmissionFormProps {
   problemId: string;
   contestId?: string | null;
   virtualParticipationId?: string | null;
+  interactive?: boolean;
 }
 
 
@@ -23,6 +24,7 @@ export function SubmissionForm({
   problemId,
   contestId = null,
   virtualParticipationId = null,
+  interactive = false,
 }: SubmissionFormProps) {
   const { t } = useI18n();
   const router = useRouter();
@@ -71,6 +73,7 @@ export function SubmissionForm({
 
   return (
     <form className="form" onSubmit={onSubmit}>
+      {interactive ? <p className="badge badge-blue">{t("This is an interactive problem. Flush every query and read responses incrementally; do not wait for EOF.")}</p> : null}
       <label className="field">
         <span className="field-label">{t("Language")}</span>
         <select

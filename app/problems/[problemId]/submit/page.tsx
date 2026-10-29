@@ -58,6 +58,7 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
 
       <section className="panel">
         <SubmissionForm
+          interactive={problem.judgeType === "interactive"}
           problemId={problem.id}
           contestId={contest?.id ?? null}
           virtualParticipationId={virtualParticipationId ?? null}

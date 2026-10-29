@@ -7,6 +7,8 @@ import {
   CHECKER_SOURCE_TEMPLATES,
   isDefaultCheckerSourceTemplate,
 } from "@/lib/checker-source-templates";
+import { INTERACTOR_SOURCE_TEMPLATES, isDefaultInteractorTemplate } from "@/lib/interactor-source-templates";
+import { DEFAULT_INTERACTIVE_LIMITS } from "@/lib/interactive-config";
 import { CodeEditor } from "@/components/code-editor";
 import {
   ProblemPackageCompareMode,
@@ -81,7 +83,7 @@ function scoreSummary(draft: ProblemPackageEditorDraft, t: Translator): {
 }
 
 function shouldReplaceCheckerSource(code: string): boolean {
-  return code.trim().length === 0 || isDefaultCheckerSourceTemplate(code);
+  return code.trim().length === 0 || isDefaultCheckerSourceTemplate(code) || isDefaultInteractorTemplate(code);
 }
 
 export function ProblemPackageDraftEditor({
@@ -104,9 +106,9 @@ export function ProblemPackageDraftEditor({
   const displayedFileCount =
     draft.fileCount > 0
       ? draft.fileCount
-      : 2 + (totalSamples + totalCases) * 2 + (draft.checkerType === "special_judge" ? 1 : 0);
+      : 2 + (totalSamples + totalCases) * 2 + (draft.checkerType !== "exact" ? 1 : 0);
   const outputLabel =
-    draft.checkerType === "special_judge" ? "Reference Output" : "Expected Output";
+    draft.checkerType !== "exact" ? "Reference Output" : "Expected Output";
 
   function patchDraft(
     updater: (current: ProblemPackageEditorDraft) => ProblemPackageEditorDraft,
@@ -295,20 +297,21 @@ export function ProblemPackageDraftEditor({
                 ...current,
                 checkerType: event.target.value as ProblemPackageCheckerType,
                 checkerSourceCode:
-                  event.target.value === "special_judge" &&
+                  event.target.value !== "exact" &&
                   shouldReplaceCheckerSource(current.checkerSourceCode)
-                    ? CHECKER_SOURCE_TEMPLATES[current.checkerLanguage]
+                    ? (event.target.value === "interactive" ? INTERACTOR_SOURCE_TEMPLATES : CHECKER_SOURCE_TEMPLATES)[current.checkerLanguage]
                     : current.checkerSourceCode,
               }))
             }
           >
             <option value="exact">{t("exact")}</option>
             <option value="special_judge">{t("special_judge")}</option>
+            <option value="interactive">{t("Interactive")}</option>
           </select>
         </label>
-        {draft.checkerType === "special_judge" ? (
+        {draft.checkerType !== "exact" ? (
           <label className="field">
-            <span className="field-label">{t("Checker Language")}</span>
+            <span className="field-label">{draft.checkerType === "interactive" ? t("Interactor Language") : t("Checker Language")}</span>
             <select
               className="select"
               value={draft.checkerLanguage}
@@ -319,7 +322,7 @@ export function ProblemPackageDraftEditor({
                     ...current,
                     checkerLanguage: nextLanguage,
                     checkerSourceCode: shouldReplaceCheckerSource(current.checkerSourceCode)
-                      ? CHECKER_SOURCE_TEMPLATES[nextLanguage]
+                      ? (current.checkerType === "interactive" ? INTERACTOR_SOURCE_TEMPLATES : CHECKER_SOURCE_TEMPLATES)[nextLanguage]
                       : current.checkerSourceCode,
                   };
                 })
@@ -348,7 +351,7 @@ export function ProblemPackageDraftEditor({
           <select
             className="select"
             value={draft.compareMode}
-            disabled={draft.checkerType === "special_judge"}
+            disabled={draft.checkerType !== "exact"}
             onChange={(event) =>
               patchDraft((current) => ({
                 ...current,
@@ -362,12 +365,12 @@ export function ProblemPackageDraftEditor({
         </label>
       </div>
 
-      {draft.checkerType === "special_judge" ? (
+      {draft.checkerType !== "exact" ? (
         <div className="stack">
           <p className="text-soft">
-            {t("Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error.")}</p>
+            {draft.checkerType === "interactive" ? t("Interactor receives the private input path as argv[1]. Communicate over stdin/stdout and flush each response. Exit 0 for AC, 1 for WA, otherwise IE.") : t("Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error.")}</p>
           <div className="field">
-            <span className="field-label">{t("Checker Source Code")}</span>
+            <span className="field-label">{draft.checkerType === "interactive" ? t("Interactor Source Code") : t("Checker Source Code")}</span>
             <CodeEditor
               language={draft.checkerLanguage}
               minHeight={220}
@@ -393,6 +396,22 @@ export function ProblemPackageDraftEditor({
       {draft.isPartial ? (
         <p className="text-soft">
           {t("Large existing packages are loaded lazily. Test case contents are fetched only when selected, and names stay read-only until all cases are loaded.")}</p>
+      ) : null}
+
+      {draft.checkerType === "interactive" ? (
+        <div className="form-grid">
+          {(["idleTimeLimitMs", "wallTimeLimitMs", "interactorTimeLimitMs"] as const).map((key) => (
+            <label key={key} className="field">
+              <span className="field-label">{t(key)}</span>
+              <input className="input" type="number" min={100} max={300000} step={100}
+                value={(draft.interactive ?? DEFAULT_INTERACTIVE_LIMITS)[key]}
+                onChange={(event) => patchDraft((current) => ({ ...current, interactive: {
+                  ...DEFAULT_INTERACTIVE_LIMITS, ...current.interactive, [key]: Number(event.target.value),
+                } }))} />
+            </label>
+          ))}
+          <p className="text-soft">{t("Private test inputs are only sent to the interactor. Expected output files are not required.")}</p>
+        </div>
       ) : null}
 
       {draft.warnings.length > 0 ? (
@@ -488,6 +507,17 @@ export function ProblemPackageDraftEditor({
                 />
               </label>
 
+              {draft.checkerType === "interactive" ? (
+                <label className="field">
+                  <span className="field-label">{t("Sample Interaction")}</span>
+                  <textarea className="textarea" value={sample.interaction ?? ""}
+                    placeholder={t("Use < for interactor output and > for submission output.")}
+                    onChange={(event) => patchDraft((current) => ({ ...current,
+                      samples: current.samples.map((item, index) => index === sampleIndex
+                        ? { ...item, interaction: event.target.value } : item),
+                    }))} />
+                </label>
+              ) : (
               <div className="form-grid">
                 <label className="field">
                   <span className="field-label">{t("Sample Input")}</span>
@@ -530,6 +560,7 @@ export function ProblemPackageDraftEditor({
                   />
                 </label>
               </div>
+              )}
             </article>
           ))
         )}
@@ -734,7 +765,7 @@ export function ProblemPackageDraftEditor({
 
                     <div className="form-grid">
                       <label className="field">
-                        <span className="field-label">{t("Input")}</span>
+                        <span className="field-label">{draft.checkerType === "interactive" ? t("Private Test Data") : t("Input")}</span>
                         <textarea
                           className="textarea"
                           value={activeCase.input}
@@ -761,6 +792,7 @@ export function ProblemPackageDraftEditor({
                           }
                         />
                       </label>
+                      {draft.checkerType !== "interactive" ? (
                       <label className="field">
                         <span className="field-label">{t(outputLabel)}</span>
                         <textarea
@@ -789,6 +821,7 @@ export function ProblemPackageDraftEditor({
                           }
                         />
                       </label>
+                      ) : null}
                     </div>
                   </article>
                 ) : null}

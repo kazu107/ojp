@@ -1,3 +1,4 @@
+import { parseInteractiveLimits } from "./interactive-config";
 import JSZip from "jszip";
 import {
   ExplanationVisibility,
@@ -23,18 +24,18 @@ interface ProblemPackageClientZipInput {
   draft: ProblemPackageEditorDraft;
 }
 
-function checkerSourceFileName(language: ProblemPackageEditorDraft["checkerLanguage"]): string {
+function checkerSourceFileName(language: ProblemPackageEditorDraft["checkerLanguage"], interactive: boolean): string {
   switch (language) {
     case "cpp":
-      return "checker/Main.cpp";
+      return (interactive ? "interactor" : "checker") + "/Main.cpp";
     case "python":
-      return "checker/Main.py";
+      return (interactive ? "interactor" : "checker") + "/Main.py";
     case "java":
-      return "checker/Main.java";
+      return (interactive ? "interactor" : "checker") + "/Main.java";
     case "javascript":
-      return "checker/Main.js";
+      return (interactive ? "interactor" : "checker") + "/Main.js";
     default:
-      return "checker/Main.txt";
+      return (interactive ? "interactor" : "checker") + "/Main.txt";
   }
 }
 
@@ -71,8 +72,11 @@ function buildConfig(input: ProblemPackageClientZipInput) {
     memoryLimitMb: input.memoryLimitMb,
     scoringType: hasPartialScores(input.draft) ? "sum_of_groups" : "binary",
     checkerType: input.draft.checkerType,
+    judgeType: input.draft.checkerType === "interactive" ? "interactive" : "batch",
+    interactorLanguage: input.draft.checkerType === "interactive" ? input.draft.checkerLanguage : undefined,
+    interactive: input.draft.checkerType === "interactive" ? parseInteractiveLimits(input.draft.interactive) : undefined,
     checkerLanguage:
-      input.draft.checkerType === "special_judge" ? input.draft.checkerLanguage : null,
+      input.draft.checkerType !== "exact" ? input.draft.checkerLanguage : null,
     compareMode: input.draft.compareMode,
     problem: {
       slug: input.slug,
@@ -104,6 +108,7 @@ export async function buildProblemPackageZipBlob(
   zip.file("config.json", `${JSON.stringify(buildConfig(input), null, 2)}\n`);
 
   for (const sample of input.draft.samples) {
+    if (input.draft.checkerType === "interactive" && sample.interaction !== undefined) zip.file(`samples/${sample.name}.interaction`, sample.interaction);
     zip.file(`samples/${sample.name}.in`, sample.input);
     zip.file(`samples/${sample.name}.out`, sample.output);
   }
@@ -111,13 +116,13 @@ export async function buildProblemPackageZipBlob(
   for (const group of input.draft.groups) {
     for (const testCase of group.tests) {
       zip.file(`tests/${group.name}/${testCase.name}.in`, testCase.input);
-      zip.file(`tests/${group.name}/${testCase.name}.out`, testCase.output);
+      if (input.draft.checkerType !== "interactive") zip.file(`tests/${group.name}/${testCase.name}.out`, testCase.output);
     }
   }
 
-  if (input.draft.checkerType === "special_judge" && input.draft.checkerSourceCode.trim()) {
+  if (input.draft.checkerType !== "exact" && input.draft.checkerSourceCode.trim()) {
     zip.file(
-      checkerSourceFileName(input.draft.checkerLanguage),
+      checkerSourceFileName(input.draft.checkerLanguage, input.draft.checkerType === "interactive"),
       input.draft.checkerSourceCode,
     );
   }

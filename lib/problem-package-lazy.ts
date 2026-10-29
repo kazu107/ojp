@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -159,8 +159,24 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
     ref: input.ref,
     fileName: input.fileName,
   });
-  const zipFile = await openZipFile(zipFilePath);
+  return openLazyPackage({ fileName: input.fileName, sizeBytes: input.ref.sizeBytes, zipFilePath, cleanupTempDir });
+}
 
+export async function createLazyProblemPackageSourceFromBuffer(fileName: string, buffer: Buffer): Promise<LazyProblemPackageSource> {
+  if (buffer.length > MAX_ZIP_BYTES) throw new Error("zip size exceeds limit");
+  const directory = await mkdtemp(path.join(os.tmpdir(), "ojp-package-test-"));
+  const zipFilePath = path.join(directory, "package.zip");
+  await writeFile(zipFilePath, buffer);
+  return openLazyPackage({ fileName, sizeBytes: buffer.length, zipFilePath,
+    cleanupTempDir: () => rm(directory, { recursive: true, force: true }),
+  });
+}
+
+async function openLazyPackage(input: { fileName: string; sizeBytes: number; zipFilePath: string; cleanupTempDir: () => Promise<void> }): Promise<LazyProblemPackageSource> {
+  const { zipFilePath, cleanupTempDir } = input;
+  let zipFile: yauzl.ZipFile;
+  try { zipFile = await openZipFile(zipFilePath); }
+  catch (error) { await cleanupTempDir(); throw error; }
   try {
     const files: yauzl.Entry[] = [];
     const entryByPath = new Map<string, yauzl.Entry>();
@@ -210,6 +226,8 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
         }
         entryByPath.set(normalizedPath, entry);
 
+        const interactionMatch = /^samples\/(.+)\.interaction$/.exec(normalizedPath);
+        if (interactionMatch) { sampleIn.add(interactionMatch[1]); sampleOut.add(interactionMatch[1]); }
         const sampleMatch = /^samples\/(.+)\.(in|out)$/.exec(normalizedPath);
         if (sampleMatch) {
           const [, baseName, extension] = sampleMatch;
@@ -246,13 +264,12 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
       throw new Error("config.json is required");
     }
 
-    validatePairs(sampleIn, sampleOut, "samples");
+    const config = parseConfig(JSON.parse(await readEntryString(zipFile, configEntry)) as unknown);
+    validatePairs(sampleIn, sampleOut, "samples", config.checkerType);
     const allGroupNames = new Set<string>([...testIn.keys(), ...testOut.keys()]);
     if (allGroupNames.size === 0) {
       throw new Error("tests/<group-name>/*.in and *.out are required");
     }
-
-    const config = parseConfig(JSON.parse(await readEntryString(zipFile, configEntry)) as unknown);
 
     const configuredSampleByName = new Map(config.samples.map((sample) => [sample.name, sample]));
     const orderedSampleNames = [
@@ -266,14 +283,16 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
       }
       const inEntry = entryByPath.get(`samples/${caseName}.in`);
       const outEntry = entryByPath.get(`samples/${caseName}.out`);
-      if (!inEntry || !outEntry) {
+      const interaction = entryByPath.get(`samples/${caseName}.interaction`);
+      if ((!inEntry || !outEntry) && !(config.checkerType === "interactive" && interaction)) {
         throw new Error(`samples/${caseName}.in/.out is required`);
       }
       sampleCases.push({
         name: caseName,
         description: configuredSampleByName.get(caseName)?.description ?? "",
-        input: await readEntryString(zipFile, inEntry),
-        output: await readEntryString(zipFile, outEntry),
+        input: inEntry ? await readEntryString(zipFile, inEntry) : "",
+        interaction: interaction ? await readEntryString(zipFile, interaction) : undefined,
+        output: outEntry ? await readEntryString(zipFile, outEntry) : "",
       });
     }
 
@@ -300,7 +319,7 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
     for (const [index, groupName] of orderedGroupNames.entries()) {
       const inSet = testIn.get(groupName) ?? new Set<string>();
       const outSet = testOut.get(groupName) ?? new Set<string>();
-      validatePairs(inSet, outSet, `tests/${groupName}`);
+      validatePairs(inSet, outSet, `tests/${groupName}`, config.checkerType);
       const configured = configByName.get(groupName);
       const discoveredCases = [...inSet].sort(naturalNameCompare);
       const caseNames = configured && configured.tests.length > 0 ? configured.tests : discoveredCases;
@@ -314,10 +333,10 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
 
     const testsByGroupName = new Map(groups.map((group) => [group.name, group.caseNames.length]));
     let checkerSourceCode: string | null = null;
-    if (config.checkerType === "special_judge" && config.checkerLanguage) {
-      const checkerEntry = entryByPath.get(checkerSourceFileName(config.checkerLanguage));
+    if (config.checkerType !== "exact" && config.checkerLanguage) {
+      const checkerEntry = entryByPath.get(checkerSourceFileName(config.checkerLanguage, config.checkerType));
       if (!checkerEntry) {
-        throw new Error(`${checkerSourceFileName(config.checkerLanguage)} is required for special_judge`);
+        throw new Error(`${checkerSourceFileName(config.checkerLanguage, config.checkerType)} is required for special_judge`);
       }
       checkerSourceCode = await readEntryString(zipFile, checkerEntry);
     }
@@ -326,7 +345,7 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
       manifest: {
         validation: {
           fileName: input.fileName,
-          zipSizeBytes: input.ref.sizeBytes,
+          zipSizeBytes: input.sizeBytes,
           fileCount: files.length,
           samplePairs: sampleCases.length,
           testGroupCount: groups.length,
@@ -336,6 +355,7 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
             memoryLimitMb: config.memoryLimitMb,
             scoringType: config.scoringType,
             checkerType: config.checkerType,
+            interactive: config.interactive,
             checkerLanguage: config.checkerLanguage,
             compareMode: config.compareMode,
             problem: {
@@ -362,6 +382,7 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
         },
         scoringType: config.scoringType,
         checkerType: config.checkerType,
+        interactive: config.interactive,
         checkerLanguage: config.checkerLanguage,
         compareMode: config.compareMode,
         sampleCases,
@@ -371,19 +392,19 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
       readTestCase: async (groupName: string, caseName: string) => {
         const inEntry = entryByPath.get(`tests/${groupName}/${caseName}.in`);
         const outEntry = entryByPath.get(`tests/${groupName}/${caseName}.out`);
-        if (!inEntry || !outEntry) {
+        if (!inEntry || (!outEntry && config.checkerType !== "interactive")) {
           throw new Error(`tests/${groupName}/${caseName}.in/.out is required`);
         }
         return {
           name: caseName,
           input: await readEntryString(zipFile, inEntry),
-          output: await readEntryString(zipFile, outEntry),
+          output: outEntry ? await readEntryString(zipFile, outEntry) : "",
         };
       },
       materializeTestCaseFiles: async (groupName: string, caseName: string, targetDir: string) => {
         const inEntry = entryByPath.get(`tests/${groupName}/${caseName}.in`);
         const outEntry = entryByPath.get(`tests/${groupName}/${caseName}.out`);
-        if (!inEntry || !outEntry) {
+        if (!inEntry || (!outEntry && config.checkerType !== "interactive")) {
           throw new Error(`tests/${groupName}/${caseName}.in/.out is required`);
         }
 
@@ -391,7 +412,8 @@ export async function createLazyProblemPackageSourceFromStorageRef(input: {
         const inputPath = path.join(targetDir, "input.txt");
         const outputPath = path.join(targetDir, "answer.txt");
         await writeEntryToFile(zipFile, inEntry, inputPath);
-        await writeEntryToFile(zipFile, outEntry, outputPath);
+        if (outEntry) await writeEntryToFile(zipFile, outEntry, outputPath);
+        else await writeFile(outputPath, "");
 
         return {
           name: caseName,

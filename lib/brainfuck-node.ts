@@ -14,6 +14,7 @@ function flush() {
   outputLength = 0;
 }
 function readByte() {
+  if (process.argv.includes("--interactive")) flush();
   if (readPosition === readLength) {
     readLength = fs.readSync(0, input, 0, input.length, null);
     readPosition = 0;
@@ -23,7 +24,7 @@ function readByte() {
 }
 function writeByte(value) {
   output[outputLength++] = value;
-  if (outputLength === output.length) flush();
+  if (outputLength === output.length || (value === 10 && process.argv.includes("--interactive"))) flush();
 }
 try {
   runBrainfuck(fs.readFileSync(process.argv[2], "utf8"), readByte, writeByte, process.argv[3] === "--check");

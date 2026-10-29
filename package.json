@@ -37,7 +37,11 @@
     "db:brainfuck": "node scripts/prisma-with-default-db-url.mjs db execute --schema prisma/schema.prisma --file prisma/brainfuck-schema.sql",
     "test:brainfuck": "tsx --test tests/brainfuck.test.ts tests/brainfuck-ui.test.tsx",
     "db:competitive-languages": "node scripts/prisma-with-default-db-url.mjs db execute --schema prisma/schema.prisma --file prisma/competitive-languages-schema.sql",
-    "test:languages": "tsx --test tests/competitive-languages.test.ts tests/language-ui.test.tsx"
+    "test:languages": "tsx --test tests/competitive-languages.test.ts tests/language-ui.test.tsx",
+    "db:interactive": "node scripts/prisma-with-default-db-url.mjs db execute --schema prisma/schema.prisma --file prisma/interactive-schema.sql",
+    "test:interactive": "tsx --test tests/interactive.test.ts tests/interactive-package.test.ts tests/interactive-ui.test.tsx",
+    "template:interactive-zip": "tsx scripts/create-interactive-package-template.ts",
+    "test:interactive:db": "tsx --test tests/interactive-db.integration.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1008.0",

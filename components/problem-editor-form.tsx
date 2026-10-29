@@ -1,4 +1,5 @@
 "use client";
+import { InteractionLog } from "@/components/interaction-log";
 import { useI18n } from "@/components/i18n-provider";
 
 
@@ -1402,7 +1403,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                                 </td>
                                 <td>{result.timeMs} {t(" ms")}</td>
                                 <td>{result.memoryKb} {t(" KB")}</td>
-                                <td>{t(result.message)}</td>
+                                <td>{t(result.message)}<InteractionLog text={result.interactionLog} /></td>
                               </tr>
                             ))}
                           </tbody>

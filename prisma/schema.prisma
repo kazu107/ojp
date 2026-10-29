@@ -306,6 +306,7 @@ model SubmissionRuntimeState {
 }
 
 model SubmissionRuntimeTestResult {
+  interactionLog String?
   id           String           @id
   submissionId String
   orderIndex   Int

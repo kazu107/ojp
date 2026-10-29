@@ -1,6 +1,6 @@
 import { closeSync, existsSync, openSync } from "node:fs";
 import { chmod, lstat, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -43,6 +43,9 @@ export interface JudgeCommandOptions {
   processLimit?: number;
   workspaceLimitBytes?: number;
   readOnlyFiles?: JudgeReadOnlyFile[];
+  onStart?: (child: ChildProcess) => void;
+  signal?: AbortSignal;
+  cpuTimeLimitMs?: number;
 }
 
 function configuredLimit(name: string, fallback: number, maximum: number): number {
@@ -95,13 +98,24 @@ function terminateProcessTree(child: ChildProcess): void {
 interface ProcessUsage {
   memoryKb: number;
   processes: number;
+  cpuMs: number;
 }
 
-async function readProcessTreeUsage(rootPid: number): Promise<ProcessUsage> {
+let clockTicks: number | undefined;
+function linuxClockTicks(): number {
+  clockTicks ??= Number(execFileSync("/usr/bin/getconf", ["CLK_TCK"], {
+    encoding: "utf8", env: { NODE_ENV: "production", PATH: "/usr/bin:/bin" },
+  }).trim());
+  if (!Number.isFinite(clockTicks) || clockTicks <= 0) throw new Error("invalid Linux clock tick rate");
+  return clockTicks;
+}
+
+async function readProcessTreeUsage(rootPid: number, captureCpu: boolean): Promise<ProcessUsage> {
   const pending = [rootPid];
   const seen = new Set<number>();
   let memoryKb = 0;
   let processes = 0;
+  let cpuTicks = 0;
   while (pending.length > 0 && seen.size < 2048) {
     const pid = pending.pop()!;
     if (seen.has(pid)) continue;
@@ -110,13 +124,18 @@ async function readProcessTreeUsage(rootPid: number): Promise<ProcessUsage> {
       const status = await readFile(`/proc/${pid}/status`, "utf8");
       memoryKb += Number(status.match(/^VmRSS:\s+(\d+)/m)?.[1] ?? 0);
       processes += Number(status.match(/^Threads:\s+(\d+)/m)?.[1] ?? 1);
+      if (captureCpu) {
+        const procStat = await readFile(`/proc/${pid}/stat`, "utf8");
+        const fields = procStat.slice(procStat.lastIndexOf(")") + 2).split(" ");
+        cpuTicks += [11, 12, 13, 14].reduce((sum, index) => sum + Number(fields[index] ?? 0), 0);
+      }
       const children = await readFile(`/proc/${pid}/task/${pid}/children`, "utf8");
       pending.push(...children.trim().split(/\s+/).filter(Boolean).map(Number));
     } catch (error) {
       if (!["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
     }
   }
-  return { memoryKb, processes };
+  return { memoryKb, processes, cpuMs: captureCpu ? cpuTicks * 1000 / linuxClockTicks() : 0 };
 }
 
 async function workspaceUsage(directory: string, limit: number): Promise<number> {
@@ -232,7 +251,7 @@ export async function runJudgeCommand(
   let launchedCommand = executable;
   let launchedArgs = args;
   const resourceArgs = [
-    `--cpu=${Math.max(1, Math.ceil(options.timeoutMs / 1000) + 1)}`,
+    `--cpu=${Math.max(1, Math.ceil((options.cpuTimeLimitMs ?? options.timeoutMs) / 1000) + 1)}`,
     `--fsize=${fileSizeLimit}`, "--nofile=128", "--core=0",
   ];
   if (sandbox === "bubblewrap") {
@@ -272,11 +291,18 @@ export async function runJudgeCommand(
       let finished = false;
       let lastWorkspaceCheck = 0;
       let memoryKb = 0;
+      let sampledCpuMs = 0;
       let outputBytes = 0;
       let monitorError: Error | null = null;
       const state = { ...empty };
       const stop = () => { if (!stopping) { stopping = true; terminateProcessTree(child); } };
+      options.signal?.addEventListener("abort", stop, { once: true });
       const capture = (chunk: Buffer, stream: "stdout" | "stderr") => {
+        if (stream === "stdout" && options.onStart) {
+          stdoutBytes += chunk.length;
+          if (stdoutBytes > outputLimit) { state.outputLimitExceeded = true; stop(); }
+          return;
+        }
         const maxBytes = stream === "stdout"
           ? options.maxStdoutCaptureBytes ?? 256 * 1024
           : options.maxStderrCaptureBytes ?? 64 * 1024;
@@ -300,10 +326,12 @@ export async function runJudgeCommand(
         if (finished || stopping) return;
         try {
           if (process.platform === "linux" && child.pid) {
-            const usage = await readProcessTreeUsage(child.pid);
+            const usage = await readProcessTreeUsage(child.pid, Boolean(options.cpuTimeLimitMs));
+            sampledCpuMs = Math.max(sampledCpuMs, usage.cpuMs);
             memoryKb = Math.max(memoryKb, usage.memoryKb);
             if (options.memoryLimitMb && usage.memoryKb > options.memoryLimitMb * 1024) state.memoryLimitExceeded = true;
             if (usage.processes > processLimit) state.processLimitExceeded = true;
+            if (options.cpuTimeLimitMs && usage.cpuMs > options.cpuTimeLimitMs) state.timedOut = true;
           }
           if (options.stdoutFilePath) {
             outputBytes = (await stat(options.stdoutFilePath)).size;
@@ -315,7 +343,7 @@ export async function runJudgeCommand(
             const tempBytes = await workspaceUsage(tempDir, workspaceLimit);
             if (workBytes + tempBytes > workspaceLimit) state.workspaceLimitExceeded = true;
           }
-          if (state.memoryLimitExceeded || state.outputLimitExceeded || state.processLimitExceeded || state.workspaceLimitExceeded) stop();
+          if (state.timedOut || state.memoryLimitExceeded || state.outputLimitExceeded || state.processLimitExceeded || state.workspaceLimitExceeded) stop();
         } catch (error) {
           if (!finished && (error as NodeJS.ErrnoException).code !== "ENOENT") {
             monitorError = error as Error; stop();
@@ -334,9 +362,10 @@ export async function runJudgeCommand(
         finished = true;
         clearInterval(monitorTimer);
         clearTimeout(timeout);
+        options.signal?.removeEventListener("abort", stop);
         const wallDurationMs = Math.max(0, Math.round(Number(process.hrtime.bigint() - startedAt) / 1_000_000));
-        let cpuDurationMs = wallDurationMs;
         await pendingMonitor;
+        let cpuDurationMs = options.cpuTimeLimitMs && process.platform === "linux" ? Math.round(sampledCpuMs) : wallDurationMs;
         try {
           if (options.stdoutFilePath) outputBytes = (await stat(options.stdoutFilePath)).size;
           if (outputBytes > outputLimit || signal === "SIGXFSZ" || (exitCode !== 0 && outputBytes >= outputLimit)) state.outputLimitExceeded = true;
@@ -351,14 +380,18 @@ export async function runJudgeCommand(
           // Live monitoring and monotonic wall time remain available if GNU time was killed.
         }
         if (options.memoryLimitMb && memoryKb > options.memoryLimitMb * 1024) state.memoryLimitExceeded = true;
+        if (options.cpuTimeLimitMs && ((timeWrapper && cpuDurationMs > options.cpuTimeLimitMs) || signal === "SIGXCPU")) state.timedOut = true;
         if (monitorError) { reject(monitorError); return; }
         resolve({
           ...state, stdout, stderr, exitCode,
-          durationMs: displayDuration(cpuDurationMs, wallDurationMs),
+          durationMs: options.cpuTimeLimitMs && timeWrapper ? Math.max(1, cpuDurationMs) : displayDuration(cpuDurationMs, wallDurationMs),
           cpuDurationMs, wallDurationMs, memoryKb,
         });
       });
-      if (child.stdin) child.stdin.end(options.stdin);
+      if (options.signal?.aborted) stop();
+      if (options.onStart) {
+        try { options.onStart(child); } catch (error) { monitorError = error as Error; stop(); }
+      } else if (child.stdin) child.stdin.end(options.stdin);
     });
     return result;
   } finally {

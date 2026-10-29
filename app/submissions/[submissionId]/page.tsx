@@ -1,3 +1,4 @@
+import { InteractionLog } from "@/components/interaction-log";
 
 import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
@@ -293,7 +294,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
                               </td>
                               <td>{result.timeMs} {t(" ms")}</td>
                               <td>{result.memoryKb} {t(" KB")}</td>
-                              <td>{t(result.message)}</td>
+                              <td>{t(result.message)}<InteractionLog text={result.interactionLog} /></td>
                             </tr>
                           ))}
                         </tbody>

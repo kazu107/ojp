@@ -4134,5 +4134,101 @@
   "Python (PyPy3)": {
     "ja": "Python (PyPy3)",
     "en": "Python (PyPy3)"
+  },
+  "Interactive": {
+    "ja": "対話型",
+    "en": "Interactive"
+  },
+  "Interactor Language": {
+    "ja": "対話ジャッジの言語",
+    "en": "Interactor Language"
+  },
+  "Interactor Source Code": {
+    "ja": "対話ジャッジのソースコード",
+    "en": "Interactor Source Code"
+  },
+  "Sample Interaction": {
+    "ja": "対話例",
+    "en": "Sample Interaction"
+  },
+  "Private Test Data": {
+    "ja": "非公開テストデータ",
+    "en": "Private Test Data"
+  },
+  "idleTimeLimitMs": {
+    "ja": "通信待ち時間の上限 (ms)",
+    "en": "idleTimeLimitMs"
+  },
+  "wallTimeLimitMs": {
+    "ja": "全体経過時間の上限 (ms)",
+    "en": "wallTimeLimitMs"
+  },
+  "interactorTimeLimitMs": {
+    "ja": "対話ジャッジのCPU時間上限 (ms)",
+    "en": "interactorTimeLimitMs"
+  },
+  "Interaction Log (Private)": {
+    "ja": "通信ログ（作問者・管理者のみ）",
+    "en": "Interaction Log (Private)"
+  },
+  "Use < for interactor output and > for submission output.": {
+    "ja": "ジャッジの出力を <、提出の出力を > で記述してください。",
+    "en": "Use < for interactor output and > for submission output."
+  },
+  "Private test inputs are only sent to the interactor. Expected output files are not required.": {
+    "ja": "非公開テストデータは対話ジャッジだけに渡されます。正解出力ファイルは不要です。",
+    "en": "Private test inputs are only sent to the interactor. Expected output files are not required."
+  },
+  "Interactor receives the private input path as argv[1]. Communicate over stdin/stdout and flush each response. Exit 0 for AC, 1 for WA, otherwise IE.": {
+    "ja": "対話ジャッジには非公開データのパスが第1引数で渡されます。標準入出力で対話し、応答ごとにflushしてください。終了コード0はAC、1はWA、それ以外はIEです。",
+    "en": "Interactor receives the private input path as argv[1]. Communicate over stdin/stdout and flush each response. Exit 0 for AC, 1 for WA, otherwise IE."
+  },
+  "This is an interactive problem. Flush every query and read responses incrementally; do not wait for EOF.": {
+    "en": "This is an interactive problem. Flush every query and read responses incrementally; do not wait for EOF.",
+    "ja": "この問題は対話型です。質問ごとにflushし、応答を逐次読み取ってください。EOFまでの一括読込は使用できません。"
+  },
+  "Interaction idle timeout (check flush and protocol).": {
+    "ja": "通信待ち時間を超過しました。flushと対話手順を確認してください。",
+    "en": "Interaction idle timeout (check flush and protocol)."
+  },
+  "Interaction wall time limit exceeded.": {
+    "ja": "対話全体の経過時間の上限を超過しました。",
+    "en": "Interaction wall time limit exceeded."
+  },
+  "Interactive execution cancelled.": {
+    "ja": "対話実行が中断されました。",
+    "en": "Interactive execution cancelled."
+  },
+  "Interactor failed or exceeded its resource limit.": {
+    "ja": "対話ジャッジで異常終了または資源制限の超過が発生しました。",
+    "en": "Interactor failed or exceeded its resource limit."
+  },
+  "Interactor compile failed.": {
+    "ja": "対話ジャッジのコンパイルに失敗しました。",
+    "en": "Interactor compile failed."
+  },
+  "Submission resource limit exceeded.": {
+    "ja": "提出プログラムが資源制限を超過しました。",
+    "en": "Submission resource limit exceeded."
+  },
+  "Submission exited abnormally.": {
+    "ja": "提出プログラムが異常終了しました。",
+    "en": "Submission exited abnormally."
+  },
+  "Interaction rejected by interactor.": {
+    "ja": "対話ジャッジにより不正解と判定されました。",
+    "en": "Interaction rejected by interactor."
+  },
+  "Submission exited abnormally or did not terminate after interaction.": {
+    "ja": "提出が異常終了したか、対話終了後に終了しませんでした。",
+    "en": "Submission exited abnormally or did not terminate after interaction."
+  },
+  "Interactor did not produce a verdict after submission ended.": {
+    "ja": "提出の終了後、対話ジャッジが判定を返しませんでした。",
+    "en": "Interactor did not produce a verdict after submission ended."
+  },
+  "Interactive runtime failed to start.": {
+    "en": "Interactive runtime failed to start.",
+    "ja": "対話実行用のプログラムを起動できませんでした。"
   }
 }

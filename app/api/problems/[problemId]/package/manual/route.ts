@@ -1,3 +1,4 @@
+import { parseInteractiveLimits } from "@/lib/interactive-config";
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
 import {
@@ -36,7 +37,7 @@ function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
 }
 
 function parseCheckerType(raw: unknown): ProblemPackageCheckerType {
-  if (raw === "special_judge") {
+  if (raw === "special_judge" || raw === "interactive") {
     return raw;
   }
   return "exact";
@@ -65,6 +66,7 @@ export async function POST(request: Request, { params }: ProblemPackageManualRou
     const body = (await request.json()) as {
       sourceLabel?: unknown;
       checkerType?: unknown;
+      interactive?: unknown;
       checkerLanguage?: unknown;
       checkerSourceCode?: unknown;
       timeLimitMs?: unknown;
@@ -80,6 +82,7 @@ export async function POST(request: Request, { params }: ProblemPackageManualRou
     const extracted = buildProblemPackageFromEditorDraft({
       sourceLabel: typeof body.sourceLabel === "string" ? body.sourceLabel : undefined,
       checkerType: parseCheckerType(body.checkerType),
+      interactive: body.checkerType === "interactive" ? parseInteractiveLimits(body.interactive) : undefined,
       checkerLanguage: parseCheckerLanguage(body.checkerLanguage),
       checkerSourceCode:
         typeof body.checkerSourceCode === "string" ? body.checkerSourceCode : undefined,
@@ -119,6 +122,7 @@ export async function POST(request: Request, { params }: ProblemPackageManualRou
               sourceLabel:
                 typeof body.sourceLabel === "string" ? body.sourceLabel : "manual-package",
               checkerType: parseCheckerType(body.checkerType),
+              interactive: body.checkerType === "interactive" ? parseInteractiveLimits(body.interactive) : undefined,
               checkerLanguage: parseCheckerLanguage(body.checkerLanguage),
               checkerSourceCode:
                 typeof body.checkerSourceCode === "string" ? body.checkerSourceCode : "",

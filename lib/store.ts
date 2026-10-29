@@ -1,3 +1,4 @@
+import { visibleInteractionResults, canViewPrivateInteraction } from "./interactive-privacy";
 import {
   Announcement,
   AuditAction,
@@ -759,12 +760,12 @@ function normalizeStoreInPlace(target: Store): void {
   }
   for (const packageData of Object.values(target.problemPackages)) {
     const legacyPackage = packageData as ProblemPackageExtracted & {
-      checkerType?: "exact" | "special_judge";
+      checkerType?: "exact" | "special_judge" | "interactive";
       checkerLanguage?: CheckerLanguage | null;
       checkerSourceCode?: string | null;
       validation: ProblemPackageExtracted["validation"] & {
         config: ProblemPackageExtracted["validation"]["config"] & {
-          checkerType?: "exact" | "special_judge";
+          checkerType?: "exact" | "special_judge" | "interactive";
           checkerLanguage?: CheckerLanguage | null;
         };
       };
@@ -826,6 +827,7 @@ function normalizeStoreInPlace(target: Store): void {
       legacyProblem.sampleCases = target.problemPackages[problem.id]?.samples.map((sample) => ({
         name: sample.name,
         description: sample.description,
+        interaction: sample.interaction,
         input: sample.input,
         output: sample.output,
       })) ?? [];
@@ -1294,6 +1296,7 @@ async function replaceSubmissionRuntimeTestResults(
           timeMs: result.timeMs,
           memoryKb: result.memoryKb,
           message: result.message,
+          interactionLog: result.interactionLog ?? null,
         })),
       });
     }
@@ -1329,6 +1332,7 @@ async function appendSubmissionRuntimeTestResult(
         timeMs: result.timeMs,
         memoryKb: result.memoryKb,
         message: result.message,
+        interactionLog: result.interactionLog ?? null,
       },
     });
   });
@@ -1358,6 +1362,7 @@ async function listSubmissionRuntimeTestResults(
         timeMs: row.timeMs,
         memoryKb: row.memoryKb,
         message: row.message,
+        interactionLog: row.interactionLog ?? undefined,
       });
     }
     return results;
@@ -2942,9 +2947,11 @@ async function applyProblemPackageExtractedInternal(
     warnings: packageData.validation.warnings,
     validatedAt: nowIso(),
   };
+  problem.judgeType = packageData.checkerType === "interactive" ? "interactive" : "batch";
   problem.sampleCases = packageData.samples.map((sample) => ({
     name: sample.name,
     description: sample.description,
+    interaction: sample.interaction,
     input: sample.input,
     output: sample.output,
   }));
@@ -2982,9 +2989,11 @@ async function applyProblemPackageManifestInternal(
     warnings: manifest.validation.warnings,
     validatedAt: nowIso(),
   };
+  problem.judgeType = manifest.checkerType === "interactive" ? "interactive" : "batch";
   problem.sampleCases = manifest.sampleCases.map((sample) => ({
     name: sample.name,
     description: sample.description,
+    interaction: sample.interaction,
     input: sample.input,
     output: sample.output,
   }));
@@ -3798,7 +3807,12 @@ export async function getSubmissionWithAccess(
   }
 
   const canViewSource = canViewSubmissionSource(submission, viewerId);
-  const visibleTestResults = applyTestCaseVisibilityPolicy(submission, canViewSource);
+  const problem = getProblemById(submission.problemId);
+  const viewer = findUser(viewerId);
+  const canViewInteraction = canViewPrivateInteraction(viewer, problem?.authorId);
+  const visibleTestResults = applyTestCaseVisibilityPolicy({ ...submission, testResults:
+    visibleInteractionResults(submission.testResults, canViewInteraction),
+  }, canViewSource || canViewInteraction);
   if (canViewSource) {
     return {
       submission: {

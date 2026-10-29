@@ -1,6 +1,7 @@
 "use client";
 
 import JSZip from "jszip";
+import { parseInteractiveLimits, resolvePackageCheckerType } from "./interactive-config";
 import {
   ProblemPackageCompareMode,
   ProblemPackageInspectResult,
@@ -56,19 +57,12 @@ function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
   return "exact";
 }
 
-function parseCheckerType(raw: unknown): "exact" | "special_judge" {
-  if (raw === "special_judge" || raw === "custom_checker") {
-    return "special_judge";
-  }
-  return "exact";
-}
-
 function parseCheckerLanguage(raw: unknown): CheckerLanguage {
   if (raw === "brainfuck") throw new Error("config.checkerLanguage must be one of: cpp, python, java, javascript");
   if (raw === "cpp" || raw === "python" || raw === "java" || raw === "javascript") {
     return raw;
   }
-  return "python";
+  throw new Error("config.checkerLanguage must be one of: cpp, python, java, javascript");
 }
 
 function parseVisibility(raw: unknown): Visibility | undefined {
@@ -199,18 +193,18 @@ function buildPrefillFromStatement(
   };
 }
 
-function checkerSourceFileName(language: CheckerLanguage): string {
+function checkerSourceFileName(language: CheckerLanguage, interactive: boolean): string {
   switch (language) {
     case "cpp":
-      return "checker/Main.cpp";
+      return (interactive ? "interactor" : "checker") + "/Main.cpp";
     case "python":
-      return "checker/Main.py";
+      return (interactive ? "interactor" : "checker") + "/Main.py";
     case "java":
-      return "checker/Main.java";
+      return (interactive ? "interactor" : "checker") + "/Main.java";
     case "javascript":
-      return "checker/Main.js";
+      return (interactive ? "interactor" : "checker") + "/Main.js";
     default:
-      return "checker/Main.txt";
+      return (interactive ? "interactor" : "checker") + "/Main.txt";
   }
 }
 
@@ -250,9 +244,10 @@ export async function inspectProblemPackageClient(
     config.scoringType === "sum_of_groups" || config.scoringType === "sum"
       ? "sum_of_groups"
       : ("binary" as ProblemPackageScoringType);
-  const checkerType = parseCheckerType(config.checkerType);
+  const checkerType = resolvePackageCheckerType(config);
+  const interactive = checkerType === "interactive" ? parseInteractiveLimits(config.interactive) : undefined;
   const checkerLanguage =
-    checkerType === "special_judge" ? parseCheckerLanguage(config.checkerLanguage) : null;
+    checkerType !== "exact" ? parseCheckerLanguage(config.interactorLanguage ?? config.checkerLanguage) : null;
   const compareMode = parseCompareMode(config.compareMode);
   const problemConfig =
     config.problem && typeof config.problem === "object"
@@ -265,6 +260,8 @@ export async function inspectProblemPackageClient(
   const testOut = new Map<string, Set<string>>();
 
   for (const filePath of textByPath.keys()) {
+    const interactionMatch = /^samples\/(.+)\.interaction$/.exec(filePath);
+    if (interactionMatch) { sampleIn.add(interactionMatch[1]); sampleOut.add(interactionMatch[1]); }
     const sampleMatch = /^samples\/(.+)\.(in|out)$/.exec(filePath);
     if (sampleMatch) {
       const [, baseName, extension] = sampleMatch;
@@ -286,7 +283,7 @@ export async function inspectProblemPackageClient(
     }
   }
 
-  validatePairs(sampleIn, sampleOut, "samples");
+  if (checkerType !== "interactive") validatePairs(sampleIn, sampleOut, "samples");
   const configSamples = Array.isArray(config.samples) ? config.samples : [];
   const sampleConfigByName = new Map(
     configSamples
@@ -319,6 +316,7 @@ export async function inspectProblemPackageClient(
     id: `sample-${sampleIndex + 1}`,
     name,
     description: sampleConfigByName.get(name) ?? "",
+    interaction: textByPath.get(`samples/${name}.interaction`),
     input: textByPath.get(`samples/${name}.in`) ?? "",
     output: textByPath.get(`samples/${name}.out`) ?? "",
   }));
@@ -365,7 +363,7 @@ export async function inspectProblemPackageClient(
   const groups = groupNames.map((groupName, groupIndex) => {
     const inSet = testIn.get(groupName) ?? new Set<string>();
     const outSet = testOut.get(groupName) ?? new Set<string>();
-    validatePairs(inSet, outSet, `tests/${groupName}`);
+    if (checkerType !== "interactive") validatePairs(inSet, outSet, `tests/${groupName}`);
     const caseNames = [...inSet].sort(naturalNameCompare);
     return {
       id: `group-${groupIndex + 1}`,
@@ -382,10 +380,11 @@ export async function inspectProblemPackageClient(
   });
 
   const checkerSourceCode =
-    checkerLanguage && textByPath.has(checkerSourceFileName(checkerLanguage))
-      ? textByPath.get(checkerSourceFileName(checkerLanguage)) ?? ""
+    checkerLanguage && textByPath.has(checkerSourceFileName(checkerLanguage, checkerType === "interactive"))
+      ? textByPath.get(checkerSourceFileName(checkerLanguage, checkerType === "interactive")) ?? ""
       : "";
 
+  if (checkerType !== "exact" && !checkerSourceCode.trim()) throw new Error("checker/interactor source code is required");
   return {
     package: {
       fileName: file.name,
@@ -401,6 +400,7 @@ export async function inspectProblemPackageClient(
           typeof config.memoryLimitMb === "number" ? config.memoryLimitMb : 512,
         scoringType,
         checkerType,
+      interactive,
         checkerLanguage,
         compareMode,
         problem: {
@@ -446,6 +446,7 @@ export async function inspectProblemPackageClient(
     draft: {
       sourceLabel: file.name,
       checkerType,
+      interactive,
       checkerLanguage: checkerLanguage ?? "python",
       checkerSourceCode,
       compareMode,

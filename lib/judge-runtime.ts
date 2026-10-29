@@ -1,5 +1,6 @@
 import { createReadStream } from "node:fs";
 import { brainfuckNodeRunner } from "./brainfuck-node";
+import { runInteractiveCase } from "./judge-interactive";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -615,6 +616,7 @@ export async function executePackageJudge(input: {
         checkerLanguage: input.packageSource.manifest.checkerLanguage,
         checkerSourceCode: input.packageSource.checkerSourceCode,
         compareMode: input.packageSource.manifest.compareMode,
+        interactive: input.packageSource.manifest.interactive,
         groups: input.packageSource.groups,
       }
     : input.packageData
@@ -624,6 +626,7 @@ export async function executePackageJudge(input: {
           checkerLanguage: input.packageData.checkerLanguage,
           checkerSourceCode: input.packageData.checkerSourceCode,
           compareMode: input.packageData.compareMode,
+          interactive: input.packageData.interactive,
           groups: input.packageData.groups.map((group) => ({
             name: group.name,
             score: group.score,
@@ -692,7 +695,7 @@ export async function executePackageJudge(input: {
 
     let checkerRuntime: CommandTemplate | null = null;
     let checkerWorkspace: string | null = null;
-    if (packageMeta.checkerType === "special_judge") {
+    if (packageMeta.checkerType !== "exact") {
       if (!packageMeta.checkerLanguage || !packageMeta.checkerSourceCode) {
         return {
           status: "internal_error",
@@ -702,7 +705,7 @@ export async function executePackageJudge(input: {
           testResults: [
             {
               id: input.nextTestResultId(),
-              groupName: "checker",
+              groupName: packageMeta.checkerType === "interactive" ? "interactor" : "checker",
               testCaseName: "-",
               verdict: "internal_error",
               timeMs: 0,
@@ -739,12 +742,13 @@ export async function executePackageJudge(input: {
           testResults: [
             {
               id: input.nextTestResultId(),
-              groupName: "checker",
+              groupName: packageMeta.checkerType === "interactive" ? "interactor" : "checker",
               testCaseName: "-",
               verdict: "internal_error",
               timeMs: checkerCompile.timeMs,
               memoryKb: 0,
-              message: `special judge compile failed: ${checkerCompile.message}`,
+              message: packageMeta.checkerType === "interactive" ? "Interactor compile failed." : `special judge compile failed: ${checkerCompile.message}`,
+              ...(packageMeta.checkerType === "interactive" ? { interactionLog: checkerCompile.message.slice(0, 16384) } : {}),
             },
           ],
         };
@@ -758,6 +762,7 @@ export async function executePackageJudge(input: {
 
     const existingResults = input.existingResults ?? [];
     const results: Submission["testResults"] = [...existingResults];
+    let remainingLogBytes = Math.max(0, 256 * 1024 - existingResults.reduce((sum, result) => sum + Buffer.byteLength(result.interactionLog ?? ""), 0));
     const judgedGroupStates: Array<{ score: number; accepted: boolean }> = [];
     let totalTimeMs = existingResults.reduce(
       (max, result) => Math.max(max, result.timeMs),
@@ -816,7 +821,18 @@ export async function executePackageJudge(input: {
               })();
           await input.onPhaseChange?.("running");
           const contestantOutputPath = path.join(caseWorkspace, "stdout.txt");
-          const executed = await runWithFallback(runtimeTemplate, {
+          const interaction = packageMeta.checkerType === "interactive" && checkerRuntime && checkerWorkspace
+            ? await runInteractiveCase({
+                contestant: { ...runtimeTemplate, args: [...runtimeTemplate.args, ...(input.language === "brainfuck" ? ["--interactive"] : [])], cwd: submissionWorkspace },
+                interactor: { ...checkerRuntime, cwd: checkerWorkspace },
+                inputPath: testCaseFiles.inputPath,
+                timeLimitMs: input.timeLimitMs,
+                memoryLimitMb: input.memoryLimitMb,
+                limits: packageMeta.interactive,
+                logLimitBytes: remainingLogBytes,
+              })
+            : null;
+          const executed = interaction ?? await runWithFallback(runtimeTemplate, {
             cwd: submissionWorkspace,
             stdin: "",
             stdinFilePath: testCaseFiles.inputPath,
@@ -833,7 +849,10 @@ export async function executePackageJudge(input: {
           let verdict: SubmissionStatus = "accepted";
           let message = "Accepted";
 
-          if (runResult.spawnErrorCode === "ENOENT") {
+          if (interaction) {
+            verdict = interaction.verdict;
+            message = interaction.message;
+          } else if (runResult.spawnErrorCode === "ENOENT") {
             verdict = "internal_error";
             message = `runtime not found: ${submissionCommands.execute.commands.join(" / ")}`;
           } else if (runResult.timedOut) {
@@ -898,7 +917,9 @@ export async function executePackageJudge(input: {
             timeMs: runResult.durationMs,
             memoryKb: runResult.memoryKb,
             message,
+            ...(interaction ? { interactionLog: interaction.interactionLog } : {}),
           };
+          remainingLogBytes = Math.max(0, remainingLogBytes - Buffer.byteLength(interaction?.interactionLog ?? ""));
           results.push(nextResult);
           await input.onTestResult?.({
             result: nextResult,

@@ -125,7 +125,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
           <>
             <p className="text-soft">
               {t("このページの下から直接提出できます。提出後は非同期ジャッジされ、提出詳細で結果を確認できます。")}</p>
-            <SubmissionForm problemId={problem.id} contestId={contestId ?? null} virtualParticipationId={virtualParticipationId ?? null}/>
+            <SubmissionForm interactive={problem.judgeType === "interactive"} problemId={problem.id} contestId={contestId ?? null} virtualParticipationId={virtualParticipationId ?? null}/>
           </>
         ) : (
           <>

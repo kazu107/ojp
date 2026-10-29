@@ -73,6 +73,10 @@ export function ProblemSamplesSection({
       {samples.map((sample) => (
         <article key={sample.name} className="package-case-editor stack">
           <p className="field-label">{sample.name}</p>
+          {sample.interaction !== undefined ? (<div className="field">
+            <span className="field-label">{t("Sample Interaction")}</span>
+            <pre className="code-block">{sample.interaction}</pre>
+          </div>) : (
           <div className="form-grid">
             <div className="field">
               <span className="field-label">{t("Input")}</span>
@@ -83,6 +87,7 @@ export function ProblemSamplesSection({
               <pre className="code-block">{sample.output}</pre>
             </div>
           </div>
+          )}
           {sample.description ? (
             <p className="sample-description text-soft">{sample.description}</p>
           ) : null}

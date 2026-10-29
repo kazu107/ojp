@@ -500,7 +500,7 @@ problem-package.zip
 
 ### 検証ルール
 
-- `samples/` と `tests/<group>/` の `.in/.out` ペアが必須
+- 通常・スペシャルジャッジは `samples/` と `tests/<group>/` の `.in/.out` ペアが必須。対話型はテストの `.in` のみで登録でき、サンプルは `.interaction` を使用できます
 - `tests[]` は省略可能で、未指定時はディレクトリから自動検出
 - path traversal と oversized ZIP/file payload は拒否
 - `statement.md`, `samples/*.in/.out`, `tests/*/*.in/.out`, checker source は読込時に改行を `LF` に正規化
@@ -651,3 +651,9 @@ npm run test:contest
 npm run db:migrate:legacy-status
 npm run db:push -- --accept-data-loss
 ```
+
+## 対話型問題
+
+対話型ジャッジ（interactor）、作問画面、ZIP入出力、非公開通信ログに対応しています。
+新しいリリースの起動前に `npm run db:interactive` でログ用の列を追加してください。
+仕様・ZIPテンプレート・資源制限は [対話型ジャッジ](docs/interactive-judge.md) を参照してください。

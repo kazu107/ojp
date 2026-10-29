@@ -40,6 +40,7 @@ export async function GET(_request: Request, { params }: ProblemPackageManifestR
       const draft = {
         sourceLabel: source.manifest.validation.fileName,
         checkerType: source.manifest.checkerType,
+        interactive: source.manifest.interactive,
         checkerLanguage: source.manifest.checkerLanguage ?? "python",
         checkerSourceCode: source.checkerSourceCode ?? "",
         compareMode: source.manifest.compareMode,
@@ -50,6 +51,7 @@ export async function GET(_request: Request, { params }: ProblemPackageManifestR
           id: `sample-${sampleIndex + 1}`,
           name: sample.name,
           description: sample.description,
+          interaction: sample.interaction,
           input: sample.input,
           output: sample.output,
         })),

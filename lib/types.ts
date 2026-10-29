@@ -45,6 +45,7 @@ export interface ProblemPackageSummary {
 }
 
 export interface ProblemSampleCase {
+  interaction?: string;
   name: string;
   description: string;
   input: string;
@@ -64,6 +65,7 @@ export interface User {
 }
 
 export interface Problem {
+  judgeType?: "batch" | "interactive";
   id: string;
   authorId: string;
   title: string;
@@ -112,6 +114,7 @@ export interface Contest {
 }
 
 export interface SubmissionTestResult {
+  interactionLog?: string;
   id: string;
   groupName: string;
   testCaseName: string;

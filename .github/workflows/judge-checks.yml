@@ -27,6 +27,7 @@ jobs:
       - run: npm ci
       - run: npm run judge:doctor
       - run: npm run test:judge
+      - run: npm run test:interactive
       - run: npm run test:ops
       - run: npm run lint
 
