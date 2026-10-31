@@ -1,3 +1,6 @@
+import { problemTags, studyEntries, discoveryStatuses } from "@/lib/problem-workspace-store";
+import { filterProblems, problemProgress, type DiscoveryFilters } from "@/lib/problem-discovery";
+import { listSubmissionsForViewer } from "@/lib/store";
 import { NextResponse } from "next/server";
 import {
   paginateItems,
@@ -14,7 +17,7 @@ import {
   getOptionalCurrentUser,
   listProblemsForListView,
 } from "@/lib/store";
-import { errorResponse } from "@/lib/api-response";
+import { apiError, errorResponse } from "@/lib/api-response";
 
 export async function GET(request: Request) {
   try {
@@ -23,11 +26,18 @@ export async function GET(request: Request) {
       defaultLimit: 50,
       maxLimit: 200,
     });
-    const { items: problems, meta } = paginateItems(
-      listProblemsForListView(user?.id ?? "guest"),
+    const params=new URL(request.url).searchParams;
+    if(!user && ((params.get("progress") && params.get("progress")!=="all")||params.get("saved")==="1"))return apiError(401,"authentication required");
+    const all=listProblemsForListView(user?.id ?? "guest");
+    const tags=await problemTags(all.map(problem=>problem.id));
+    const progress=problemProgress(user?await discoveryStatuses(listSubmissionsForViewer(user.id,{userId:user.id})):[]);
+    const saved=new Set(user?(await studyEntries(user.id)).filter(row=>row.bookmarked).map(row=>row.problemId):[]);
+    const filters=Object.fromEntries(["q","tag","min","max","progress","saved"].map(key=>[key,params.get(key)??undefined])) as DiscoveryFilters;
+    const { items, meta } = paginateItems(
+      filterProblems(all,filters,tags,progress,saved),
       pagination,
     );
-    return NextResponse.json({ problems, pagination: meta });
+    return NextResponse.json({ problems:items.map(problem=>({...problem,tags:tags.get(problem.id)??[]})), pagination: meta });
   } catch (error) {
     return errorResponse(error, "failed to fetch problems");
   }

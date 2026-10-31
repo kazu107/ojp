@@ -1,3 +1,4 @@
+import { normalizeTags } from "@/lib/problem-discovery";
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
 import { buildProblemPackageZip } from "@/lib/problem-package";
@@ -10,6 +11,7 @@ import {
 
 interface ExportRequestBody {
   title?: unknown;
+  tags?: unknown;
   slug?: unknown;
   statementMarkdown?: unknown;
   inputDescription?: unknown;
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
     }
 
     const zipBuffer = buildProblemPackageZip({
+      tags: body.tags === undefined ? undefined : normalizeTags(body.tags),
       title: typeof body.title === "string" ? body.title : "",
       slug: typeof body.slug === "string" ? body.slug : "",
       visibility: parseVisibility(body.visibility),

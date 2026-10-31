@@ -367,6 +367,7 @@ async function openLazyPackage(input: { fileName: string; sizeBytes: number; zip
                   ? null
                   : config.problemSettings.difficulty,
               testCaseVisibility: config.problemSettings.testCaseVisibility ?? null,
+            tags: config.problemSettings.tags,
             },
             samples: sampleCases.map((sample) => ({
               name: sample.name,

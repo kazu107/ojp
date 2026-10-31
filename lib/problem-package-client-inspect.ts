@@ -1,4 +1,5 @@
 "use client";
+import { normalizeTags } from "./problem-discovery";
 
 import JSZip from "jszip";
 import { parseInteractiveLimits, resolvePackageCheckerType } from "./interactive-config";
@@ -126,6 +127,7 @@ function buildPrefillFromStatement(
     explanationVisibility?: ExplanationVisibility;
     difficulty?: number | null;
     testCaseVisibility?: TestCaseVisibility;
+    tags?:string[];
     slug?: string;
   },
 ) {
@@ -190,6 +192,7 @@ function buildPrefillFromStatement(
     explanationVisibility: options.explanationVisibility,
     difficulty: options.difficulty,
     testCaseVisibility: options.testCaseVisibility,
+    tags: options.tags,
   };
 }
 
@@ -438,6 +441,7 @@ export async function inspectProblemPackageClient(
       difficulty:
         typeof problemConfig?.difficulty === "number" ? problemConfig.difficulty : undefined,
       testCaseVisibility: parseTestCaseVisibility(problemConfig?.testCaseVisibility),
+      tags: problemConfig?.tags === undefined ? undefined : normalizeTags(problemConfig.tags),
       slug:
         problemConfig && typeof problemConfig.slug === "string"
           ? problemConfig.slug

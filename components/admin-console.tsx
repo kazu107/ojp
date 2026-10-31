@@ -550,7 +550,7 @@ export function AdminConsole({
                   <tr key={request.id}>
                     <td>{request.id}</td>
                     <td>{request.submissionId}</td>
-                    <td>{request.problemId}</td>
+                    <td>{request.problemId}<p className="text-soft">{t("Judge Revision")}: {request.judgeRevisionId?.slice(0,8) ?? t("Legacy (not recorded)")}</p></td>
                     <td>{t(request.reason)}</td>
                     <td>{formatDate(request.createdAt, locale)}</td>
                   </tr>

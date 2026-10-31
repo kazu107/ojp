@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { HttpError } from "@/lib/store";
 import { ContestError } from "@/lib/contest";
+import { WorkspaceError } from "@/lib/workspace-error";
 
 function statusToCode(status: number): string {
   if (status === 400) {
@@ -40,6 +41,7 @@ export function apiError(status: number, message: string, details?: unknown) {
 }
 
 export function errorResponse(error: unknown, fallbackMessage: string) {
+  if (error instanceof WorkspaceError) return apiError(error.status, error.message);
   if (error instanceof ContestError) return apiError(error.status, error.message);
   if (error instanceof HttpError) {
     const headers: Record<string, string> = {};

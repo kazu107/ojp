@@ -15,6 +15,7 @@ const PRESET_REASONS = [
 export function RejudgeRequestForm({ submissionId }: { submissionId: string }) {
   const { t } = useI18n();
   const router = useRouter();
+  const [revision,setRevision]=useState("latest");
   const [reason, setReason] = useState(PRESET_REASONS[0]);
   const [detail, setDetail] = useState("");
   const [error, setError] = useState("");
@@ -31,6 +32,7 @@ export function RejudgeRequestForm({ submissionId }: { submissionId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           reason,
+          revision,
           detail,
         }),
       });
@@ -48,6 +50,7 @@ export function RejudgeRequestForm({ submissionId }: { submissionId: string }) {
 
   return (
     <form className="form" onSubmit={onSubmit}>
+      <label className="field"><span className="field-label">{t("Judge Revision")}</span><select className="select" value={revision} onChange={event=>setRevision(event.target.value)}><option value="latest">{t("Latest version at request time")}</option><option value="original">{t("Original submitted version")}</option></select></label>
       <div className="form-grid">
         <label className="field">
           <span className="field-label">{t("Reason preset")}</span>

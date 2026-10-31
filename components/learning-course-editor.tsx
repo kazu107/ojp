@@ -1,5 +1,6 @@
 "use client";
 
+import { DraftRecovery, useDraftRecovery } from "./draft-recovery";
 import { LEARNING_RUNTIME_LANGUAGES } from "@/lib/languages";
 import { BRAINFUCK_HELLO_WORLD } from "@/lib/brainfuck.js";
 import { useI18n } from "@/components/i18n-provider";
@@ -66,6 +67,7 @@ export function LearningCourseEditor({ initial }: Props) {
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(!initial);
   const [preview, setPreview] = useState(true);
+  const recovery = useDraftRecovery({ name:`course:${courseId ?? "new"}`,base:String(editVersion ?? "new"),value:draft,enabled:!busy,restore(saved){const next=validateLearningDraft(saved);setDraft(next);setChapterId(next.chapters[0].id);setItemId(next.chapters[0].items[0].id);setDirty(true);} });
   const chapter =
     draft.chapters.find((chapter) => chapter.id === chapterId) ??
     draft.chapters[0];
@@ -169,6 +171,7 @@ export function LearningCourseEditor({ initial }: Props) {
     setEditVersion(result.editVersion);
     setDraft(normalized);
     setDirty(false);
+    await recovery.clear(normalized);
     if (!courseId)
       window.history.replaceState(null, "", `/learn/${result.id}/edit`);
     return result;
@@ -293,6 +296,7 @@ export function LearningCourseEditor({ initial }: Props) {
 
   return (
     <fieldset className="stack learning-editor" disabled={!!busy}>
+      <DraftRecovery draft={recovery} />
       <div className="learning-toolbar">
         <div className="button-row">
           <button

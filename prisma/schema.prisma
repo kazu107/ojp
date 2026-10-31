@@ -392,3 +392,38 @@ model ContestVirtualParticipation {
   @@unique([contestId, userId])
   @@index([userId, startedAt])
 }
+
+// AppState IDs intentionally have no foreign keys here.
+model ProblemTags {
+  problemId String @id
+  tags String[] @default([])
+  updatedAt DateTime @updatedAt
+}
+
+model ProblemStudy {
+  userId String
+  problemId String
+  bookmarked Boolean @default(false)
+  review Boolean @default(false)
+  notes String @default("")
+  reviewAt DateTime?
+  lastReviewedAt DateTime?
+  updatedAt DateTime @updatedAt
+  @@id([userId, problemId])
+  @@index([userId, review, reviewAt])
+}
+
+model ProblemRevision {
+  id String @id
+  problemId String
+  digest String
+  snapshot Json
+  summary Json
+  storageKey String?
+  createdBy String
+  kind String
+  createdAt DateTime @default(now())
+  @@unique([problemId, digest])
+  @@index([problemId, createdAt])
+  @@index([storageKey])
+}

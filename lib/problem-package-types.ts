@@ -31,6 +31,7 @@ export interface ProblemPackageEditorGroup {
 }
 
 export interface ProblemPackageEditorDraft {
+  recoveryNeedsReimport?: boolean;
   interactive?: import("./interactive-config").InteractiveLimits;
   sourceLabel: string;
   checkerType: ProblemPackageCheckerType;
@@ -59,6 +60,7 @@ export interface ProblemPackagePrefill {
   explanationVisibility?: ExplanationVisibility;
   difficulty?: number | null;
   testCaseVisibility?: TestCaseVisibility;
+    tags?: string[];
 }
 
 export interface ProblemPackageInspectResult {
@@ -83,6 +85,7 @@ export interface ProblemPackageInspectResult {
         explanationVisibility: ExplanationVisibility | null;
         difficulty: number | null;
         testCaseVisibility: TestCaseVisibility | null;
+    tags?: string[];
       };
       samples: Array<{
         name: string;

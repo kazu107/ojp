@@ -1,3 +1,5 @@
+import { captureProblemRevision, revisionById, retainedPackage } from "./problem-revisions";
+import { saveProblemTags } from "./problem-workspace-store";
 import { visibleInteractionResults, canViewPrivateInteraction } from "./interactive-privacy";
 import {
   Announcement,
@@ -931,7 +933,7 @@ function rememberProblemPackageData(
   problemId: string,
   packageData: ProblemPackageExtracted,
 ): void {
-  if (packageData.validation.zipSizeBytes > PROBLEM_PACKAGE_MEMORY_CACHE_MAX_ZIP_BYTES) {
+  if (store.problemPackageRefs[problemId] && packageData.validation.zipSizeBytes > PROBLEM_PACKAGE_MEMORY_CACHE_MAX_ZIP_BYTES) {
     forgetProblemPackageData(problemId);
     return;
   }
@@ -943,7 +945,8 @@ function rememberProblemPackageData(
   order.push(problemId);
   while (order.length > PROBLEM_PACKAGE_MEMORY_CACHE_LIMIT) {
     const evicted = order.shift();
-    if (evicted) {
+    // Inline legacy packages are durable data, not disposable R2-backed cache entries.
+    if (evicted && store.problemPackageRefs[evicted]) {
       delete store.problemPackages[evicted];
     }
   }
@@ -1909,11 +1912,18 @@ function repairJudgeQueueInternal(): number {
 }
 
 async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReason): Promise<void> {
-  let submission = findSubmissionByIdInternal(submissionId);
-  if (!submission && STORE_DB_SYNC_ENABLED) {
-    await refreshStoreFromDbNow();
-    submission = findSubmissionByIdInternal(submissionId);
-  }
+  // Fetch only this submission: do not copy large legacy packages or reset in-flight flags.
+  const metadataRows = STORE_DB_SYNC_ENABLED ? await prisma.$queryRaw<Array<{submission:Prisma.JsonValue}>>`
+    SELECT item.value AS submission
+    FROM "AppState" AS state
+    CROSS JOIN LATERAL jsonb_array_elements(
+      CASE WHEN jsonb_typeof(state.snapshot->'submissions')='array'
+        THEN state.snapshot->'submissions' ELSE '[]'::jsonb END
+    ) AS item(value)
+    WHERE state.id=${STORE_STATE_ID} AND item.value->>'id'=${submissionId}
+    LIMIT 1
+  ` : null;
+  const submission = metadataRows ? metadataRows[0]?.submission as unknown as Submission | undefined : findSubmissionByIdInternal(submissionId);
   if (!submission) {
     throw new HttpError("Submission metadata is not available for judging.",409);
   }
@@ -1935,7 +1945,9 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
     judgeEnvironmentVersion,
   });
 
-  const problem = getProblemById(submission.problemId);
+  const revisionId=submission.judgeRevisionId ?? submission.problemRevisionId;
+  const pinned=revisionId ? await revisionById(submission.problemId,revisionId) : null;
+  const problem = revisionId ? pinned?.problem : getProblemById(submission.problemId);
   if (!problem) {
     const result = {
       id: nextTestResultId(),
@@ -1944,7 +1956,7 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
       verdict: "internal_error" as SubmissionStatus,
       timeMs: 0,
       memoryKb: 0,
-      message: "problem not found while judging",
+      message: revisionId ? "Pinned problem revision is unavailable." : "problem not found while judging",
     };
     await replaceSubmissionRuntimeTestResults(submissionId, [result]);
     await upsertSubmissionRuntimeState({
@@ -1971,8 +1983,8 @@ async function runJudgeForSubmission(submissionId: string, reason: JudgeJobReaso
     return;
   }
 
-  const packageRef = store.problemPackageRefs[problem.id];
-  const packageData = packageRef ? null : await loadProblemPackageData(problem.id);
+  const packageRef = pinned ? pinned.storageRef : store.problemPackageRefs[problem.id];
+  const packageData = packageRef ? null : pinned ? pinned.inlinePackage : await loadProblemPackageData(problem.id);
   const packageSource =
     packageRef && isProblemPackageObjectStorageEnabled()
       ? await createLazyProblemPackageSourceFromStorageRef({
@@ -2821,6 +2833,41 @@ export function getProblemPackageStorageRef(
   return store.problemPackageRefs[problemId];
 }
 
+export async function recordCurrentProblemRevision(problem: Problem, actorId: string, kind: string) {
+  return captureProblemRevision(problem, store.problemPackageRefs[problem.id] ?? null, store.problemPackages[problem.id] ?? null, actorId, kind);
+}
+
+export async function restoreProblemRevision(problemId: string, revisionId: string): Promise<Problem> {
+  const actor = await getCurrentUser();
+  assertActiveUser(actor);
+  const problem = resolveProblemIfExists(problemId);
+  if (!canEditProblemByViewer(problem, actor.id)) throw new HttpError("you cannot edit this problem",403);
+  const snapshot = await revisionById(problemId, revisionId);
+  if (!snapshot) throw new HttpError("problem revision not found",404);
+  uniqueSlugOrThrow("problem",snapshot.problem.slug,problemId);
+  await recordCurrentProblemRevision(problem,actor.id,"before_restore");
+  Object.assign(problem,snapshot.problem,{id:problem.id,authorId:problem.authorId,updatedAt:nowIso()});
+  forgetProblemPackageData(problemId);
+  if(snapshot.storageRef)store.problemPackageRefs[problemId]=snapshot.storageRef;
+  else {delete store.problemPackageRefs[problemId];if(snapshot.inlinePackage)rememberProblemPackageData(problemId,snapshot.inlinePackage);}
+  await saveProblemTags(problemId,snapshot.tags);
+  appendAuditLog({actorId:actor.id,action:"problem.revision.restore",targetType:"problem",targetId:problemId,reason:"Restore problem revision",metadata:{revisionId}});
+  await persistStoreSnapshotNow();
+  return problem;
+}
+
+export async function getSubmissionPackageCaseManifest(submission: Submission): Promise<ProblemPackageCaseManifest|null> {
+  const id=submission.judgeRevisionId ?? submission.problemRevisionId;
+  if(!id)return getProblemPackageCaseManifest(submission.problemId);
+  const snapshot=await revisionById(submission.problemId,id);
+  if(!snapshot)throw new HttpError("problem revision not found",409);
+  if(snapshot.storageRef){
+    const source=await createLazyProblemPackageSourceFromStorageRef({ref:snapshot.storageRef,fileName:snapshot.problem.latestPackageSummary?.fileName ?? "problem.zip"});
+    try{return {groups:source.groups.map(group=>({name:group.name,caseNames:group.caseNames}))}}finally{await source.cleanup()}
+  }
+  return snapshot.inlinePackage ? {groups:snapshot.inlinePackage.groups.map(group=>({name:group.name,caseNames:group.tests.map(test=>test.name)}))} : null;
+}
+
 export async function createProblem(input: CreateProblemInput): Promise<Problem> {
   uniqueSlugOrThrow("problem", input.slug);
   const user = await getCurrentUser();
@@ -2851,7 +2898,9 @@ export async function createProblem(input: CreateProblemInput): Promise<Problem>
     updatedAt: timestamp,
   };
 
+  await captureProblemRevision(problem,null,null,user.id,"created");
   store.problems.unshift(problem);
+  await persistStoreSnapshotNow();
   return problem;
 }
 
@@ -2865,6 +2914,7 @@ export async function updateProblem(
     throw new HttpError("you cannot edit this problem", 403);
   }
 
+  await recordCurrentProblemRevision(problem,user.id,"baseline");
   if (typeof input.slug === "string") {
     uniqueSlugOrThrow("problem", input.slug, problemId);
     problem.slug = toSlug(input.slug);
@@ -2911,6 +2961,8 @@ export async function updateProblem(
   }
 
   problem.updatedAt = nowIso();
+  await persistStoreSnapshotNow();
+  await recordCurrentProblemRevision(problem,user.id,"metadata");
   return problem;
 }
 
@@ -2925,14 +2977,17 @@ export async function applyProblemPackageValidation(
     throw new HttpError("you cannot upload package for this problem", 403);
   }
 
-  return applyProblemPackageExtractedInternal(problem, packageData, storageRef ?? null);
+  return applyProblemPackageExtractedInternal(problem, packageData, storageRef ?? null, actor.id);
 }
 
 async function applyProblemPackageExtractedInternal(
   problem: Problem,
   packageData: ProblemPackageExtracted,
   storageRef: ProblemPackageStorageRef | null,
+  actorId = problem.authorId,
 ): Promise<Problem> {
+  await recordCurrentProblemRevision(problem,actorId,"baseline");
+  if(packageData.validation.config.problem.tags !== undefined)await saveProblemTags(problem.id,packageData.validation.config.problem.tags);
   problem.timeLimitMs = packageData.validation.config.timeLimitMs;
   problem.memoryLimitMb = packageData.validation.config.memoryLimitMb;
   problem.scoringType =
@@ -2955,16 +3010,15 @@ async function applyProblemPackageExtractedInternal(
     input: sample.input,
     output: sample.output,
   }));
-  const previousRef = store.problemPackageRefs[problem.id];
-  rememberProblemPackageData(problem.id, packageData);
   if (storageRef) {
     store.problemPackageRefs[problem.id] = storageRef;
-    if (previousRef && previousRef.key !== storageRef.key) {
-      await deleteProblemPackageZip(previousRef);
-    }
+  } else {
+    delete store.problemPackageRefs[problem.id];
   }
+  rememberProblemPackageData(problem.id, packageData);
   problem.updatedAt = nowIso();
   await persistStoreSnapshotNow();
+  await recordCurrentProblemRevision(problem,actorId,"package");
 
   return problem;
 }
@@ -2974,7 +3028,11 @@ async function applyProblemPackageManifestInternal(
   manifest: ProblemPackageManifest,
   storageRef: ProblemPackageStorageRef | null,
   previousRef: ProblemPackageStorageRef | null,
+  actorId = problem.authorId,
 ): Promise<Problem> {
+  void previousRef;
+  await recordCurrentProblemRevision(problem,actorId,"baseline");
+  if(manifest.validation.config.problem.tags !== undefined)await saveProblemTags(problem.id,manifest.validation.config.problem.tags);
   problem.timeLimitMs = manifest.validation.config.timeLimitMs;
   problem.memoryLimitMb = manifest.validation.config.memoryLimitMb;
   problem.scoringType =
@@ -3000,12 +3058,11 @@ async function applyProblemPackageManifestInternal(
   forgetProblemPackageData(problem.id);
   if (storageRef) {
     store.problemPackageRefs[problem.id] = storageRef;
-    if (previousRef && previousRef.key !== storageRef.key) {
-      await deleteProblemPackageZip(previousRef);
-    }
+
   }
   problem.updatedAt = nowIso();
   await persistStoreSnapshotNow();
+  await recordCurrentProblemRevision(problem,actorId,"package");
   return problem;
 }
 
@@ -3030,6 +3087,7 @@ async function runPackageJobInternal(job: PackageJobRecord): Promise<void> {
             manifest,
             job.storageRef,
             job.previousRef,
+            job.requestedBy,
           );
         } finally {
           await releaseLease(APP_STATE_WRITE_LEASE_ID);
@@ -3074,7 +3132,7 @@ async function runPackageJobInternal(job: PackageJobRecord): Promise<void> {
       const currentRef = store.problemPackageRefs[job.problemId];
       if (!currentRef || currentRef.key !== job.storageRef.key) {
         try {
-          await deleteProblemPackageZip(job.storageRef);
+          if (!(await retainedPackage(job.storageRef))) await deleteProblemPackageZip(job.storageRef);
         } catch {
           // noop
         }
@@ -3445,7 +3503,10 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
       }
     }
   }
+  const revision=await recordCurrentProblemRevision(problem,currentUser.id,"submission");
   const submission: Submission = {
+    problemRevisionId:revision.id,
+    judgeRevisionId:revision.id,
     id: nextSubmissionId(),
     userId: currentUser.id,
     problemId: problem.id,
@@ -4498,7 +4559,8 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     throw new HttpError("rejudge reason is required", 400);
   }
 
-  const submission = resolveSubmissionIfExists(input.submissionId);
+  const submission = findSubmissionByIdInternal(input.submissionId);
+  if(!submission)throw new HttpError("submission not found",404);
   const problem = resolveProblemIfExists(submission.problemId);
   const contest = submission.contestId ? getContestById(submission.contestId) : undefined;
 
@@ -4519,6 +4581,12 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
 
   enforceRejudgeRateLimit(actor.id, problem.id, isAdminBypass(actor));
 
+  if(input.revision === "original"){
+    if(!submission.problemRevisionId)throw new HttpError("This legacy submission has no recorded original revision.",409);
+    submission.judgeRevisionId=submission.problemRevisionId;
+  } else {
+    submission.judgeRevisionId=(await recordCurrentProblemRevision(problem,actor.id,"rejudge")).id;
+  }
   submission.status = "pending";
   submission.score = 0;
   submission.totalTimeMs = 0;
@@ -4529,6 +4597,7 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
   submission.testResults = [];
 
   const request: RejudgeRequest = {
+    judgeRevisionId:submission.judgeRevisionId,
     id: nextRejudgeId(),
     requestedBy: actor.id,
     submissionId: submission.id,
@@ -4545,7 +4614,7 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     targetType: "submission",
     targetId: submission.id,
     reason: request.reason,
-    metadata: { requestId: request.id, problemId: problem.id },
+    metadata: { requestId: request.id, problemId: problem.id, revisionId:submission.judgeRevisionId ?? "legacy" },
   });
 
   await persistStoreSnapshotNow();

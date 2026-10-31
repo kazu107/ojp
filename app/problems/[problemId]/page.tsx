@@ -1,3 +1,5 @@
+import { problemTags, studyEntry } from "@/lib/problem-workspace-store";
+import { ProblemStudy } from "@/components/problem-study";
 
 import { getI18n } from "@/lib/i18n/server";
 ﻿import Link from "next/link";
@@ -41,6 +43,8 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
     notFound();
   }
 
+  const tags=(await problemTags([problem.id])).get(problem.id) ?? [];
+  const study=me ? await studyEntry(me.id, problem.id) : null;
   const canEditProblem = me ? canEditProblemByViewer(problem, me.id) : false;
   const signInUrl = `/signin?callbackUrl=${encodeURIComponent(`/problems/${problem.id}${contextQuery}`)}`;
 
@@ -71,6 +75,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
         </div>
       </section>
 
+      {tags.length ? <div className="button-row">{tags.map(tag=><Link className="badge badge-blue" key={tag} href={`/problems?tag=${encodeURIComponent(tag)}`}>{tag}</Link>)}</div> : null}
       <section className="panel stack">
         <h2 className="panel-title">{t("Statement")}</h2>
         <MarkdownBlock text={problem.statementMarkdown} />
@@ -138,6 +143,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
           </>
         )}
       </section>
+      {me ? <ProblemStudy problemId={problem.id} initial={study ? {...study,reviewAt:study.reviewAt?.toISOString() ?? null} : null} /> : null}
     </div>
   );
 }

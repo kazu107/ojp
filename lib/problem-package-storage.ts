@@ -5,6 +5,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { Readable } from "node:stream";
+import { randomUUID } from "node:crypto";
 
 export interface ProblemPackageStorageRef {
   provider: "r2";
@@ -90,7 +91,7 @@ function sanitizeFileName(fileName: string): string {
 
 function buildObjectKey(prefix: string, fileName: string): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  return `${prefix}/${stamp}-${sanitizeFileName(fileName)}`;
+  return `${prefix}/${stamp}-${randomUUID()}-${sanitizeFileName(fileName)}`;
 }
 
 async function putPackageZip(input: {
@@ -108,6 +109,7 @@ async function putPackageZip(input: {
       Key: key,
       Body: input.body,
       ContentType: "application/zip",
+      IfNoneMatch: "*",
       ContentLength: input.sizeBytes > 0 ? input.sizeBytes : undefined,
     }),
   );
@@ -157,6 +159,7 @@ export async function getProblemPackageZip(
     new GetObjectCommand({
       Bucket: ref.bucket,
       Key: ref.key,
+      IfMatch: ref.etag ?? undefined,
     }),
   );
 
@@ -176,6 +179,7 @@ export async function getProblemPackageZipStream(
     new GetObjectCommand({
       Bucket: ref.bucket,
       Key: ref.key,
+      IfMatch: ref.etag ?? undefined,
     }),
   );
 

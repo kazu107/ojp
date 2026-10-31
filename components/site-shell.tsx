@@ -1,4 +1,5 @@
 
+import { DraftScope } from "@/components/draft-recovery";
 import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
 import { AuthControls } from "@/components/auth-controls";
@@ -10,6 +11,7 @@ const links = [
   { href: "/", label: "Dashboard" },
   { href: "/problems", label: "Problems" },
   { href: "/learn", label: "Learn" },
+  { href: "/review", label: "Bookmarks and Review" },
   { href: "/submissions", label: "Submissions" },
   { href: "/contests", label: "Contests" },
   { href: "/ratings", label: "Ratings" },
@@ -45,7 +47,7 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div className="site-backdrop" />
-      <main className="site-main">{children}</main>
+      <main className="site-main"><DraftScope owner={me?.id ?? null}>{children}</DraftScope></main>
       <footer className="site-footer">
         <div className="site-footer-inner">
           <div className="site-footer-copy">

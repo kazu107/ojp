@@ -1,3 +1,4 @@
+import { normalizeTags } from "./problem-discovery";
 import { parseInteractiveLimits } from "./interactive-config";
 import JSZip from "jszip";
 import {
@@ -9,6 +10,7 @@ import { ProblemPackageEditorDraft } from "@/lib/problem-package-types";
 
 interface ProblemPackageClientZipInput {
   title: string;
+  tags?: string[];
   slug: string;
   visibility: Visibility;
   explanationVisibility: ExplanationVisibility;
@@ -80,6 +82,7 @@ function buildConfig(input: ProblemPackageClientZipInput) {
     compareMode: input.draft.compareMode,
     problem: {
       slug: input.slug,
+      tags: input.tags === undefined ? undefined : normalizeTags(input.tags),
       visibility: input.visibility,
       explanationVisibility: input.explanationVisibility,
       difficulty: input.difficulty,

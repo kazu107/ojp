@@ -13,7 +13,9 @@ export async function POST(request: Request, { params }: RejudgeRouteContext) {
   try {
     const { submissionId } = await params;
     const body = (await request.json()) as Record<string, unknown>;
+    if(body.revision !== undefined && body.revision !== "original" && body.revision !== "latest")throw new Error("Invalid revision selection.");
     const result = await requestRejudge({
+      revision:body.revision as "original"|"latest"|undefined,
       submissionId,
       reason: parseString(body.reason),
       detail: parseString(body.detail),

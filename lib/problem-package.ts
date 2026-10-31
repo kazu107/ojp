@@ -1,3 +1,4 @@
+import { normalizeTags } from "./problem-discovery";
 ﻿import AdmZip from "adm-zip";
 import { parseInteractiveLimits, resolvePackageCheckerType, type InteractiveLimits } from "./interactive-config";
 
@@ -58,6 +59,7 @@ interface ConfigSummary {
     explanationVisibility: ExplanationVisibility | null;
     difficulty: number | null;
     testCaseVisibility: TestCaseVisibility | null;
+    tags?: string[];
   };
   samples: ConfigSampleSummary[];
   groups: ConfigGroupSummary[];
@@ -140,6 +142,7 @@ export interface ParsedConfig {
     explanationVisibility?: ExplanationVisibility;
     difficulty?: number | null;
     testCaseVisibility?: TestCaseVisibility;
+    tags?: string[];
   };
   samples: ParsedConfigSample[];
   groups: ParsedConfigGroup[];
@@ -395,6 +398,7 @@ export function parseConfig(configJson: unknown): ParsedConfig {
       throw new Error("config.problem must be an object when provided");
     }
     const problem = config.problem as Record<string, unknown>;
+    if(problem.tags !== undefined)problemSettings.tags=normalizeTags(problem.tags);
     if (problem.slug !== undefined) {
       if (typeof problem.slug !== "string" || !problem.slug.trim()) {
         throw new Error("config.problem.slug must be a non-empty string");
@@ -751,6 +755,7 @@ export function validateProblemPackage(
             ? null
             : config.problemSettings.difficulty,
         testCaseVisibility: config.problemSettings.testCaseVisibility ?? null,
+        tags: config.problemSettings.tags,
       },
       samples: samples.map((sample) => ({
         name: sample.name,
@@ -1042,6 +1047,7 @@ export function inspectProblemPackageManifestFromZip(
               ? null
               : archive.config.problemSettings.difficulty,
           testCaseVisibility: archive.config.problemSettings.testCaseVisibility ?? null,
+          tags: archive.config.problemSettings.tags,
         },
         samples: sampleCases.map((sample) => ({
           name: sample.name,
@@ -1131,6 +1137,7 @@ function buildPrefillFromStatement(
     explanationVisibility?: ExplanationVisibility;
     difficulty?: number | null;
     testCaseVisibility?: TestCaseVisibility;
+    tags?: string[];
     slug?: string;
   },
 ): ProblemPackagePrefill {
@@ -1195,6 +1202,7 @@ function buildPrefillFromStatement(
     explanationVisibility: options.explanationVisibility,
     difficulty: options.difficulty,
     testCaseVisibility: options.testCaseVisibility,
+    tags: options.tags,
   };
 }
 
@@ -1469,6 +1477,7 @@ export function inspectProblemPackage(
       testCaseVisibility:
         extracted.validation.config.problem.testCaseVisibility ?? undefined,
       slug: extracted.validation.config.problem.slug ?? undefined,
+      tags: extracted.validation.config.problem.tags,
     }),
     draft: buildEditorDraftFromExtracted(extracted),
   };
@@ -1506,6 +1515,7 @@ export function buildProblemStatementMarkdown(input: {
 
 export function buildProblemPackageZip(input: {
   title: string;
+  tags?: string[];
   slug: string;
   visibility: Visibility;
   explanationVisibility: ExplanationVisibility;
@@ -1548,6 +1558,7 @@ export function buildProblemPackageZip(input: {
     compareMode: extracted.compareMode,
     problem: {
       slug: input.slug,
+      tags: input.tags === undefined ? undefined : normalizeTags(input.tags),
       visibility: input.visibility,
       explanationVisibility: input.explanationVisibility,
       difficulty: input.difficulty,

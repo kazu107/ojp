@@ -4230,5 +4230,405 @@
   "Interactive runtime failed to start.": {
     "en": "Interactive runtime failed to start.",
     "ja": "対話実行用のプログラムを起動できませんでした。"
+  },
+  "After": {
+    "en": "After",
+    "ja": "変更後"
+  },
+  "Before": {
+    "en": "Before",
+    "ja": "変更前"
+  },
+  "All Problems": {
+    "en": "All Problems",
+    "ja": "すべての問題"
+  },
+  "All Saved Notes": {
+    "en": "All Saved Notes",
+    "ja": "保存したすべての問題"
+  },
+  "All Tags": {
+    "en": "All Tags",
+    "ja": "すべてのタグ"
+  },
+  "An unsaved draft was found on this device. It expires after 14 days.": {
+    "en": "An unsaved draft was found on this device. It expires after 14 days.",
+    "ja": "この端末に未保存の下書きがあります。最終保存から14日間復元できます。"
+  },
+  "Attempted": {
+    "en": "Attempted",
+    "ja": "挑戦中"
+  },
+  "Bookmark": {
+    "en": "Bookmark",
+    "ja": "ブックマーク"
+  },
+  "Bookmarked Only": {
+    "en": "Bookmarked Only",
+    "ja": "ブックマークのみ"
+  },
+  "Bookmarks": {
+    "en": "Bookmarks",
+    "ja": "ブックマーク"
+  },
+  "Bookmarks and Review": {
+    "en": "Bookmarks and Review",
+    "ja": "ブックマーク・復習"
+  },
+  "Bookmarks and notes are private to your account.": {
+    "en": "Bookmarks and notes are private to your account.",
+    "ja": "ブックマークとメモは本人だけが閲覧できます。"
+  },
+  "Comma-separated tags, e.g. dp, graph": {
+    "en": "Comma-separated tags, e.g. dp, graph",
+    "ja": "カンマ区切りで入力（例: dp, グラフ）"
+  },
+  "Current Revision": {
+    "en": "Current Revision",
+    "ja": "現在の版"
+  },
+  "Discard Draft": {
+    "en": "Discard Draft",
+    "ja": "下書きを破棄"
+  },
+  "Due for Review": {
+    "en": "Due for Review",
+    "ja": "復習する問題"
+  },
+  "Edit Private Notes": {
+    "en": "Edit Private Notes",
+    "ja": "個人メモを編集"
+  },
+  "Judge Revision": {
+    "en": "Judge Revision",
+    "ja": "判定に使用する版"
+  },
+  "Latest version at request time": {
+    "en": "Latest version at request time",
+    "ja": "要求時点の最新の版"
+  },
+  "Legacy (not recorded)": {
+    "en": "Legacy (not recorded)",
+    "ja": "旧提出（版の記録なし）"
+  },
+  "Loading...": {
+    "en": "Loading...",
+    "ja": "読み込み中…"
+  },
+  "Mark Reviewed": {
+    "en": "Mark Reviewed",
+    "ja": "復習済みにする"
+  },
+  "Matching problems: {count}": {
+    "en": "Matching problems: {count}",
+    "ja": "該当する問題: {count}件"
+  },
+  "Maximum Difficulty": {
+    "en": "Maximum Difficulty",
+    "ja": "難易度の上限"
+  },
+  "Minimum Difficulty": {
+    "en": "Minimum Difficulty",
+    "ja": "難易度の下限"
+  },
+  "My Study Notes": {
+    "en": "My Study Notes",
+    "ja": "自分のメモ・復習"
+  },
+  "Next": {
+    "en": "Next",
+    "ja": "次へ"
+  },
+  "No matching saved problems.": {
+    "en": "No matching saved problems.",
+    "ja": "該当する保存済み問題はありません。"
+  },
+  "No recorded revisions yet. History starts with saves after this feature was enabled.": {
+    "en": "No recorded revisions yet. History starts with saves after this feature was enabled.",
+    "ja": "版履歴はまだありません。この機能の導入後の保存から記録されます。"
+  },
+  "Original submitted version": {
+    "en": "Original submitted version",
+    "ja": "最初の提出時の版"
+  },
+  "Previous": {
+    "en": "Previous",
+    "ja": "前へ"
+  },
+  "Private Notes": {
+    "en": "Private Notes",
+    "ja": "個人メモ"
+  },
+  "Progress": {
+    "en": "Progress",
+    "ja": "解答状況"
+  },
+  "Reset Filters": {
+    "en": "Reset Filters",
+    "ja": "絞り込みを解除"
+  },
+  "Restore Draft": {
+    "en": "Restore Draft",
+    "ja": "下書きを復元"
+  },
+  "Restore Revision": {
+    "en": "Restore Revision",
+    "ja": "この版へ復元"
+  },
+  "Restore this revision? Statement, settings, tags and tests will change. Existing submissions keep their pinned versions.": {
+    "en": "Restore this revision? Statement, settings, tags and tests will change. Existing submissions keep their pinned versions.",
+    "ja": "この版へ復元しますか？問題文・設定・タグ・テストが変更されます。既存提出に固定された版は変わりません。"
+  },
+  "Review Date": {
+    "en": "Review Date",
+    "ja": "復習日（日本時間）"
+  },
+  "Review Filters": {
+    "en": "Review Filters",
+    "ja": "復習の絞り込み"
+  },
+  "Review Later": {
+    "en": "Review Later",
+    "ja": "復習したい"
+  },
+  "Revision History": {
+    "en": "Revision History",
+    "ja": "版履歴"
+  },
+  "Save Notes": {
+    "en": "Save Notes",
+    "ja": "メモ・設定を保存"
+  },
+  "Search": {
+    "en": "Search",
+    "ja": "検索"
+  },
+  "Search Problems": {
+    "en": "Search Problems",
+    "ja": "問題を検索"
+  },
+  "Show Changes": {
+    "en": "Show Changes",
+    "ja": "差分を見る"
+  },
+  "Sign in to filter your progress and bookmarks.": {
+    "en": "Sign in to filter your progress and bookmarks.",
+    "ja": "解答状況・ブックマークの絞り込みにはログインが必要です。"
+  },
+  "Solved": {
+    "en": "Solved",
+    "ja": "正解済み"
+  },
+  "Submitted Revision": {
+    "en": "Submitted Revision",
+    "ja": "最初の提出時の版"
+  },
+  "Tags": {
+    "en": "Tags",
+    "ja": "タグ"
+  },
+  "The latest 50 distinct versions are shown. Older recorded versions and pinned ZIPs remain stored.": {
+    "en": "The latest 50 distinct versions are shown. Older recorded versions and pinned ZIPs remain stored.",
+    "ja": "新しい50版を表示します。以前の版と提出に固定されたZIPも保持されます。"
+  },
+  "The server version has changed. Review the restored content before saving.": {
+    "en": "The server version has changed. Review the restored content before saving.",
+    "ja": "サーバー上の内容が更新されています。復元内容を確認してから保存してください。"
+  },
+  "Title, slug or tag": {
+    "en": "Title, slug or tag",
+    "ja": "タイトル・識別名・タグ"
+  },
+  "Unattempted": {
+    "en": "Unattempted",
+    "ja": "未挑戦"
+  },
+  "Saved on this device.": {
+    "en": "Saved on this device.",
+    "ja": "この端末に自動保存しました。"
+  },
+  "Local draft restored.": {
+    "en": "Local draft restored.",
+    "ja": "この端末の下書きを復元しました。"
+  },
+  "Local draft storage is unavailable. Please save or export manually.": {
+    "en": "Local draft storage is unavailable. Please save or export manually.",
+    "ja": "端末の自動保存を使用できません。手動で保存するかZIPを書き出してください。"
+  },
+  "Local draft is too large. Export a ZIP instead.": {
+    "en": "Local draft is too large. Export a ZIP instead.",
+    "ja": "自動保存の容量を超えています。ZIPを書き出してください。"
+  },
+  "Another tab changed this draft. Restore or discard it first.": {
+    "en": "Another tab changed this draft. Restore or discard it first.",
+    "ja": "別のタブで下書きが更新されました。再読込して復元するか、下書きを破棄してください。"
+  },
+  "Unable to save a local draft.": {
+    "en": "Unable to save a local draft.",
+    "ja": "下書きを自動保存できません。"
+  },
+  "Invalid local draft.": {
+    "en": "Invalid local draft.",
+    "ja": "下書きの形式が不正です。"
+  },
+  "ZIP files and large cases are not stored in recovery drafts. Reimport or reload them if needed.": {
+    "en": "ZIP files and large cases are not stored in recovery drafts. Reimport or reload them if needed.",
+    "ja": "ZIP本体や大きなケース本文は復元用データに含みません。必要に応じて元のZIPを再選択してください。"
+  },
+  "Reimport the original ZIP before saving recovered test data.": {
+    "en": "Reimport the original ZIP before saving recovered test data.",
+    "ja": "大きなケースを省略して復元しました。元のZIPを再選択してから保存してください。"
+  },
+  "Private notes saved.": {
+    "en": "Private notes saved.",
+    "ja": "個人メモ・設定を保存しました。"
+  },
+  "Review completed.": {
+    "en": "Review completed.",
+    "ja": "復習済みにしました。"
+  },
+  "Unable to save.": {
+    "en": "Unable to save.",
+    "ja": "保存できませんでした。"
+  },
+  "Unable to restore revision.": {
+    "en": "Unable to restore revision.",
+    "ja": "版を復元できませんでした。"
+  },
+  "created": {
+    "en": "created",
+    "ja": "新規作成"
+  },
+  "baseline": {
+    "en": "baseline",
+    "ja": "更新前"
+  },
+  "metadata": {
+    "en": "metadata",
+    "ja": "問題文・設定"
+  },
+  "tags": {
+    "en": "tags",
+    "ja": "タグ"
+  },
+  "package": {
+    "en": "package",
+    "ja": "テストパッケージ"
+  },
+  "before_restore": {
+    "en": "before_restore",
+    "ja": "復元前"
+  },
+  "rejudge": {
+    "en": "rejudge",
+    "ja": "再ジャッジ時"
+  },
+  "title": {
+    "en": "title",
+    "ja": "タイトル"
+  },
+  "slug": {
+    "en": "slug",
+    "ja": "識別名"
+  },
+  "statementMarkdown": {
+    "en": "statementMarkdown",
+    "ja": "問題文"
+  },
+  "inputDescription": {
+    "en": "inputDescription",
+    "ja": "入力形式"
+  },
+  "outputDescription": {
+    "en": "outputDescription",
+    "ja": "出力形式"
+  },
+  "constraintsMarkdown": {
+    "en": "constraintsMarkdown",
+    "ja": "制約"
+  },
+  "explanationMarkdown": {
+    "en": "explanationMarkdown",
+    "ja": "解説"
+  },
+  "visibility": {
+    "en": "visibility",
+    "ja": "公開範囲"
+  },
+  "explanationVisibility": {
+    "en": "explanationVisibility",
+    "ja": "解説の公開条件"
+  },
+  "difficulty": {
+    "en": "difficulty",
+    "ja": "難易度"
+  },
+  "timeLimitMs": {
+    "en": "timeLimitMs",
+    "ja": "実行時間制限"
+  },
+  "memoryLimitMb": {
+    "en": "memoryLimitMb",
+    "ja": "メモリ制限"
+  },
+  "testCaseVisibility": {
+    "en": "testCaseVisibility",
+    "ja": "ケースの公開範囲"
+  },
+  "judgeType": {
+    "en": "judgeType",
+    "ja": "ジャッジ方式"
+  },
+  "Load More Revisions": {
+    "en": "Load More Revisions",
+    "ja": "さらに以前の版を表示"
+  },
+  "Workspace features require database setup. Run npm run db:workspace-features.": {
+    "en": "Workspace features require database setup. Run npm run db:workspace-features.",
+    "ja": "追加機能のDB準備が必要です。管理者が npm run db:workspace-features を実行してください。"
+  },
+  "Version storage is temporarily unavailable. Please retry.": {
+    "en": "Version storage is temporarily unavailable. Please retry.",
+    "ja": "版の保存先を一時的に利用できません。再試行してください。"
+  },
+  "Use at most 20 tags.": {
+    "en": "Use at most 20 tags.",
+    "ja": "タグは20個まで設定できます。"
+  },
+  "Each tag must contain 1 to 40 characters without markup.": {
+    "en": "Each tag must contain 1 to 40 characters without markup.",
+    "ja": "各タグは40文字以内で、HTML等を含めずに入力してください。"
+  },
+  "Notes must be at most 10000 characters.": {
+    "en": "Notes must be at most 10000 characters.",
+    "ja": "メモは10,000文字以内で入力してください。"
+  },
+  "Request body is too large.": {
+    "en": "Request body is too large.",
+    "ja": "送信内容のサイズが大きすぎます。"
+  },
+  "Unable to load revisions.": {
+    "en": "Unable to load revisions.",
+    "ja": "版履歴を読み込めません。"
+  },
+  "The ZIP does not contain all recovered cases.": {
+    "en": "The ZIP does not contain all recovered cases.",
+    "ja": "選択したZIPに復元対象のケースが揃っていません。元のZIPを選択してください。"
+  },
+  "The ZIP does not contain all recovered samples.": {
+    "en": "The ZIP does not contain all recovered samples.",
+    "ja": "選択したZIPに復元対象のサンプルが揃っていません。元のZIPを選択してください。"
+  },
+  "Unable to save tags.": {
+    "en": "Unable to save tags.",
+    "ja": "タグを保存できませんでした。"
+  },
+  "This legacy submission has no recorded original revision.": {
+    "en": "This legacy submission has no recorded original revision.",
+    "ja": "この旧提出には最初の版が記録されていません。最新版を指定してください。"
+  },
+  "Tags cannot contain separators.": {
+    "en": "Tags cannot contain separators.",
+    "ja": "1つのタグにカンマ・読点は含められません。別のタグとして入力してください。"
   }
 }

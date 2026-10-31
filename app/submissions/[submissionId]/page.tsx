@@ -20,7 +20,7 @@ import {
   canRequestRejudgeByViewer,
   findUser,
   getOptionalCurrentUser,
-  getProblemPackageCaseManifest,
+  getSubmissionPackageCaseManifest,
   getProblemById,
   getSubmissionWithAccess,
 } from "@/lib/store";
@@ -98,7 +98,7 @@ function buildDisplayResults(input: {
   testCaseVisibility: "group_only" | "case_index_only" | "case_name_visible";
   canViewSource: boolean;
   packageManifest:
-    | Awaited<ReturnType<typeof getProblemPackageCaseManifest>>
+    | Awaited<ReturnType<typeof getSubmissionPackageCaseManifest>>
     | null
     | undefined;
 }): Submission["testResults"] {
@@ -178,7 +178,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
   const testCaseVisibility = problem?.testCaseVisibility ?? "case_index_only";
   const packageManifest =
     problem && isWaitingSubmissionStatus(submission.status)
-      ? await getProblemPackageCaseManifest(problem.id)
+      ? await getSubmissionPackageCaseManifest(submission)
       : null;
   const displayResults = buildDisplayResults({
     submission,
@@ -213,6 +213,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
       <section className="panel stack">
         {submission.contestId ? <p className="text-soft"><Link className="link" href={`/contests/${submission.contestId}`}>{t(submission.virtualParticipationId?"Virtual Participation":"Contests")}</Link></p> : null}
         <SubmissionLiveRefresh status={submission.status} />
+        <p className="text-soft">{t("Submitted Revision")}: {submission.problemRevisionId?.slice(0,8) ?? t("Legacy (not recorded)")} / {t("Judge Revision")}: {(submission.judgeRevisionId ?? submission.problemRevisionId)?.slice(0,8) ?? t("Legacy (not recorded)")}</p>
         <div className="meta-inline">
           <StatusBadge className={badgeClassForSubmission(submission.status)}>
             {t(detailVerdictLabel(submission.status))}

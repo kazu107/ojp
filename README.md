@@ -657,3 +657,9 @@ npm run db:push -- --accept-data-loss
 対話型ジャッジ（interactor）、作問画面、ZIP入出力、非公開通信ログに対応しています。
 新しいリリースの起動前に `npm run db:interactive` でログ用の列を追加してください。
 仕様・ZIPテンプレート・資源制限は [対話型ジャッジ](docs/interactive-judge.md) を参照してください。
+
+## 問題ワークスペース
+
+自動保存・復元、問題検索とタグ、問題の版履歴・判定版の固定、個人ブックマーク・メモ・復習に対応しています。
+新しいWeb/workerの起動前に `npm run db:workspace-features` を実行してください。
+仕様・制限・導入手順は [問題ワークスペース](docs/problem-workspace.md) を参照してください。

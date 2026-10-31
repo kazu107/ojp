@@ -1,4 +1,8 @@
 "use client";
+import { normalizeTags } from "@/lib/problem-discovery";
+import { ProblemRevisionHistory } from "./problem-revision-history";
+import { DraftRecovery, useDraftRecovery } from "./draft-recovery";
+import { recoverablePackage, mergeRecoveredPackage, validateRecoveryPackage } from "@/lib/problem-drafts";
 import { InteractionLog } from "@/components/interaction-log";
 import { useI18n } from "@/components/i18n-provider";
 
@@ -35,18 +39,21 @@ type ProblemEditorFormProps =
       mode: "create";
       initialProblem?: undefined;
       initialPackageDraft?: ProblemPackageEditorDraft | null;
+      initialTags?: string[];
     }
   | {
       mode: "edit";
       initialProblem: Problem;
       initialPackageDraft?: ProblemPackageEditorDraft | null;
+      initialTags?: string[];
     };
 
-type EditorTab = "content" | "settings" | "tests" | "testrun";
+type EditorTab = "content" | "settings" | "tests" | "testrun" | "history";
 
 interface FormState {
   title: string;
   slug: string;
+  tags: string;
   statementMarkdown: string;
   inputDescription: string;
   outputDescription: string;
@@ -128,6 +135,7 @@ function emptyState(): FormState {
   return {
     title: "",
     slug: "",
+    tags: "",
     statementMarkdown: "",
     inputDescription: "",
     outputDescription: "",
@@ -142,10 +150,11 @@ function emptyState(): FormState {
   };
 }
 
-function stateFromProblem(problem: Problem): FormState {
+function stateFromProblem(problem: Problem, tags:string[]=[]): FormState {
   return {
     title: problem.title,
     slug: problem.slug,
+    tags: tags.join(", "),
     statementMarkdown: problem.statementMarkdown,
     inputDescription: problem.inputDescription,
     outputDescription: problem.outputDescription,
@@ -220,8 +229,9 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const { t } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState<FormState>(
-    props.mode === "edit" ? stateFromProblem(props.initialProblem) : emptyState(),
+    props.mode === "edit" ? stateFromProblem(props.initialProblem,props.initialTags) : emptyState(),
   );
+  const tagsLoaded=true;
   const [activeTab, setActiveTab] = useState<EditorTab>("content");
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState<ActionProgressState | null>(null);
@@ -263,6 +273,24 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   const hasExistingStoredPackage =
     props.mode === "edit" && Boolean(props.initialProblem.latestPackageSummary);
 
+  const draftValue = useMemo(() => ({form,packageDraft,previewLanguage,previewDraftsByLanguage,createdProblemId}), [form,packageDraft,previewLanguage,previewDraftsByLanguage,createdProblemId]);
+  const recovery = useDraftRecovery({name:`problem:${props.mode === "edit" ? props.initialProblem.id : "new"}`,base:props.initialProblem?.updatedAt ?? "new",value:draftValue,enabled:!isSaving && !isInspectingPackage,
+    prepare(saved){return {...saved,packageDraft:recoverablePackage(saved.packageDraft)}},
+    restore(saved){
+      if(!saved?.form || typeof saved.form.title!=="string" || typeof saved.form.slug!=="string")throw new Error("Invalid local draft.");
+      const next=emptyState();
+      for(const key of Object.keys(next) as Array<keyof FormState>){const value=saved.form[key];if(value===undefined)continue;if(typeof value!==typeof next[key]||(typeof value==="number"&&!Number.isFinite(value)))throw new Error("Invalid local draft.");Object.assign(next,{[key]:value});}
+      if(!["public","private","unlisted"].includes(next.visibility)||!["always","private","contest_end"].includes(next.explanationVisibility))throw new Error("Invalid local draft.");
+      const recoveredPackage=validateRecoveryPackage(saved.packageDraft ?? null);
+      setForm(next);setPackageDraft(recoveredPackage);
+      setCreatedProblemId(typeof saved.createdProblemId==="string"?saved.createdProblemId:null);
+      if(SUBMISSION_LANGUAGES.includes(saved.previewLanguage))setPreviewLanguage(saved.previewLanguage);
+      if(saved.previewDraftsByLanguage){const sources={...SOURCE_CODE_TEMPLATES};for(const key of SUBMISSION_LANGUAGES)if(typeof saved.previewDraftsByLanguage[key]==="string")sources[key]=saved.previewDraftsByLanguage[key];setPreviewDraftsByLanguage(sources);}
+      importedPackageFileRef.current=null;importedPackageSignatureRef.current=null;generatedPackageFileCacheRef.current=null;
+      setPackageNotice("ZIP files and large cases are not stored in recovery drafts. Reimport or reload them if needed.");
+    },
+  });
+
   async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
     try {
       const body = (await response.json()) as { error?: string };
@@ -285,9 +313,10 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       const inspected = await inspectProblemPackageClient(file, (progress) => {
         setInspectProgressText(`${progress.message} (${progress.current}/${progress.total})`);
       });
-      setForm((prev) => ({
+      setForm((prev) => packageDraft?.recoveryNeedsReimport ? prev : ({
         ...prev,
         title: inspected.prefill.title || prev.title,
+        tags: inspected.prefill.tags?.join(", ") ?? prev.tags,
         slug: inspected.prefill.slugSuggestion || prev.slug,
         statementMarkdown: inspected.prefill.statementMarkdown,
         inputDescription: inspected.prefill.inputDescription,
@@ -308,12 +337,13 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         testCaseVisibility:
           inspected.prefill.testCaseVisibility ?? prev.testCaseVisibility,
       }));
-      setPackageDraft(inspected.draft);
+      setPackageDraft(packageDraft?.recoveryNeedsReimport ? mergeRecoveredPackage(packageDraft,inspected.draft) : inspected.draft);
       importedPackageFileRef.current = file;
       importedPackageSignatureRef.current = JSON.stringify({
         form: {
           ...form,
           title: inspected.prefill.title || form.title,
+          tags: inspected.prefill.tags?.join(", ") ?? form.tags,
           slug: inspected.prefill.slugSuggestion || form.slug,
           statementMarkdown: inspected.prefill.statementMarkdown,
           inputDescription: inspected.prefill.inputDescription,
@@ -493,6 +523,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   }
 
   async function hydratePartialPackageDraftIfNeeded(): Promise<ProblemPackageEditorDraft> {
+    if(packageDraft?.recoveryNeedsReimport)throw new Error("Reimport the original ZIP before saving recovered test data.");
     if (!packageDraft) {
       throw new Error("Judge package is required.");
     }
@@ -678,6 +709,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
     const zipBlob = await buildProblemPackageZipBlob({
       title: form.title,
       slug: form.slug,
+      tags: normalizeTags(form.tags),
       statementMarkdown: form.statementMarkdown,
       inputDescription: form.inputDescription,
       outputDescription: form.outputDescription,
@@ -899,15 +931,14 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
     setIsSaving(true);
     setError("");
-    setCreatedProblemId(null);
     setSaveProgress({
       phase: "Saving problem metadata...",
       percent: 10,
     });
 
     try {
-      const response = await fetch(endpoint, {
-        method,
+      const response = await fetch(props.mode === "create" && createdProblemId ? `/api/problems/${createdProblemId}` : endpoint, {
+        method: props.mode === "create" && createdProblemId ? "PATCH" : method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -930,12 +961,17 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         phase: packageDraft ? "Problem metadata saved. Preparing package..." : "Problem metadata saved.",
         percent: packageDraft ? 15 : 85,
       });
+      if(tagsLoaded){
+        const tagResponse=await fetch(`/api/problems/${body.problem.id}/tags`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({tags:form.tags})});
+        if(!tagResponse.ok)throw new Error(await parseErrorMessage(tagResponse,"Unable to save tags."));
+      }
       await saveProblemPackage(body.problem.id);
 
       setSaveProgress({
         phase: "Redirecting to problem page...",
         percent: 100,
       });
+      await recovery.clear();
       router.push(`/problems/${body.problem.id}`);
       router.refresh();
     } catch (submitError) {
@@ -948,6 +984,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
 
   return (
     <form className="form" onSubmit={onSubmit}>
+      <DraftRecovery draft={recovery} />
       <section className="panel stack">
         <div className="button-row">
           <button
@@ -977,6 +1014,8 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         </div>
       </section>
 
+      {props.mode === "edit" ? <div className="button-row"><button type="button" className={activeTab === "history" ? "button" : "button button-secondary"} onClick={()=>setActiveTab("history")}>{t("Revision History")}</button></div> : null}
+      {activeTab === "history" && props.mode === "edit" ? <ProblemRevisionHistory problemId={props.initialProblem.id} /> : null}
       {activeTab === "content" ? (
         <section className="stack">
           <div className="form-grid">
@@ -1072,6 +1111,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       {activeTab === "settings" ? (
         <section className="stack">
           <div className="form-grid">
+            <label className="field"><span className="field-label">{t("Tags")}</span><input className="input" disabled={!tagsLoaded} value={form.tags} onChange={event=>setForm(current=>({...current,tags:event.target.value}))} placeholder={t("Comma-separated tags, e.g. dp, graph")} /></label>
             <label className="field">
               <span className="field-label">{t("Visibility")}</span>
               <select

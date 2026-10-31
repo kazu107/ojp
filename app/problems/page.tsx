@@ -1,3 +1,6 @@
+import { ProblemFilters } from "@/components/problem-filters";
+import { problemTags, studyEntries, discoveryStatuses } from "@/lib/problem-workspace-store";
+import { filterProblems, problemProgress, type DiscoveryFilters } from "@/lib/problem-discovery";
 
 import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
@@ -20,19 +23,20 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function ProblemsPage() {
+export default async function ProblemsPage({searchParams}:{searchParams:Promise<DiscoveryFilters & {page?:string}>}) {
   const { t, locale } = await getI18n();
   const me = await getOptionalCurrentUser();
   const canCreateProblem = me ? canCreateProblemByRole(me.role) : false;
-  const problems = listProblemsForListView(me?.id ?? "guest");
-  const acceptedProblemIds = me
-    ? new Set(
-        listSubmissionsForViewer(me.id, {
-          userId: me.id,
-          status: "accepted",
-        }).map((submission) => submission.problemId),
-      )
-    : new Set<string>();
+  const allProblems = listProblemsForListView(me?.id ?? "guest");
+  const filters=await searchParams;
+  const tags=await problemTags(allProblems.map(problem=>problem.id));
+  const progress=problemProgress(me?await discoveryStatuses(listSubmissionsForViewer(me.id,{userId:me.id})):[]);
+  const bookmarks=new Set(me?(await studyEntries(me.id)).filter(row=>row.bookmarked).map(row=>row.problemId):[]);
+  const filtered=filterProblems(allProblems,me?filters:{...filters,progress:"all",saved:""},tags,progress,bookmarks);
+  const pages=Math.max(1,Math.ceil(filtered.length/50));
+  const page=Math.min(pages,Math.max(1,Math.floor(Number(filters.page)||1)));
+  const problems=filtered.slice((page-1)*50,page*50);
+  const pageUrl=(target:number)=>{const params=new URLSearchParams();for(const key of ["q","tag","min","max","progress","saved"] as const)if(filters[key])params.set(key,filters[key]!);params.set("page",String(target));return "/problems?"+params.toString()};
 
   return (
     <div className="page">
@@ -50,6 +54,8 @@ export default async function ProblemsPage() {
         </div>
       </section>
 
+      <ProblemFilters filters={filters} tags={[...new Set([...tags.values()].flat())].sort()} loggedIn={!!me} />
+      <p className="text-soft">{t("Matching problems: {count}",{count:filtered.length})}</p>
       <section className="panel">
         {problems.length === 0 ? (
           <p className="empty">{t("表示できる問題がありません。")}</p>
@@ -71,12 +77,13 @@ export default async function ProblemsPage() {
                 {problems.map((problem) => (
                   <tr
                     key={problem.id}
-                    className={acceptedProblemIds.has(problem.id) ? "problem-row-solved" : undefined}
+                    className={progress.get(problem.id) === "solved" ? "problem-row-solved" : undefined}
                   >
                     <td>
                       <Link className="link" href={`/problems/${problem.id}`}>
                         {problem.title}
                       </Link>
+                      <div className="meta-inline">{(tags.get(problem.id)??[]).map(tag=><Link key={tag} className="badge badge-blue" href={`/problems?tag=${encodeURIComponent(tag)}`}>{tag}</Link>)}</div>
                     </td>
                     <td>
                       <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
@@ -109,6 +116,7 @@ export default async function ProblemsPage() {
           </div>
         )}
       </section>
+      <div className="button-row">{page>1?<Link className="link" href={pageUrl(page-1)}>{t("Previous")}</Link>:null}<span>{page} / {pages}</span>{page<pages?<Link className="link" href={pageUrl(page+1)}>{t("Next")}</Link>:null}</div>
     </div>
   );
 }

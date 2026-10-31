@@ -125,6 +125,8 @@ export interface SubmissionTestResult {
 }
 
 export interface Submission {
+  problemRevisionId?: string;
+  judgeRevisionId?: string;
   id: string;
   userId: string;
   problemId: string;
@@ -177,6 +179,7 @@ export interface CreateReportInput {
 
 export type AuditAction =
   | "profile.display_name.update"
+  | "problem.revision.restore"
   | "report.create"
   | "report.status.update"
   | "admin.user.freeze"
@@ -204,6 +207,7 @@ export interface AuditLog {
 }
 
 export interface RejudgeRequest {
+  judgeRevisionId?: string;
   id: string;
   requestedBy: string;
   submissionId: string;
@@ -319,6 +323,7 @@ export interface CreateAnnouncementInput {
 }
 
 export interface RequestRejudgeInput {
+  revision?: "original" | "latest";
   submissionId: string;
   reason: string;
   detail: string;

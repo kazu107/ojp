@@ -1,3 +1,4 @@
+import { problemTags } from "@/lib/problem-workspace-store";
 
 import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
@@ -26,6 +27,7 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
   }
 
   const canEdit = canEditProblemByViewer(problem, me.id);
+  const tags=canEdit ? (await problemTags([problem.id])).get(problem.id) ?? [] : [];
 
   return (
     <div className="page">
@@ -40,7 +42,7 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
       {canEdit ? (
         <>
           <section className="panel">
-            <ProblemEditorForm mode="edit" initialProblem={problem} />
+            <ProblemEditorForm mode="edit" initialProblem={problem} initialTags={tags} />
           </section>
           <section className="panel stack">
             <h2 className="panel-title">{t("Publish Settings")}</h2>
