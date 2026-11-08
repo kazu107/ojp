@@ -1,6 +1,7 @@
 "use client";
 import { normalizeTags } from "./problem-discovery";
 
+import {parseHeuristicConfig, validateHeuristicGroups} from "./heuristic-config";
 import JSZip from "jszip";
 import { parseInteractiveLimits, resolvePackageCheckerType } from "./interactive-config";
 import {
@@ -243,11 +244,14 @@ export async function inspectProblemPackageClient(
   }
   const config = JSON.parse(configRaw) as Record<string, unknown>;
 
-  const scoringType =
+  let scoringType: ProblemPackageScoringType =
     config.scoringType === "sum_of_groups" || config.scoringType === "sum"
       ? "sum_of_groups"
       : ("binary" as ProblemPackageScoringType);
   const checkerType = resolvePackageCheckerType(config);
+  if(config.scoringType!==undefined&&((checkerType==="heuristic")!==(config.scoringType==="heuristic")))throw new Error("Heuristic checker and scoringType must be selected together");
+  const heuristic = checkerType === "heuristic" ? parseHeuristicConfig(config.heuristic) : undefined;
+  if(heuristic)scoringType="heuristic";
   const interactive = checkerType === "interactive" ? parseInteractiveLimits(config.interactive) : undefined;
   const checkerLanguage =
     checkerType !== "exact" ? parseCheckerLanguage(config.interactorLanguage ?? config.checkerLanguage) : null;
@@ -286,7 +290,7 @@ export async function inspectProblemPackageClient(
     }
   }
 
-  if (checkerType !== "interactive") validatePairs(sampleIn, sampleOut, "samples");
+  if (!["interactive", "heuristic"].includes(checkerType)) validatePairs(sampleIn, sampleOut, "samples");
   const configSamples = Array.isArray(config.samples) ? config.samples : [];
   const sampleConfigByName = new Map(
     configSamples
@@ -366,7 +370,7 @@ export async function inspectProblemPackageClient(
   const groups = groupNames.map((groupName, groupIndex) => {
     const inSet = testIn.get(groupName) ?? new Set<string>();
     const outSet = testOut.get(groupName) ?? new Set<string>();
-    if (checkerType !== "interactive") validatePairs(inSet, outSet, `tests/${groupName}`);
+    if (!["interactive", "heuristic"].includes(checkerType)) validatePairs(inSet, outSet, `tests/${groupName}`);
     const caseNames = [...inSet].sort(naturalNameCompare);
     return {
       id: `group-${groupIndex + 1}`,
@@ -382,6 +386,7 @@ export async function inspectProblemPackageClient(
     };
   });
 
+  if(heuristic)validateHeuristicGroups(heuristic,groups.map(g=>g.name));
   const checkerSourceCode =
     checkerLanguage && textByPath.has(checkerSourceFileName(checkerLanguage, checkerType === "interactive"))
       ? textByPath.get(checkerSourceFileName(checkerLanguage, checkerType === "interactive")) ?? ""
@@ -403,6 +408,7 @@ export async function inspectProblemPackageClient(
           typeof config.memoryLimitMb === "number" ? config.memoryLimitMb : 512,
         scoringType,
         checkerType,
+      heuristic,
       interactive,
         checkerLanguage,
         compareMode,
@@ -450,6 +456,7 @@ export async function inspectProblemPackageClient(
     draft: {
       sourceLabel: file.name,
       checkerType,
+      heuristic,
       interactive,
       checkerLanguage: checkerLanguage ?? "python",
       checkerSourceCode,

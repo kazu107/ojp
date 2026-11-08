@@ -1,5 +1,6 @@
 import { createReadStream } from "node:fs";
 import { brainfuckNodeRunner } from "./brainfuck-node";
+import { absoluteScore, parseScorerResult } from "./heuristic-score";
 import { runInteractiveCase } from "./judge-interactive";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -33,6 +34,7 @@ interface CommandTemplate {
 }
 
 interface JudgeResult {
+  heuristicScore?: string | null;
   status: SubmissionStatus;
   score: number;
   totalTimeMs: number;
@@ -298,6 +300,7 @@ function scoreFromGroups(
   scoringType: ProblemPackageScoringType,
   judgedGroupStates: Array<{ score: number; accepted: boolean }>,
 ): number {
+  if (scoringType === "heuristic") return 0;
   if (scoringType === "binary") {
     return judgedGroupStates.every((state) => state.accepted) ? 100 : 0;
   }
@@ -384,12 +387,15 @@ async function compileProgram(
 }
 
 async function runSpecialJudgeCase(input: {
+  numeric?: boolean;
   checkerWorkspace: string;
   checkerRuntime: CommandTemplate;
   inputPath: string;
   answerPath: string;
   contestantOutputPath: string;
 }): Promise<{
+  rawScore?: string | null;
+  scorerDiagnostic?: string;
   verdict: SubmissionStatus;
   message: string;
 }> {
@@ -407,6 +413,7 @@ async function runSpecialJudgeCase(input: {
       cwd: input.checkerWorkspace,
       stdin: "",
       timeoutMs: 10_000,
+      ...(input.numeric ? {outputLimitBytes:16384,maxStdoutCaptureBytes:16384,maxStderrCaptureBytes:16384} : {}),
       captureMemory: true,
       memoryLimitMb: getJudgeResourceLimits().checkerMemoryMb,
       readOnlyFiles: [
@@ -446,12 +453,19 @@ async function runSpecialJudgeCase(input: {
     };
   }
   if (checkResult.exitCode === 0) {
+    if (input.numeric) {
+      try {
+        const parsed = parseScorerResult(checkResult.stdout.trim());
+        return { verdict: parsed.valid ? "accepted" : "wrong_answer", message: parsed.valid ? "Valid solution" : "Invalid solution", rawScore: parsed.score, scorerDiagnostic: parsed.diagnostic };
+      } catch { return { verdict: "internal_error", message: "Invalid scorer response." }; }
+    }
     return {
       verdict: "accepted",
       message: detail || "Accepted",
     };
   }
   if (checkResult.exitCode === 1) {
+    if (input.numeric) return { verdict: "internal_error", message: "Scorer exited unsuccessfully." };
     return {
       verdict: "wrong_answer",
       message: detail || "Wrong answer.",
@@ -592,6 +606,7 @@ async function isOutputAcceptedFiles(
 }
 
 export async function executePackageJudge(input: {
+  phase?: "provisional" | "system";
   sourceCode: string;
   language: Language;
   timeLimitMs: number;
@@ -617,6 +632,7 @@ export async function executePackageJudge(input: {
         checkerSourceCode: input.packageSource.checkerSourceCode,
         compareMode: input.packageSource.manifest.compareMode,
         interactive: input.packageSource.manifest.interactive,
+        heuristic: input.packageSource.manifest.heuristic,
         groups: input.packageSource.groups,
       }
     : input.packageData
@@ -627,6 +643,7 @@ export async function executePackageJudge(input: {
           checkerSourceCode: input.packageData.checkerSourceCode,
           compareMode: input.packageData.compareMode,
           interactive: input.packageData.interactive,
+          heuristic: input.packageData.heuristic,
           groups: input.packageData.groups.map((group) => ({
             name: group.name,
             score: group.score,
@@ -637,6 +654,11 @@ export async function executePackageJudge(input: {
       : null;
   if (!packageMeta) {
     throw new Error("package data is required");
+  }
+  if (packageMeta.checkerType === "heuristic" && !packageMeta.heuristic) throw new Error("Heuristic configuration is required");
+  if (packageMeta.heuristic) {
+    packageMeta.groups = packageMeta.groups.filter(group => packageMeta.heuristic!.finalGroups.includes(group.name) === (input.phase === "system"));
+    if (!packageMeta.groups.length) throw new Error("No cases configured for this evaluation phase");
   }
 
   await assertJudgeSandboxReady();
@@ -762,7 +784,7 @@ export async function executePackageJudge(input: {
 
     const existingResults = input.existingResults ?? [];
     const results: Submission["testResults"] = [...existingResults];
-    let remainingLogBytes = Math.max(0, 256 * 1024 - existingResults.reduce((sum, result) => sum + Buffer.byteLength(result.interactionLog ?? ""), 0));
+    let remainingLogBytes = Math.max(0, 256 * 1024 - existingResults.reduce((sum, result) => sum + Buffer.byteLength(result.interactionLog ?? "") + Buffer.byteLength(result.scorerDiagnostic ?? ""), 0));
     const judgedGroupStates: Array<{ score: number; accepted: boolean }> = [];
     let totalTimeMs = existingResults.reduce(
       (max, result) => Math.max(max, result.timeMs),
@@ -772,12 +794,12 @@ export async function executePackageJudge(input: {
       (max, result) => Math.max(max, result.memoryKb),
       0,
     );
-    let existingIndex = 0;
+    const existingByKey=new Map(existingResults.map(result=>[`${result.groupName}/${result.testCaseName}`,result]));
 
     for (const group of packageMeta.groups) {
       let groupAccepted = true;
       for (const caseName of group.caseNames) {
-        const existing = existingResults[existingIndex];
+        const existing = existingByKey.get(`${group.name}/${caseName}`);
         if (
           existing &&
           existing.groupName === group.name &&
@@ -786,7 +808,6 @@ export async function executePackageJudge(input: {
           if (!isAcceptedSubmissionStatus(existing.verdict)) {
             groupAccepted = false;
           }
-          existingIndex += 1;
           totalTimeMs = Math.max(totalTimeMs, existing.timeMs);
           peakMemoryKb = Math.max(peakMemoryKb, existing.memoryKb);
           continue;
@@ -848,6 +869,8 @@ export async function executePackageJudge(input: {
 
           let verdict: SubmissionStatus = "accepted";
           let message = "Accepted";
+          let rawScore: string | null = null;
+          let scorerDiagnostic: string | undefined;
 
           if (interaction) {
             verdict = interaction.verdict;
@@ -878,10 +901,11 @@ export async function executePackageJudge(input: {
           } else if (runResult.exitCode !== 0) {
             verdict = "runtime_error";
             message = runResult.stderr || "Runtime error.";
-          } else if (packageMeta.checkerType === "special_judge") {
+          } else if (packageMeta.checkerType === "special_judge" || packageMeta.checkerType === "heuristic") {
             const checked =
               checkerRuntime && checkerWorkspace
                 ? await runSpecialJudgeCase({
+                    numeric: packageMeta.checkerType === "heuristic",
                     checkerWorkspace,
                     checkerRuntime,
                     inputPath: testCaseFiles.inputPath,
@@ -894,6 +918,8 @@ export async function executePackageJudge(input: {
                   };
             verdict = checked.verdict;
             message = checked.message;
+            if ("rawScore" in checked) rawScore = checked.rawScore ?? null;
+            if ("scorerDiagnostic" in checked) scorerDiagnostic = checked.scorerDiagnostic;
           } else if (
             !(await isOutputAcceptedFiles(
               contestantOutputPath,
@@ -909,6 +935,12 @@ export async function executePackageJudge(input: {
             groupAccepted = false;
           }
 
+          if(packageMeta.heuristic){
+            const detail=scorerDiagnostic??(verdict==="accepted"?"":message);
+            scorerDiagnostic=detail.slice(0,Math.min(4000,Math.floor(remainingLogBytes/4)));
+            remainingLogBytes=Math.max(0,remainingLogBytes-Buffer.byteLength(scorerDiagnostic));
+            message=verdict==="accepted"?"Valid solution":verdict==="wrong_answer"?"Invalid solution":"Evaluation failed";
+          }
           const nextResult = {
             id: input.nextTestResultId(),
             groupName: group.name,
@@ -917,6 +949,7 @@ export async function executePackageJudge(input: {
             timeMs: runResult.durationMs,
             memoryKb: runResult.memoryKb,
             message,
+            ...(packageMeta.heuristic ? { rawScore, scorerDiagnostic } : {}),
             ...(interaction ? { interactionLog: interaction.interactionLog } : {}),
           };
           remainingLogBytes = Math.max(0, remainingLogBytes - Buffer.byteLength(interaction?.interactionLog ?? ""));
@@ -942,8 +975,11 @@ export async function executePackageJudge(input: {
     }
 
     await input.onPhaseChange?.("judging");
+    const caseOrder=new Map(packageMeta.groups.flatMap(g=>g.caseNames.map(name=>`${g.name}/${name}`)).map((key,i)=>[key,i]));
+    results.sort((a,b)=>(caseOrder.get(`${a.groupName}/${a.testCaseName}`)??-1)-(caseOrder.get(`${b.groupName}/${b.testCaseName}`)??-1));
     return {
       status: overallVerdict(results),
+      ...(packageMeta.heuristic ? { heuristicScore: absoluteScore(packageMeta.heuristic, results.map(r=>({key:`${r.groupName}/${r.testCaseName}`,verdict:r.verdict,rawScore:r.rawScore ?? null}))) } : {}),
       score: scoreFromGroups(packageMeta.scoringType, judgedGroupStates),
       totalTimeMs,
       peakMemoryKb,

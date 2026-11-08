@@ -1,3 +1,4 @@
+import { enqueueHeuristicRun, workOneHeuristicRun, heuristicStandings, assertHeuristicAvailable, isHeuristicRevision } from "./heuristic-store";
 import { captureProblemRevision, revisionById, retainedPackage } from "./problem-revisions";
 import { saveProblemTags } from "./problem-workspace-store";
 import { visibleInteractionResults, canViewPrivateInteraction } from "./interactive-privacy";
@@ -1688,6 +1689,11 @@ async function enqueueMissingJudgeJobsDb(): Promise<number> {
     if (activeIds.has(submissionId)) {
       continue;
     }
+    if(waitingSubmission.heuristic){
+      const run=await prisma.heuristicRun.findFirst({where:{submissionId,phase:"provisional"},select:{id:true}});
+      if(!run)await enqueueHeuristicRun(waitingSubmission);
+      continue;
+    }
     if (waitingSubmission?.status === "pending") {
       waitingSubmission.status = "queued";
     }
@@ -3003,6 +3009,7 @@ async function applyProblemPackageExtractedInternal(
     validatedAt: nowIso(),
   };
   problem.judgeType = packageData.checkerType === "interactive" ? "interactive" : "batch";
+  problem.heuristic = packageData.heuristic;
   problem.sampleCases = packageData.samples.map((sample) => ({
     name: sample.name,
     description: sample.description,
@@ -3048,6 +3055,7 @@ async function applyProblemPackageManifestInternal(
     validatedAt: nowIso(),
   };
   problem.judgeType = manifest.checkerType === "interactive" ? "interactive" : "batch";
+  problem.heuristic = manifest.heuristic;
   problem.sampleCases = manifest.sampleCases.map((sample) => ({
     name: sample.name,
     description: sample.description,
@@ -3262,6 +3270,13 @@ export function getContestStatus(contest: Contest): ContestStatus {
   return contestStatus(contest);
 }
 
+async function configureHeuristicContest(contest:Contest,actorId:string){
+  if(!contest.heuristic)return;
+  const revisions:Record<string,string>={};
+  for(const item of contest.problems){const p=resolveProblemIfExists(item.problemId);revisions[p.id]=(await recordCurrentProblemRevision(p,actorId,"contest")).id;}
+  await prisma.heuristicContest.upsert({where:{contestId:contest.id},create:{contestId:contest.id,selection:contest.heuristic.selection,revisions},update:{selection:contest.heuristic.selection,revisions}});
+}
+
 export async function createContest(input: CreateContestInput): Promise<Contest> {
   const user = await getCurrentUser();
   assertActiveUser(user);
@@ -3284,12 +3299,14 @@ export async function createContest(input: CreateContestInput): Promise<Contest>
     penaltyMinutes: input.penaltyMinutes,
     scoreboardVisibility: input.scoreboardVisibility,
     rated: input.rated ?? false,
+    heuristic: input.heuristic,
     problems: [...input.problems].sort((left, right) => left.orderIndex - right.orderIndex),
     participantUserIds: [user.id],
     createdAt: timestamp,
     updatedAt: timestamp,
   };
 
+  await configureHeuristicContest(contest,user.id);
   store.contests.unshift(contest);
   await persistStoreSnapshotNow();
   return contest;
@@ -3307,9 +3324,18 @@ export async function updateContest(
   }
 
   const next = {...contest, ...Object.fromEntries(Object.entries(input).filter(([,value]) => value !== undefined))};
-  validateContest(next, store.problems, user);
+  let validationProblems=store.problems;
+  if(contest.heuristic&&contestStatus(contest)!=="scheduled"){
+    const fixed=await prisma.heuristicContest.findUnique({where:{contestId:contest.id}});
+    const revisions=(fixed?.revisions??{}) as Record<string,string>;
+    const frozen=new Map<string,Problem>();
+    for(const item of contest.problems){const snapshot=await revisionById(item.problemId,revisions[item.problemId]);if(snapshot)frozen.set(item.problemId,snapshot.problem)}
+    validationProblems=store.problems.map(p=>frozen.get(p.id)??p);
+  }
+  validateContest(next, validationProblems, user);
   assertContestStructureEditable(contest, next);
   uniqueSlugOrThrow("contest", next.slug, contestId);
+  if(contestStatus(contest)==="scheduled")await configureHeuristicContest(next,user.id);
   Object.assign(contest, next, {slug:toSlug(next.slug), title:next.title.trim(),
     problems:[...next.problems].sort((a,b) => a.orderIndex-b.orderIndex), updatedAt:nowIso()});
   await persistStoreSnapshotNow();
@@ -3351,6 +3377,7 @@ export async function startVirtualContest(contestId: string): Promise<VirtualPar
   const user = await getCurrentUser();
   assertActiveUser(user);
   const contest = resolveContestIfExists(contestId);
+  if(contest.heuristic)throw new ContestError("Heuristic virtual participation is not supported yet.",409);
   if (!canAccessContest(contest,user)) throw new HttpError("contest not found",404);
   if (getContestStatus(contest) !== "ended") throw new ContestError("Virtual participation is available only after the contest ends.",409);
   return startVirtualParticipation(contestId,user.id,Date.parse(contest.endAt)-Date.parse(contest.startAt));
@@ -3503,8 +3530,13 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
       }
     }
   }
-  const revision=await recordCurrentProblemRevision(problem,currentUser.id,"submission");
+  const heuristicContest=contestId ? await prisma.heuristicContest.findUnique({where:{contestId}}) : null;
+  const pinnedContestId=(heuristicContest?.revisions as Record<string,string>|undefined)?.[problem.id];
+  const revision=pinnedContestId ? {id:pinnedContestId} : await recordCurrentProblemRevision(problem,currentUser.id,"submission");
+  const numeric=!!pinnedContestId||!!problem.heuristic;
+  if(numeric)await assertHeuristicAvailable();
   const submission: Submission = {
+    ...(numeric?{heuristic:true as const}:{}),
     problemRevisionId:revision.id,
     judgeRevisionId:revision.id,
     id: nextSubmissionId(),
@@ -3537,7 +3569,10 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     judgedAt: null,
     judgeEnvironmentVersion: null,
   });
-  if (JUDGE_PROCESS_MODE === "inline") {
+  if (numeric) {
+    await enqueueHeuristicRun(submission);
+    if(JUDGE_PROCESS_MODE === "inline")void workOneHeuristicRun();
+  } else if (JUDGE_PROCESS_MODE === "inline") {
     enqueueJudgeJob(submission.id, "normal");
   } else {
     await enqueueJudgeJobDb(submission.id, "normal");
@@ -3594,14 +3629,15 @@ export async function getContestLiveData(contestId: string, user: User | null): 
   await refreshContestRuntime();
   const submissions = store.submissions.map(s => applySubmissionRuntimeSummary(s));
   const ratings = currentRatings();
-  const board = buildVisibleScoreboard(contestId);
+  const heuristicBoard=contest.heuristic?await heuristicStandings(contest,submissions):null;
+  const board=heuristicBoard ? {rows:!canViewAnyScoreboard(contest)?[]:heuristicBoard.rows.map(row=>({...row,cells:canViewScoreboardDetails(contest)?row.cells:[]})),detailLevel:(!canViewAnyScoreboard(contest)?"hidden":canViewScoreboardDetails(contest)?"full":"summary") as "hidden"|"full"|"summary"} : buildVisibleScoreboard(contestId);
   const session = user ? await readVirtualParticipation(contestId,user.id) : null;
   const status = getContestStatus(contest);
   const canOpen = status !== "scheduled" || (!!user && canEditContestByViewer(contest,user.id));
-  return {contestId, serverNow:nowIso(),startAt:contest.startAt,endAt:contest.endAt,status,
+  return {heuristic:heuristicBoard?{state:heuristicBoard.state,canFinalize:!!user&&canEditContestByViewer(contest,user.id)&&status==="ended"}:undefined,contestId, serverNow:nowIso(),startAt:contest.startAt,endAt:contest.endAt,status,
     rated:!!contest.rated, joined:!!user && contest.participantUserIds.includes(user.id), visibility:contest.scoreboardVisibility,
     canJoin:!!user && user.status === "active" && status !== "ended",
-    canVirtual:!!user && user.status === "active" && status === "ended",
+    canVirtual:!contest.heuristic && !!user && user.status === "active" && status === "ended",
     detailLevel:board.detailLevel,
     rows:board.rows.map(row => ({...row,displayName:findUser(row.userId)?.displayName ?? row.userId})),
     ratingResult:ratings.results.get(contestId) ?? {status:"unrated",changes:[]},
@@ -4476,7 +4512,11 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
 
   globalStore.__ojpDedicatedJudgeLoopStarted = true;
 
+  let ticking=false;
   const tick = async () => {
+    if(ticking)return;
+    ticking=true;
+    try {
     if (store.judgeWorkerRunning || store.packageJobWorkerRunning) {
       return;
     }
@@ -4501,6 +4541,7 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
       return;
     }
 
+    if (await workOneHeuristicRun()) return;
     const judgeJob = await claimNextJudgeJobDb();
     if (judgeJob) {
       store.judgeWorkerRunning = true;
@@ -4525,11 +4566,12 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
         store.judgeWorkerRunning = false;
       }
     }
+    } finally { ticking=false; }
   };
 
   await tick();
   setInterval(() => {
-    void tick();
+    void tick().catch(()=>console.error("[judge-worker] tick failed; retrying"));
   }, DEDICATED_JUDGE_POLL_INTERVAL_MS);
 }
 
@@ -4581,12 +4623,20 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
 
   enforceRejudgeRateLimit(actor.id, problem.id, isAdminBypass(actor));
 
-  if(input.revision === "original"){
+  const pinnedHeuristicContest=contest?.heuristic ? await prisma.heuristicContest.findUnique({where:{contestId:contest.id}}) : null;
+  let targetRevisionId:string;
+  if(pinnedHeuristicContest){
+    targetRevisionId=(pinnedHeuristicContest.revisions as Record<string,string>)[problem.id];
+  } else if(input.revision === "original"){
     if(!submission.problemRevisionId)throw new HttpError("This legacy submission has no recorded original revision.",409);
-    submission.judgeRevisionId=submission.problemRevisionId;
+    targetRevisionId=submission.problemRevisionId;
   } else {
-    submission.judgeRevisionId=(await recordCurrentProblemRevision(problem,actor.id,"rejudge")).id;
+    targetRevisionId=(await recordCurrentProblemRevision(problem,actor.id,"rejudge")).id;
   }
+  const numeric=await isHeuristicRevision(problem.id,targetRevisionId);
+  if(numeric!==!!submission.heuristic)throw new HttpError("Cannot switch an existing submission between numeric and binary scoring. Submit a new solution.",409);
+  if(numeric)await assertHeuristicAvailable();
+  submission.judgeRevisionId=targetRevisionId;
   submission.status = "pending";
   submission.score = 0;
   submission.totalTimeMs = 0;
@@ -4624,7 +4674,10 @@ export async function requestRejudge(input: RequestRejudgeInput): Promise<{
     judgedAt: null,
     judgeEnvironmentVersion: null,
   });
-  if (JUDGE_PROCESS_MODE === "inline") {
+  if (numeric) {
+    await enqueueHeuristicRun(submission,"provisional",request.id);
+    if(JUDGE_PROCESS_MODE === "inline")void workOneHeuristicRun();
+  } else if (JUDGE_PROCESS_MODE === "inline") {
     enqueueJudgeJob(submission.id, "rejudge");
   } else {
     await enqueueJudgeJobDb(submission.id, "rejudge");

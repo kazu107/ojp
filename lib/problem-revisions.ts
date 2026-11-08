@@ -33,9 +33,9 @@ export function revisionDigest(snapshot: RevisionSnapshot): string {
 }
 export function revisionSummary(snapshot: RevisionSnapshot): Summary {
   const result: Summary = {};
-  for (const key of ["title", "slug", "statementMarkdown", "inputDescription", "outputDescription", "constraintsMarkdown", "explanationMarkdown", "visibility", "explanationVisibility", "difficulty", "timeLimitMs", "memoryLimitMb", "testCaseVisibility", "judgeType"] as const) {
+  for (const key of ["title", "slug", "statementMarkdown", "inputDescription", "outputDescription", "constraintsMarkdown", "explanationMarkdown", "visibility", "explanationVisibility", "difficulty", "timeLimitMs", "memoryLimitMb", "testCaseVisibility", "judgeType", "heuristic"] as const) {
     const value = snapshot.problem[key] ?? "";
-    result[key] = { digest: hash(value), value: snippet(value) };
+    result[key] = { digest: hash(value), value: snippet(typeof value === "object" ? JSON.stringify(value) : value) };
   }
   result.tags = { digest: hash(snapshot.tags), value: snapshot.tags.join(", ") };
   const packageHash = hash(snapshot.storageRef ?? snapshot.inlinePackage);

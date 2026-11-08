@@ -2,6 +2,55 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model HeuristicRun {
+  id           String               @id
+  submissionId String
+  problemId    String
+  revisionId   String
+  evaluationId String?
+  phase        String
+  status       String
+  config       Json
+  sourceCode   String
+  language     Language
+  score        Decimal?             @db.Decimal(48, 12)
+  token        String?
+  leaseUntil   DateTime?
+  error        String?
+  createdAt    DateTime             @default(now())
+  finishedAt   DateTime?
+  cases        HeuristicCaseScore[]
+
+  @@unique([submissionId, phase, evaluationId])
+  @@index([status, createdAt])
+  @@index([submissionId, createdAt])
+}
+
+model HeuristicCaseScore {
+  runId      String
+  caseKey    String
+  groupName  String
+  caseName   String
+  verdict    String
+  rawScore   Decimal?     @db.Decimal(48, 12)
+  timeMs     Int
+  memoryKb   Int
+  diagnostic String
+  run        HeuristicRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@id([runId, caseKey])
+}
+
+model HeuristicContest {
+  contestId          String    @id
+  selection          String
+  revisions          Json
+  evaluationId       String?
+  finalSubmissionIds Json?
+  finalizedAt        DateTime?
+  createdAt          DateTime  @default(now())
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

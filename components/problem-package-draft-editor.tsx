@@ -1,4 +1,7 @@
 "use client";
+import { HeuristicSettings } from "./heuristic-settings";
+import { DEFAULT_HEURISTIC_CONFIG } from "@/lib/heuristic-config";
+import { SCORER_SOURCE_TEMPLATES, isDefaultScorerTemplate } from "@/lib/scorer-source-templates";
 import { useI18n } from "@/components/i18n-provider";
 
 
@@ -50,6 +53,7 @@ function scoreSummary(draft: ProblemPackageEditorDraft, t: Translator): {
   label: string;
   badgeClass: string;
 } {
+  if(draft.checkerType==="heuristic")return {label:t("Heuristic Scoring"),badgeClass:"badge badge-blue"};
   const scores = draft.groups.map((group) => group.score);
   const hasAnyScore = scores.some((score) => score !== null);
   const hasAllScores = scores.every((score) => score !== null);
@@ -113,7 +117,9 @@ export function ProblemPackageDraftEditor({
   function patchDraft(
     updater: (current: ProblemPackageEditorDraft) => ProblemPackageEditorDraft,
   ) {
-    onChange(updater(draft));
+    const next=updater(draft);
+    if(next.heuristic)next.heuristic={...next.heuristic,finalGroups:next.heuristic.finalGroups.map(name=>{const old=draft.groups.find(g=>g.name===name);return old?next.groups.find(g=>g.id===old.id)?.name??name:name}).filter(name=>next.groups.some(g=>g.name===name))};
+    onChange(next);
   }
 
   const activeGroup =
@@ -296,15 +302,17 @@ export function ProblemPackageDraftEditor({
               patchDraft((current) => ({
                 ...current,
                 checkerType: event.target.value as ProblemPackageCheckerType,
+                heuristic: event.target.value==="heuristic"?(current.heuristic??DEFAULT_HEURISTIC_CONFIG):undefined,
                 checkerSourceCode:
                   event.target.value !== "exact" &&
-                  shouldReplaceCheckerSource(current.checkerSourceCode)
-                    ? (event.target.value === "interactive" ? INTERACTOR_SOURCE_TEMPLATES : CHECKER_SOURCE_TEMPLATES)[current.checkerLanguage]
+                  (shouldReplaceCheckerSource(current.checkerSourceCode)||isDefaultScorerTemplate(current.checkerSourceCode))
+                    ? (event.target.value === "heuristic" ? SCORER_SOURCE_TEMPLATES : event.target.value === "interactive" ? INTERACTOR_SOURCE_TEMPLATES : CHECKER_SOURCE_TEMPLATES)[current.checkerLanguage]
                     : current.checkerSourceCode,
               }))
             }
           >
             <option value="exact">{t("exact")}</option>
+            <option value="heuristic">{t("Heuristic Scoring")}</option>
             <option value="special_judge">{t("special_judge")}</option>
             <option value="interactive">{t("Interactive")}</option>
           </select>
@@ -322,7 +330,7 @@ export function ProblemPackageDraftEditor({
                     ...current,
                     checkerLanguage: nextLanguage,
                     checkerSourceCode: shouldReplaceCheckerSource(current.checkerSourceCode)
-                      ? (current.checkerType === "interactive" ? INTERACTOR_SOURCE_TEMPLATES : CHECKER_SOURCE_TEMPLATES)[nextLanguage]
+                      ? (current.checkerType === "heuristic" ? SCORER_SOURCE_TEMPLATES : current.checkerType === "interactive" ? INTERACTOR_SOURCE_TEMPLATES : CHECKER_SOURCE_TEMPLATES)[nextLanguage]
                       : current.checkerSourceCode,
                   };
                 })
@@ -365,10 +373,11 @@ export function ProblemPackageDraftEditor({
         </label>
       </div>
 
+      {draft.checkerType === "heuristic" ? <HeuristicSettings value={draft.heuristic} groups={draft.groups.map(g=>g.name)} onChange={heuristic=>patchDraft(current=>({...current,heuristic}))}/> : null}
       {draft.checkerType !== "exact" ? (
         <div className="stack">
           <p className="text-soft">
-            {draft.checkerType === "interactive" ? t("Interactor receives the private input path as argv[1]. Communicate over stdin/stdout and flush each response. Exit 0 for AC, 1 for WA, otherwise IE.") : t("Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error.")}</p>
+            {draft.checkerType === "heuristic" ? t("Scorer receives input, reference and contestant output paths. Exit 0 and print JSON with version:1, valid:boolean, score:decimal-string. Invalid solutions use valid:false; scorer failures are IE.") : draft.checkerType === "interactive" ? t("Interactor receives the private input path as argv[1]. Communicate over stdin/stdout and flush each response. Exit 0 for AC, 1 for WA, otherwise IE.") : t("Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error.")}</p>
           <div className="field">
             <span className="field-label">{draft.checkerType === "interactive" ? t("Interactor Source Code") : t("Checker Source Code")}</span>
             <CodeEditor
@@ -656,6 +665,7 @@ export function ProblemPackageDraftEditor({
                       min={0}
                       step={1}
                       value={activeGroup.score ?? ""}
+                      disabled={draft.checkerType === "heuristic"}
                       onChange={(event) => {
                         const value = event.target.value.trim();
                         patchDraft((current) => ({
@@ -792,7 +802,7 @@ export function ProblemPackageDraftEditor({
                           }
                         />
                       </label>
-                      {draft.checkerType !== "interactive" ? (
+                      {!["interactive","heuristic"].includes(draft.checkerType) ? (
                       <label className="field">
                         <span className="field-label">{t(outputLabel)}</span>
                         <textarea

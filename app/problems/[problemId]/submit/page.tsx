@@ -1,3 +1,4 @@
+import {loadHeuristicContestProblem} from "@/lib/heuristic-store";
 
 import { getI18n } from "@/lib/i18n/server";
 ﻿import Link from "next/link";
@@ -26,11 +27,13 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
   const { problemId } = await params;
   const { contestId, virtualParticipationId } = await searchParams;
   const me = await getCurrentUser();
-  const problem = contestId ? getProblemForContestViewer(problemId,contestId,me.id) : getProblemForViewer(problemId, me.id);
+  let problem = contestId ? getProblemForContestViewer(problemId,contestId,me.id) : getProblemForViewer(problemId, me.id);
 
   if (!problem) {
     notFound();
   }
+  const fixed=contestId?await loadHeuristicContestProblem(contestId,problemId):null;
+  if(fixed)problem=fixed.problem;
 
   const contest = contestId ? getContestForViewer(contestId, me.id) : undefined;
   if (contestId && !contest) {

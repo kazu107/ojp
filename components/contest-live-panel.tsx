@@ -143,6 +143,7 @@ export function ContestLivePanel({
       setActing(false);
     }
   }
+  async function finalize(){setActing(true);try{const response=await fetch(`/api/contests/${data.contestId}/heuristic/finalize`,{method:"POST"});const body=await response.json();if(!response.ok)throw new Error(body.error);await refresh()}catch(e){setError(e instanceof Error?e.message:"System test failed")}finally{setActing(false)}}
   const session = data.virtual?.session;
   const virtualRunning = !!session && virtualIsRunning(session, now);
   // Derive the clock locally; authorization and submit cutoffs always use server time.
@@ -165,7 +166,7 @@ export function ContestLivePanel({
               <th>{t("Rank")}</th>
               <th>{t("User")}</th>
               <th>{t("Total")}</th>
-              <th>{t("Penalty")}</th>
+              {!data.heuristic?<th>{t("Penalty")}</th>:null}
               {full
                 ? data.problems.map((p) => <th key={p.problemId}>{p.label}</th>)
                 : null}
@@ -175,17 +176,17 @@ export function ContestLivePanel({
           <tbody>
             {rows.map((row) => (
               <tr key={row.userId}>
-                <td>{row.rank}</td>
+                <td>{row.rank||"-"}</td>
                 <td>{row.displayName ?? row.userId}</td>
-                <td>{row.totalScore}</td>
-                <td>{row.penalty}</td>
+                <td>{row.heuristicScore!==undefined?row.heuristicScore??"-":row.totalScore}</td>
+                {!data.heuristic?<td>{row.penalty}</td>:null}
                 {full
                   ? row.cells.map((cell) => (
                       <td key={cell.label}>
-                        <strong>{cell.score}</strong>
+                        <strong>{cell.heuristicScore!==undefined?cell.heuristicScore??"-":cell.score}</strong>
                         <div className="text-soft">
                           {t("Fail:")}
-                          {cell.wrongSubmissions}
+                          {data.heuristic?"-":cell.wrongSubmissions}
                         </div>
                       </td>
                     ))
@@ -217,6 +218,7 @@ export function ContestLivePanel({
     );
   return (
     <div className="stack">
+      {data.heuristic?<section className="panel stack"><h2>{t("Heuristic Scoring")}</h2><p>{t(data.heuristic.state)}</p>{data.heuristic.canFinalize&&data.heuristic.state!=="final"?<button className="button" disabled={acting} onClick={()=>void finalize()}>{t("Start or Resume System Tests")}</button>:null}</section>:null}
       <section className="panel stack">
         <div className="button-row">
           <span className="badge badge-blue">
@@ -272,7 +274,7 @@ export function ContestLivePanel({
               <tr>
                 <th>{t("Label")}</th>
                 <th>{t("Title")}</th>
-                <th>{t("Maximum Points")}</th>
+                <th>{t(data.heuristic?"Problem Weight":"Maximum Points")}</th>
                 <th>{t("Action")}</th>
               </tr>
             </thead>
@@ -333,7 +335,7 @@ export function ContestLivePanel({
           {t("Rating Rules and Leaderboard")}
         </Link>
       </section>
-      {status === "ended" ? (
+      {status === "ended" && !data.heuristic ? (
         <section className="panel stack">
           <h2 className="panel-title">{t("Virtual Participation")}</h2>
           <p className="text-soft">

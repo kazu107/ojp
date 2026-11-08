@@ -1,3 +1,4 @@
+import {loadHeuristicContestProblem} from "@/lib/heuristic-store";
 
 import { getI18n } from "@/lib/i18n/server";
 import Link from "next/link";
@@ -43,10 +44,12 @@ export default async function ProblemExplanationPage({
   const contextQuery=contestId?`?contestId=${encodeURIComponent(contestId)}${virtualParticipationId?`&virtualParticipationId=${encodeURIComponent(virtualParticipationId)}`:""}`:"";
   const me = await getOptionalCurrentUser();
   const viewerId = me?.id ?? "guest";
-  const problem = contestId?getProblemForContestViewer(problemId,contestId,viewerId):getProblemForViewer(problemId, viewerId);
+  let problem = contestId?getProblemForContestViewer(problemId,contestId,viewerId):getProblemForViewer(problemId, viewerId);
   if (!problem) {
     notFound();
   }
+  const fixed=contestId?await loadHeuristicContestProblem(contestId,problemId):null;
+  if(fixed)problem=fixed.problem;
 
   const canEditProblem = me ? canEditProblemByViewer(problem, me.id) : false;
   const canViewExplanation = canViewProblemExplanation(problem, viewerId);

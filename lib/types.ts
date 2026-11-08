@@ -80,7 +80,8 @@ export interface Problem {
   difficulty: number | null;
   timeLimitMs: number;
   memoryLimitMb: number;
-  scoringType: "sum" | "binary" | "sum_of_groups";
+  heuristic?: import("./heuristic-config").HeuristicConfig;
+  scoringType: "sum" | "binary" | "sum_of_groups" | "heuristic";
   testCaseVisibility: TestCaseVisibility;
   latestPackageSummary: ProblemPackageSummary | null;
   sampleCases: ProblemSampleCase[];
@@ -96,6 +97,7 @@ export interface ContestProblem {
 }
 
 export interface Contest {
+  heuristic?: { selection: "best" | "last" };
   id: string;
   organizerId: string;
   title: string;
@@ -114,6 +116,8 @@ export interface Contest {
 }
 
 export interface SubmissionTestResult {
+  rawScore?: string | null;
+  scorerDiagnostic?: string;
   interactionLog?: string;
   id: string;
   groupName: string;
@@ -125,6 +129,7 @@ export interface SubmissionTestResult {
 }
 
 export interface Submission {
+  heuristic?: true;
   problemRevisionId?: string;
   judgeRevisionId?: string;
   id: string;
@@ -218,6 +223,7 @@ export interface RejudgeRequest {
 }
 
 export interface ScoreboardProblemCell {
+  heuristicScore?: string | null;
   label: string;
   score: number;
   acceptedAt: string | null;
@@ -225,6 +231,7 @@ export interface ScoreboardProblemCell {
 }
 
 export interface ScoreboardRow {
+  heuristicScore?: string | null;
   userId: string;
   rank: number;
   totalScore: number;
@@ -252,6 +259,7 @@ export interface CreateProblemInput {
 export type UpdateProblemInput = Partial<CreateProblemInput>;
 
 export interface CreateContestInput {
+  heuristic?: { selection: "best" | "last" };
   title: string;
   slug: string;
   descriptionMarkdown: string;
@@ -300,6 +308,7 @@ export interface ContestRatingResult {
 }
 
 export interface ContestLiveData {
+  heuristic?: {state:string;canFinalize:boolean};
   contestId: string;
   serverNow: string;
   startAt: string;

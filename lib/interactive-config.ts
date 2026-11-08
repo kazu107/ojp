@@ -29,15 +29,17 @@ export function parseInteractiveLimits(raw: unknown): InteractiveLimits {
   return result;
 }
 
-export function resolvePackageCheckerType(config: Record<string, unknown>): "exact" | "special_judge" | "interactive" {
+export function resolvePackageCheckerType(config: Record<string, unknown>): "exact" | "special_judge" | "interactive" | "heuristic" {
   if (config.judgeType !== undefined && !["batch", "interactive"].includes(String(config.judgeType))) {
     throw new Error("config.judgeType must be batch or interactive");
   }
   if (config.judgeType === "batch" && config.checkerType === "interactive") {
     throw new Error("judgeType=batch conflicts with checkerType=interactive");
   }
+  if (config.checkerType === "heuristic" && config.judgeType === "interactive") throw new Error("Interactive numeric scoring is not supported");
+  if (config.checkerType === "heuristic") return "heuristic";
   if (config.judgeType === "interactive" || config.checkerType === "interactive") return "interactive";
   if (config.checkerType === "special_judge" || config.checkerType === "custom_checker") return "special_judge";
   if (config.checkerType === undefined || config.checkerType === null || config.checkerType === "" || config.checkerType === "exact") return "exact";
-  throw new Error("config.checkerType must be exact, special_judge or interactive");
+  throw new Error("config.checkerType must be exact, special_judge, interactive or heuristic");
 }

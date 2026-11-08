@@ -91,10 +91,18 @@ export function validateContest(
     throw new ContestError("Invalid contest visibility.");
   if (input.rated !== undefined && typeof input.rated !== "boolean")
     throw new ContestError("Rated must be a boolean.");
+  if(input.heuristic&&!["best","last"].includes(input.heuristic.selection))throw new ContestError("Invalid heuristic selection");
   if (input.rated && input.visibility !== "public")
     throw new ContestError("Rated contests must be public.");
   if (input.problems.length < 1 || input.problems.length > 100)
     throw new ContestError("Select between 1 and 100 contest problems.");
+  const heuristicProblems=input.problems.map(i=>problems.find(p=>p.id===i.problemId)).filter(p=>p?.heuristic);
+  if(heuristicProblems.length&&!input.heuristic)throw new ContestError("Select heuristic contest mode for numeric-scored problems");
+  if(input.heuristic){
+    if(input.rated||heuristicProblems.length!==input.problems.length)throw new ContestError("Heuristic contests must be Unrated and contain only heuristic problems");
+    const signatures=new Set(heuristicProblems.map(p=>JSON.stringify([p!.heuristic!.direction,p!.heuristic!.evaluation,p!.heuristic!.aggregate])));
+    if(signatures.size!==1)throw new ContestError("Heuristic contest problems must use the same direction, evaluation and aggregate");
+  }
   const ids = new Set<string>(),
     labels = new Set<string>(),
     orders = new Set<number>();
@@ -147,6 +155,7 @@ export function assertContestStructureEditable(
       value.endAt,
       value.penaltyMinutes,
       !!value.rated,
+      value.heuristic,
       [...value.problems]
         .sort((a, b) => a.orderIndex - b.orderIndex)
         .map((p) => [p.problemId, p.label, p.score, p.orderIndex]),

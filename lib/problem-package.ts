@@ -1,3 +1,4 @@
+import { parseHeuristicConfig, validateHeuristicGroups, type HeuristicConfig } from "./heuristic-config";
 import { normalizeTags } from "./problem-discovery";
 ﻿import AdmZip from "adm-zip";
 import { parseInteractiveLimits, resolvePackageCheckerType, type InteractiveLimits } from "./interactive-config";
@@ -50,6 +51,7 @@ interface ConfigSummary {
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  heuristic?: HeuristicConfig;
   interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   compareMode: ProblemPackageCompareMode;
@@ -98,6 +100,7 @@ export interface ProblemPackageExtracted {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  heuristic?: HeuristicConfig;
   interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   checkerSourceCode: string | null;
@@ -110,6 +113,7 @@ export interface ProblemPackageManifest {
   validation: ProblemPackageValidationResult;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  heuristic?: HeuristicConfig;
   interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   compareMode: ProblemPackageCompareMode;
@@ -132,6 +136,7 @@ export interface ParsedConfig {
   memoryLimitMb: number;
   scoringType: ProblemPackageScoringType;
   checkerType: ProblemPackageCheckerType;
+  heuristic?: HeuristicConfig;
   interactive?: InteractiveLimits;
   checkerLanguage: CheckerLanguage | null;
   checkerSourceCode: string | null;
@@ -186,7 +191,7 @@ function normalizePackageText(text: string): string {
 }
 
 export function validatePairs(inSet: Set<string>, outSet: Set<string>, scope: string, checkerType?: ProblemPackageCheckerType): void {
-  if (checkerType === "interactive") {
+  if (checkerType === "interactive" || checkerType === "heuristic") {
     if (inSet.size === 0 && scope !== "samples") throw new Error(`${scope} must include .in files`);
     if (diffSet(outSet, inSet).length) throw new Error(`${scope} has an .out without .in`);
     return;
@@ -226,6 +231,7 @@ function parseNonNegativeInteger(value: unknown, fieldName: string): number {
 }
 
 function parseScoringType(raw: unknown): ProblemPackageScoringType | undefined {
+  if (raw === "heuristic") return "heuristic";
   if (raw === undefined || raw === null || raw === "") {
     return undefined;
   }
@@ -437,18 +443,22 @@ export function parseConfig(configJson: unknown): ParsedConfig {
     : [];
   const groups = config.groups.map((group, index) => parseConfigGroup(group, index));
   const requestedScoringType = parseScoringType(config.scoringType);
+  if(requestedScoringType!==undefined&&((checkerType==="heuristic")!==(requestedScoringType==="heuristic")))throw new Error("Heuristic checker and scoringType must be selected together");
   const warnings: string[] = [];
   const hasAnyPartialScore = groups.some((group) => group.score !== null);
   const hasAllPartialScores = groups.every((group) => group.score !== null);
 
-  if (hasAnyPartialScore && !hasAllPartialScores) {
+  if (checkerType !== "heuristic" && hasAnyPartialScore && !hasAllPartialScores) {
     throw new Error(
       "config.groups[*].score must be either set for all groups or omitted for all groups",
     );
   }
 
   let scoringType: ProblemPackageScoringType;
-  if (hasAllPartialScores) {
+  if (checkerType === "heuristic") {
+    scoringType = "heuristic";
+    validateHeuristicGroups(parseHeuristicConfig(config.heuristic), groups.map(g=>g.name));
+  } else if (hasAllPartialScores) {
     if (requestedScoringType === "binary") {
       warnings.push(
         "config.groups[*].score is set, so scoringType is treated as sum_of_groups.",
@@ -474,6 +484,7 @@ export function parseConfig(configJson: unknown): ParsedConfig {
     memoryLimitMb: parsePositiveNumber(config.memoryLimitMb, "config.memoryLimitMb"),
     scoringType,
     checkerType,
+    heuristic: checkerType === "heuristic" ? parseHeuristicConfig(config.heuristic) : undefined,
     interactive: checkerType === "interactive" ? parseInteractiveLimits(config.interactive) : undefined,
     checkerLanguage,
     checkerSourceCode: null,
@@ -548,7 +559,7 @@ function buildSampleCases(
       const inEntry = entryByPath.get(samplePath(caseName, "in"));
       const outEntry = entryByPath.get(samplePath(caseName, "out"));
       const interaction = entryByPath.get(`samples/${caseName}.interaction`);
-      if ((!inEntry || !outEntry) && !(checkerType === "interactive" && interaction)) {
+      if ((!inEntry || !outEntry) && !(checkerType === "interactive" && interaction) && !(checkerType === "heuristic" && inEntry)) {
         throw new Error(`samples/${caseName}.in/.out is required`);
       }
       return {
@@ -604,7 +615,7 @@ function buildTestGroups(
     const tests = caseNames.map((caseName) => {
       const inEntry = entryByPath.get(casePath(groupName, caseName, "in"));
       const outEntry = entryByPath.get(casePath(groupName, caseName, "out"));
-      if (!inEntry || (!outEntry && config.checkerType !== "interactive")) {
+      if (!inEntry || (!outEntry && !["interactive", "heuristic"].includes(config.checkerType))) {
         throw new Error(`tests/${groupName}/${caseName}.in/.out is required by config.groups`);
       }
       return {
@@ -743,6 +754,7 @@ export function validateProblemPackage(
       memoryLimitMb: config.memoryLimitMb,
       scoringType: config.scoringType,
       checkerType: config.checkerType,
+      heuristic: config.heuristic,
       interactive: config.interactive,
       checkerLanguage: config.checkerLanguage,
       compareMode: config.compareMode,
@@ -775,6 +787,7 @@ export function validateProblemPackage(
     validation,
     scoringType: config.scoringType,
     checkerType: config.checkerType,
+    heuristic: config.heuristic,
     interactive: config.interactive,
     checkerLanguage: config.checkerLanguage,
     checkerSourceCode: config.checkerSourceCode,
@@ -989,6 +1002,7 @@ export function buildEditorDraftManifestFromZip(
   return {
     sourceLabel: fileName,
     checkerType: archive.config.checkerType,
+    heuristic: archive.config.heuristic,
     interactive: archive.config.interactive,
     checkerLanguage: archive.config.checkerLanguage ?? "python",
     checkerSourceCode: archive.config.checkerSourceCode ?? "",
@@ -1035,6 +1049,7 @@ export function inspectProblemPackageManifestFromZip(
         memoryLimitMb: archive.config.memoryLimitMb,
         scoringType: archive.config.scoringType,
         checkerType: archive.config.checkerType,
+        heuristic: archive.config.heuristic,
         interactive: archive.config.interactive,
         checkerLanguage: archive.config.checkerLanguage,
         compareMode: archive.config.compareMode,
@@ -1064,6 +1079,7 @@ export function inspectProblemPackageManifestFromZip(
     },
     scoringType: archive.config.scoringType,
     checkerType: archive.config.checkerType,
+    heuristic: archive.config.heuristic,
     interactive: archive.config.interactive,
     checkerLanguage: archive.config.checkerLanguage,
     compareMode: archive.config.compareMode,
@@ -1088,7 +1104,7 @@ export function readProblemPackageTestCaseFromZip(
 
   const inEntry = archive.entryByPath.get(casePath(normalizedGroupName, normalizedCaseName, "in"));
   const outEntry = archive.entryByPath.get(casePath(normalizedGroupName, normalizedCaseName, "out"));
-  if (!inEntry || (!outEntry && archive.config.checkerType !== "interactive")) {
+  if (!inEntry || (!outEntry && !["interactive", "heuristic"].includes(archive.config.checkerType))) {
     throw new Error(`tests/${normalizedGroupName}/${normalizedCaseName}.in/.out is required`);
   }
 
@@ -1257,6 +1273,7 @@ export function buildEditorDraftFromExtracted(
   return {
     sourceLabel: extracted.validation.fileName,
     checkerType: extracted.checkerType,
+    heuristic: extracted.heuristic,
     interactive: extracted.interactive,
     checkerLanguage: extracted.checkerLanguage ?? "python",
     checkerSourceCode: extracted.checkerSourceCode ?? "",
@@ -1291,6 +1308,7 @@ export function buildEditorDraftFromExtracted(
 export function buildProblemPackageFromEditorDraft(input: {
   sourceLabel?: string;
   checkerType?: ProblemPackageCheckerType;
+  heuristic?: HeuristicConfig;
   interactive?: InteractiveLimits;
   checkerLanguage?: CheckerLanguage;
   checkerSourceCode?: string;
@@ -1357,8 +1375,9 @@ export function buildProblemPackageFromEditorDraft(input: {
     };
   });
 
-  const scoringType = buildScoringTypeFromEditorGroups(groups);
   const checkerType = input.checkerType ?? "exact";
+  const scoringType = checkerType === "heuristic" ? "heuristic" : buildScoringTypeFromEditorGroups(groups);
+  if(checkerType === "heuristic")validateHeuristicGroups(parseHeuristicConfig(input.heuristic),groups.map(g=>g.name));
   const checkerLanguage = checkerType !== "exact" ? input.checkerLanguage ?? "python" : null;
   const checkerSourceCode =
     checkerType !== "exact"
@@ -1419,6 +1438,7 @@ export function buildProblemPackageFromEditorDraft(input: {
         memoryLimitMb,
         scoringType,
         checkerType,
+    heuristic: checkerType === "heuristic" ? parseHeuristicConfig(input.heuristic) : undefined,
     interactive: checkerType === "interactive" ? parseInteractiveLimits(input.interactive) : undefined,
         checkerLanguage,
         compareMode,
@@ -1444,6 +1464,7 @@ export function buildProblemPackageFromEditorDraft(input: {
     },
     scoringType,
     checkerType,
+    heuristic: checkerType === "heuristic" ? parseHeuristicConfig(input.heuristic) : undefined,
     interactive: checkerType === "interactive" ? parseInteractiveLimits(input.interactive) : undefined,
     checkerLanguage,
     checkerSourceCode,
@@ -1533,6 +1554,7 @@ export function buildProblemPackageZip(input: {
   const extracted = buildProblemPackageFromEditorDraft({
     sourceLabel: input.draft.sourceLabel,
     checkerType: input.draft.checkerType,
+    heuristic: input.draft.heuristic,
     interactive: input.draft.interactive,
     checkerLanguage: input.draft.checkerLanguage,
     checkerSourceCode: input.draft.checkerSourceCode,
@@ -1553,6 +1575,7 @@ export function buildProblemPackageZip(input: {
     judgeType: extracted.checkerType === "interactive" ? "interactive" : "batch",
     interactorLanguage: extracted.checkerType === "interactive" ? extracted.checkerLanguage : undefined,
     checkerType: extracted.checkerType,
+    heuristic: extracted.heuristic,
     interactive: extracted.interactive,
     checkerLanguage: extracted.checkerLanguage,
     compareMode: extracted.compareMode,
@@ -1607,7 +1630,7 @@ export function buildProblemPackageZip(input: {
   for (const group of extracted.groups) {
     for (const testCase of group.tests) {
       zip.addFile(`tests/${group.name}/${testCase.name}.in`, Buffer.from(testCase.input, "utf8"));
-      if (extracted.checkerType !== "interactive") zip.addFile(`tests/${group.name}/${testCase.name}.out`, Buffer.from(testCase.output, "utf8"));
+      if (!["interactive", "heuristic"].includes(extracted.checkerType)) zip.addFile(`tests/${group.name}/${testCase.name}.out`, Buffer.from(testCase.output, "utf8"));
     }
   }
 

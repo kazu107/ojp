@@ -68,6 +68,7 @@ interface FormState {
 }
 
 interface PackageTestPreviewResult {
+  heuristicScore?: string | null;
   status: SubmissionStatus;
   score: number;
   totalTimeMs: number;
@@ -1404,7 +1405,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                 <StatusBadge className={badgeClassForSubmission(previewResult.status)}>
                   {t(submissionStatusLabel(previewResult.status))}
                 </StatusBadge>
-                <span className="text-soft">{t("Score: ")}{previewResult.score}</span>
+                <span className="text-soft">{t("Score: ")}{previewResult.heuristicScore!==undefined?previewResult.heuristicScore??"-":previewResult.score}</span>
                 <span className="text-soft">{t("Time: ")}{previewResult.totalTimeMs} {t(" ms")}</span>
                 <span className="text-soft">{t("Memory: ")}{previewResult.peakMemoryKb} {t(" KB")}</span>
               </div>
@@ -1443,7 +1444,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                                 </td>
                                 <td>{result.timeMs} {t(" ms")}</td>
                                 <td>{result.memoryKb} {t(" KB")}</td>
-                                <td>{t(result.message)}<InteractionLog text={result.interactionLog} /></td>
+                                <td>{result.rawScore!==undefined?<strong>{t("Raw Score")}: {result.rawScore??"-"}<br/></strong>:null}{t(result.message)}{result.scorerDiagnostic?<pre>{result.scorerDiagnostic}</pre>:null}<InteractionLog text={result.interactionLog} /></td>
                               </tr>
                             ))}
                           </tbody>

@@ -2,7 +2,7 @@ import type { ProblemPackageEditorDraft } from "./problem-package-types";
 
 export function validateRecoveryPackage(value: ProblemPackageEditorDraft | null): ProblemPackageEditorDraft | null {
   if (!value) return null;
-  if (!["exact", "special_judge", "interactive"].includes(value.checkerType) || typeof value.checkerSourceCode !== "string" || !Array.isArray(value.groups) || !Array.isArray(value.samples)) throw new Error("Invalid local draft.");
+  if (!["exact", "special_judge", "interactive", "heuristic"].includes(value.checkerType) || typeof value.checkerSourceCode !== "string" || !Array.isArray(value.groups) || !Array.isArray(value.samples)) throw new Error("Invalid local draft.");
   for (const group of value.groups) {
     if (typeof group.id !== "string" || typeof group.name !== "string" || !Array.isArray(group.tests)) throw new Error("Invalid local draft.");
     for (const test of group.tests) if (typeof test.id !== "string" || typeof test.name !== "string" || typeof test.input !== "string" || typeof test.output !== "string") throw new Error("Invalid local draft.");

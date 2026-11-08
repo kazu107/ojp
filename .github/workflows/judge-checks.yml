@@ -26,7 +26,9 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap util-linux g++ gcc rustc golang-go ruby kotlin mono-mcs mono-runtime libmono-system-numerics4.0-cil python3 pypy3 default-jdk-headless time
       - run: npm ci
       - run: npm run judge:doctor
+      - run: npm run db:generate
       - run: npm run test:judge
+      - run: npm run test:heuristic
       - run: npm run test:interactive
       - run: npm run test:workspace
       - run: npm run test:ops
@@ -172,3 +174,54 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3102/api/health/db >/dev/null
           npm run test:workspace:integration
+
+  heuristic:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: heuristic-test
+          POSTGRES_DB: ojp_heuristic_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:heuristic-test@127.0.0.1:5432/ojp_heuristic_test
+      HEURISTIC_TEST_ORIGIN: http://127.0.0.1:3103
+      AUTH_SECRET: heuristic-local-validation-only
+      AUTH_URL: http://127.0.0.1:3103
+      AUTH_TRUST_HOST: "true"
+      ADMIN_GITHUB_LOGINS: heuristic-test
+      JUDGE_PROCESS_MODE: web
+      JUDGE_SANDBOX: basic
+      STORE_DB_SYNC: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run db:push
+      - run: npm run db:heuristic && npm run db:heuristic
+      - run: npm run test:heuristic
+      - run: npm run build
+        env:
+          STORE_DB_SYNC: "0"
+      - name: Numeric judge and system test lifecycle
+        run: |
+          node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3103 >/tmp/ojp-heuristic-web.log 2>&1 &
+          web=$!
+          trap 'kill "$web" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3103/api/health/db >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3103/api/health/db >/dev/null
+          npm run test:heuristic:integration

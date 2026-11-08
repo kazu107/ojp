@@ -31,6 +31,10 @@ export function readContestInput(
       throw new ContestError("Invalid contest visibility.");
     result[key] = body[key];
   }
+  if(body.heuristic!==undefined){
+    if(!body.heuristic||typeof body.heuristic!=="object"||!["best","last"].includes(String((body.heuristic as Record<string,unknown>).selection)))throw new ContestError("Invalid heuristic contest selection");
+    result.heuristic={selection:(body.heuristic as Record<string,unknown>).selection};
+  }
   if (body.problems !== undefined)
     result.problems = parseContestProblems(body.problems);
   return result as UpdateContestInput;

@@ -1,3 +1,7 @@
+import {loadHeuristicContestProblem} from "@/lib/heuristic-store";
+import {HeuristicPersonalBest} from "@/components/heuristic-personal-best";
+import {listSubmissionsForViewer} from "@/lib/store";
+import {HeuristicVisualizer} from "@/components/heuristic-visualizer";
 import { problemTags, studyEntry } from "@/lib/problem-workspace-store";
 import { ProblemStudy } from "@/components/problem-study";
 
@@ -38,12 +42,14 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
   const me = await getOptionalCurrentUser();
   const viewerId = me?.id ?? "guest";
   const judgeEnvironmentVersion = getJudgeEnvironmentVersion();
-  const problem = contestId ? getProblemForContestViewer(problemId,contestId,viewerId) : getProblemForViewer(problemId, viewerId);
+  let problem = contestId ? getProblemForContestViewer(problemId,contestId,viewerId) : getProblemForViewer(problemId, viewerId);
   if (!problem) {
     notFound();
   }
+  const fixed=contestId?await loadHeuristicContestProblem(contestId,problemId):null;
+  if(fixed)problem=fixed.problem;
 
-  const tags=(await problemTags([problem.id])).get(problem.id) ?? [];
+  const tags=fixed?.tags??(await problemTags([problem.id])).get(problem.id)??[];
   const study=me ? await studyEntry(me.id, problem.id) : null;
   const canEditProblem = me ? canEditProblemByViewer(problem, me.id) : false;
   const signInUrl = `/signin?callbackUrl=${encodeURIComponent(`/problems/${problem.id}${contextQuery}`)}`;
@@ -99,6 +105,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
         </article>
         <article className="panel stack">
           <h2 className="panel-title">{t("Judge Settings")}</h2>
+          {problem.heuristic?<div className="stack"><strong>{t("Heuristic Scoring")}</strong><p>{t(problem.heuristic.direction)} / {t(problem.heuristic.evaluation)} / {t(problem.heuristic.aggregate)}</p><p className="text-soft">{t("AC means a valid solution, not necessarily an optimal solution. Relative contest points are shown on the standings.")}</p></div>:null}
           <p className="text-soft">
             {t("Difficulty:")}{" "}
             <StatusBadge className={badgeClassForDifficulty(problem.difficulty)}>
@@ -143,6 +150,8 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
           </>
         )}
       </section>
+      {me&&problem.heuristic?<HeuristicPersonalBest problemId={problem.id} submissionIds={listSubmissionsForViewer(me.id,{userId:me.id,problemId:problem.id}).map(s=>s.id)}/>:null}
+      {problem.heuristic?.visualizer&&problem.heuristic.visualizer!=="none"?<HeuristicVisualizer kind={problem.heuristic.visualizer} sampleInput={problem.sampleCases[0]?.input??""} sampleOutput={problem.sampleCases[0]?.output??""}/>:null}
       {me ? <ProblemStudy problemId={problem.id} initial={study ? {...study,reviewAt:study.reviewAt?.toISOString() ?? null} : null} /> : null}
     </div>
   );

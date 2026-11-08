@@ -1,3 +1,4 @@
+import type { HeuristicConfig } from "./heuristic-config";
 import {
   ExplanationVisibility,
   CheckerLanguage,
@@ -5,9 +6,9 @@ import {
   Visibility,
 } from "@/lib/types";
 
-export type ProblemPackageScoringType = "binary" | "sum_of_groups";
+export type ProblemPackageScoringType = "binary" | "sum_of_groups" | "heuristic";
 export type ProblemPackageCompareMode = "exact" | "ignore_trailing_spaces";
-export type ProblemPackageCheckerType = "exact" | "special_judge" | "interactive";
+export type ProblemPackageCheckerType = "exact" | "special_judge" | "interactive" | "heuristic";
 
 export interface ProblemPackageEditorTestCase {
   id: string;
@@ -32,6 +33,7 @@ export interface ProblemPackageEditorGroup {
 
 export interface ProblemPackageEditorDraft {
   recoveryNeedsReimport?: boolean;
+  heuristic?: HeuristicConfig;
   interactive?: import("./interactive-config").InteractiveLimits;
   sourceLabel: string;
   checkerType: ProblemPackageCheckerType;
@@ -76,7 +78,8 @@ export interface ProblemPackageInspectResult {
       memoryLimitMb: number;
       scoringType: ProblemPackageScoringType;
       checkerType: ProblemPackageCheckerType;
-      interactive?: import("./interactive-config").InteractiveLimits;
+      heuristic?: HeuristicConfig;
+  interactive?: import("./interactive-config").InteractiveLimits;
       checkerLanguage: CheckerLanguage | null;
       compareMode: ProblemPackageCompareMode;
       problem: {

@@ -284,7 +284,7 @@ async function openLazyPackage(input: { fileName: string; sizeBytes: number; zip
       const inEntry = entryByPath.get(`samples/${caseName}.in`);
       const outEntry = entryByPath.get(`samples/${caseName}.out`);
       const interaction = entryByPath.get(`samples/${caseName}.interaction`);
-      if ((!inEntry || !outEntry) && !(config.checkerType === "interactive" && interaction)) {
+      if ((!inEntry || !outEntry) && !(config.checkerType === "interactive" && interaction) && !(config.checkerType === "heuristic" && inEntry)) {
         throw new Error(`samples/${caseName}.in/.out is required`);
       }
       sampleCases.push({
@@ -355,6 +355,7 @@ async function openLazyPackage(input: { fileName: string; sizeBytes: number; zip
             memoryLimitMb: config.memoryLimitMb,
             scoringType: config.scoringType,
             checkerType: config.checkerType,
+            heuristic: config.heuristic,
             interactive: config.interactive,
             checkerLanguage: config.checkerLanguage,
             compareMode: config.compareMode,
@@ -383,6 +384,7 @@ async function openLazyPackage(input: { fileName: string; sizeBytes: number; zip
         },
         scoringType: config.scoringType,
         checkerType: config.checkerType,
+        heuristic: config.heuristic,
         interactive: config.interactive,
         checkerLanguage: config.checkerLanguage,
         compareMode: config.compareMode,
@@ -393,7 +395,7 @@ async function openLazyPackage(input: { fileName: string; sizeBytes: number; zip
       readTestCase: async (groupName: string, caseName: string) => {
         const inEntry = entryByPath.get(`tests/${groupName}/${caseName}.in`);
         const outEntry = entryByPath.get(`tests/${groupName}/${caseName}.out`);
-        if (!inEntry || (!outEntry && config.checkerType !== "interactive")) {
+        if (!inEntry || (!outEntry && !["interactive", "heuristic"].includes(config.checkerType))) {
           throw new Error(`tests/${groupName}/${caseName}.in/.out is required`);
         }
         return {
@@ -405,7 +407,7 @@ async function openLazyPackage(input: { fileName: string; sizeBytes: number; zip
       materializeTestCaseFiles: async (groupName: string, caseName: string, targetDir: string) => {
         const inEntry = entryByPath.get(`tests/${groupName}/${caseName}.in`);
         const outEntry = entryByPath.get(`tests/${groupName}/${caseName}.out`);
-        if (!inEntry || (!outEntry && config.checkerType !== "interactive")) {
+        if (!inEntry || (!outEntry && !["interactive", "heuristic"].includes(config.checkerType))) {
           throw new Error(`tests/${groupName}/${caseName}.in/.out is required`);
         }
 

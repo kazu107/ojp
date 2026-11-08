@@ -72,7 +72,8 @@ function buildConfig(input: ProblemPackageClientZipInput) {
   return {
     timeLimitMs: input.timeLimitMs,
     memoryLimitMb: input.memoryLimitMb,
-    scoringType: hasPartialScores(input.draft) ? "sum_of_groups" : "binary",
+    heuristic: input.draft.heuristic,
+    scoringType: input.draft.checkerType === "heuristic" ? "heuristic" : hasPartialScores(input.draft) ? "sum_of_groups" : "binary",
     checkerType: input.draft.checkerType,
     judgeType: input.draft.checkerType === "interactive" ? "interactive" : "batch",
     interactorLanguage: input.draft.checkerType === "interactive" ? input.draft.checkerLanguage : undefined,
@@ -119,7 +120,7 @@ export async function buildProblemPackageZipBlob(
   for (const group of input.draft.groups) {
     for (const testCase of group.tests) {
       zip.file(`tests/${group.name}/${testCase.name}.in`, testCase.input);
-      if (input.draft.checkerType !== "interactive") zip.file(`tests/${group.name}/${testCase.name}.out`, testCase.output);
+      if (!["interactive", "heuristic"].includes(input.draft.checkerType)) zip.file(`tests/${group.name}/${testCase.name}.out`, testCase.output);
     }
   }
 

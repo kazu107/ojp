@@ -1,3 +1,5 @@
+import {scoreString} from "@/lib/heuristic-score";
+import {prisma} from "@/lib/db/prisma";
 import { SUBMISSION_LANGUAGES as LANGUAGE_FILTER_VALUES } from "@/lib/languages";
 
 import { getI18n } from "@/lib/i18n/server";
@@ -85,6 +87,8 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
     isWaitingSubmissionStatus(submission.status),
   );
 
+  const heuristicRuns=await prisma.heuristicRun.findMany({where:{submissionId:{in:submissions.map(s=>s.id)},phase:"provisional"},orderBy:{createdAt:"desc"},select:{submissionId:true,score:true,status:true}});
+  const heuristicScores=new Map<string,string|null>();for(const run of heuristicRuns)if(!heuristicScores.has(run.submissionId))heuristicScores.set(run.submissionId,run.status==="queued"||run.status==="running"?"WJ":(run.score?scoreString(run.score):null));
   return (
     <div className="page">
       <section className="page-head">
@@ -239,7 +243,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
                           {t(submissionStatusLabel(submission.status))}
                         </StatusBadge>
                       </td>
-                      <td>{submission.score}</td>
+                      <td>{heuristicScores.has(submission.id)?heuristicScores.get(submission.id)??"-":submission.score}</td>
                       <td>{submission.totalTimeMs} {t(" ms")}</td>
                       <td>{submission.peakMemoryKb} {t(" KB")}</td>
                       <td>{formatDate(submission.submittedAt, locale)}</td>

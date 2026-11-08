@@ -663,3 +663,5 @@ npm run db:push -- --accept-data-loss
 自動保存・復元、問題検索とタグ、問題の版履歴・判定版の固定、個人ブックマーク・メモ・復習に対応しています。
 新しいWeb/workerの起動前に `npm run db:workspace-features` を実行してください。
 仕様・制限・導入手順は [問題ワークスペース](docs/problem-workspace.md) を参照してください。
+
+ヒューリスティック採点・最大化/最小化・相対順位・最終テスト・例題ZIP: [仕様と使い方](docs/heuristic-judge.md)

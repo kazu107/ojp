@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/db/prisma";
+import {HeuristicResults} from "@/components/heuristic-results";
 import { InteractionLog } from "@/components/interaction-log";
 
 import { getI18n } from "@/lib/i18n/server";
@@ -173,6 +175,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
 
   const { submission, canViewSource } = result;
   const problem = getProblemById(submission.problemId);
+  const isHeuristic=(await prisma.heuristicRun.count({where:{submissionId}}))>0;
   const user = findUser(submission.userId);
   const canRequestRejudge = me ? canRequestRejudgeByViewer(submission, me.id) : false;
   const testCaseVisibility = problem?.testCaseVisibility ?? "case_index_only";
@@ -219,7 +222,7 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
             {t(detailVerdictLabel(submission.status))}
           </StatusBadge>
           <span className="text-soft">
-            {t("Score: ")}{submission.score} {t(" / Time: ")}{submission.totalTimeMs} {t(" ms / Memory:")}{" "}
+            {t("Score: ")}{isHeuristic?t("See heuristic results"):submission.score} {t(" / Time: ")}{submission.totalTimeMs} {t(" ms / Memory:")}{" "}
             {submission.peakMemoryKb} {t(" KB")}</span>
         </div>
         <p className="text-soft">
@@ -249,7 +252,8 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
         </p>
       </section>
 
-      <section className="panel stack">
+      {isHeuristic?<HeuristicResults submissionId={submissionId}/>:null}
+      <section className="panel stack" hidden={isHeuristic}>
         <h2 className="panel-title">{t("Test Results")}</h2>
         <p className="text-soft">
           {t("Visibility mode: ")}{t(testCaseVisibilityLabel(testCaseVisibility))}

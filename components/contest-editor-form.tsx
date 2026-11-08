@@ -50,6 +50,7 @@ export function ContestEditorForm({
     penaltyMinutes: initialContest?.penaltyMinutes ?? 5,
     scoreboardVisibility: initialContest?.scoreboardVisibility ?? "full",
     rated: initialContest?.rated ?? false,
+    heuristic: initialContest?.heuristic,
     problems: [...(initialContest?.problems ?? [])].sort(
       (a, b) => a.orderIndex - b.orderIndex,
     ),
@@ -132,6 +133,8 @@ export function ContestEditorForm({
   }
   return (
     <form className="form" onSubmit={save}>
+      <label className="field"><span>{t("Contest Scoring Mode")}</span><select className="select" disabled={structureLocked||!!initialContest?.heuristic} value={form.heuristic?"heuristic":"algorithm"} onChange={e=>setForm({...form,rated:false,heuristic:e.target.value==="heuristic"?{selection:"best"}:undefined})}><option value="algorithm">{t("Algorithmic")}</option><option value="heuristic">{t("Heuristic Scoring")}</option></select></label>
+      {form.heuristic?<label className="field"><span>{t("Submission Selection")}</span><select className="select" disabled={structureLocked} value={form.heuristic.selection} onChange={e=>setForm({...form,heuristic:{selection:e.target.value as "best"|"last"}})}><option value="best">{t("Best Submission")}</option><option value="last">{t("Latest Non-CE Submission")}</option></select></label>:null}
       <div className="form-grid">
         <label className="field">
           <span className="field-label">{t("タイトル")}</span>

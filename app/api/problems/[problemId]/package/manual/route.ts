@@ -1,3 +1,4 @@
+import {parseHeuristicConfig} from "@/lib/heuristic-config";
 import { parseInteractiveLimits } from "@/lib/interactive-config";
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
@@ -37,7 +38,7 @@ function parseCompareMode(raw: unknown): ProblemPackageCompareMode {
 }
 
 function parseCheckerType(raw: unknown): ProblemPackageCheckerType {
-  if (raw === "special_judge" || raw === "interactive") {
+  if (raw === "special_judge" || raw === "interactive" || raw === "heuristic") {
     return raw;
   }
   return "exact";
@@ -66,6 +67,7 @@ export async function POST(request: Request, { params }: ProblemPackageManualRou
     const body = (await request.json()) as {
       sourceLabel?: unknown;
       checkerType?: unknown;
+      heuristic?: unknown;
       interactive?: unknown;
       checkerLanguage?: unknown;
       checkerSourceCode?: unknown;
@@ -82,6 +84,7 @@ export async function POST(request: Request, { params }: ProblemPackageManualRou
     const extracted = buildProblemPackageFromEditorDraft({
       sourceLabel: typeof body.sourceLabel === "string" ? body.sourceLabel : undefined,
       checkerType: parseCheckerType(body.checkerType),
+      heuristic: body.checkerType==="heuristic"?parseHeuristicConfig(body.heuristic):undefined,
       interactive: body.checkerType === "interactive" ? parseInteractiveLimits(body.interactive) : undefined,
       checkerLanguage: parseCheckerLanguage(body.checkerLanguage),
       checkerSourceCode:
@@ -122,6 +125,7 @@ export async function POST(request: Request, { params }: ProblemPackageManualRou
               sourceLabel:
                 typeof body.sourceLabel === "string" ? body.sourceLabel : "manual-package",
               checkerType: parseCheckerType(body.checkerType),
+              heuristic: body.checkerType==="heuristic"?parseHeuristicConfig(body.heuristic):undefined,
               interactive: body.checkerType === "interactive" ? parseInteractiveLimits(body.interactive) : undefined,
               checkerLanguage: parseCheckerLanguage(body.checkerLanguage),
               checkerSourceCode:

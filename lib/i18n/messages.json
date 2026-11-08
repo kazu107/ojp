@@ -4630,5 +4630,261 @@
   "Tags cannot contain separators.": {
     "en": "Tags cannot contain separators.",
     "ja": "1つのタグにカンマ・読点は含められません。別のタグとして入力してください。"
+  },
+  "Heuristic Scoring": {
+    "ja": "ヒューリスティック採点",
+    "en": "Heuristic Scoring"
+  },
+  "Heuristic Results": {
+    "ja": "ヒューリスティック採点結果",
+    "en": "Heuristic Results"
+  },
+  "Raw Score": {
+    "ja": "生スコア",
+    "en": "Raw Score"
+  },
+  "No valid score": {
+    "ja": "有効な得点なし",
+    "en": "No valid score"
+  },
+  "Scorer Diagnostics": {
+    "ja": "採点器の診断（作問者・管理者用）",
+    "en": "Scorer Diagnostics"
+  },
+  "Evaluation History": {
+    "ja": "採点履歴",
+    "en": "Evaluation History"
+  },
+  "See heuristic results": {
+    "ja": "下の数値採点結果を参照",
+    "en": "See heuristic results"
+  },
+  "Optimization Direction": {
+    "ja": "評価方向",
+    "en": "Optimization Direction"
+  },
+  "Score Evaluation": {
+    "ja": "評価方式",
+    "en": "Score Evaluation"
+  },
+  "Score Aggregation": {
+    "ja": "集計方式",
+    "en": "Score Aggregation"
+  },
+  "Failed Case Policy": {
+    "ja": "失敗ケースの扱い",
+    "en": "Failed Case Policy"
+  },
+  "System Test Groups": {
+    "ja": "最終テスト用グループ",
+    "en": "System Test Groups"
+  },
+  "maximize": {
+    "ja": "大きいほど良い",
+    "en": "maximize"
+  },
+  "minimize": {
+    "ja": "小さいほど良い",
+    "en": "minimize"
+  },
+  "absolute": {
+    "ja": "絶対評価",
+    "en": "absolute"
+  },
+  "relative": {
+    "ja": "相対評価",
+    "en": "relative"
+  },
+  "sum": {
+    "ja": "合計",
+    "en": "sum"
+  },
+  "mean": {
+    "ja": "平均",
+    "en": "mean"
+  },
+  "case_zero": {
+    "ja": "失敗ケースのみ無得点",
+    "en": "case_zero"
+  },
+  "submission_zero": {
+    "ja": "提出全体を無得点",
+    "en": "submission_zero"
+  },
+  "none": {
+    "ja": "なし",
+    "en": "none"
+  },
+  "knapsack": {
+    "ja": "荷物詰め",
+    "en": "knapsack"
+  },
+  "route": {
+    "ja": "巡回経路",
+    "en": "route"
+  },
+  "Visualizer": {
+    "ja": "ビジュアライザ",
+    "en": "Visualizer"
+  },
+  "Route Visualization": {
+    "ja": "巡回経路図",
+    "en": "Route Visualization"
+  },
+  "Compare Another Output": {
+    "ja": "別の出力と比較",
+    "en": "Compare Another Output"
+  },
+  "Comparison Output": {
+    "ja": "比較する出力",
+    "en": "Comparison Output"
+  },
+  "Contest Scoring Mode": {
+    "ja": "コンテストの採点方式",
+    "en": "Contest Scoring Mode"
+  },
+  "Algorithmic": {
+    "ja": "通常の競技プログラミング",
+    "en": "Algorithmic"
+  },
+  "Submission Selection": {
+    "ja": "採用する提出",
+    "en": "Submission Selection"
+  },
+  "Best Submission": {
+    "ja": "最良の提出全体",
+    "en": "Best Submission"
+  },
+  "Latest Non-CE Submission": {
+    "ja": "最新の提出（CEを除く）",
+    "en": "Latest Non-CE Submission"
+  },
+  "Start or Resume System Tests": {
+    "ja": "最終テストを開始・再開",
+    "en": "Start or Resume System Tests"
+  },
+  "provisional": {
+    "ja": "暫定順位",
+    "en": "provisional"
+  },
+  "system_pending": {
+    "ja": "最終テスト実行中（順位は暫定）",
+    "en": "system_pending"
+  },
+  "final": {
+    "ja": "最終順位確定",
+    "en": "final"
+  },
+  "Seed Metadata (JSON)": {
+    "ja": "seed情報（JSON）",
+    "en": "Seed Metadata (JSON)"
+  },
+  "Invalid seed JSON; the last valid metadata is retained.": {
+    "ja": "seed情報のJSONが不正です。最後の有効な設定を保持します。",
+    "en": "Invalid seed JSON; the last valid metadata is retained."
+  },
+  "AC means a valid solution, not necessarily an optimal solution. Relative contest points are shown on the standings.": {
+    "ja": "ACは有効な解を意味し、最適解とは限りません。相対評価の得点はコンテスト順位表に表示します。",
+    "en": "AC means a valid solution, not necessarily an optimal solution. Relative contest points are shown on the standings."
+  },
+  "Heuristic scores are not limited to 100 points. Group partial scores are ignored. AC means a valid solution.": {
+    "ja": "数値採点は100点満点に制限しません。グループの固定部分点は使用せず、ACは有効な解を意味します。",
+    "en": "Heuristic scores are not limited to 100 points. Group partial scores are ignored. AC means a valid solution."
+  },
+  "Unchecked groups run during provisional judging; checked groups are reserved for system tests after the contest.": {
+    "ja": "チェックなしは暫定テスト、チェックありはコンテスト終了後の最終テストで使用します。",
+    "en": "Unchecked groups run during provisional judging; checked groups are reserved for system tests after the contest."
+  },
+  "Seeds are imported/exported in config.json. Inputs are generated offline, not by running generators on the web server.": {
+    "ja": "seed情報はconfig.jsonへ入出力します。入力は手元で生成し、Webサーバー上で生成器は実行しません。",
+    "en": "Seeds are imported/exported in config.json. Inputs are generated offline, not by running generators on the web server."
+  },
+  "Scorer receives input, reference and contestant output paths. Exit 0 and print JSON with version:1, valid:boolean, score:decimal-string. Invalid solutions use valid:false; scorer failures are IE.": {
+    "ja": "採点器には入力・参照出力・提出出力のパスが渡ります。終了コード0で、version:1、valid:真偽値、score:小数文字列のJSONを出力します。不正な解はvalid:false、採点器の故障はIEです。",
+    "en": "Scorer receives input, reference and contestant output paths. Exit 0 and print JSON with version:1, valid:boolean, score:decimal-string. Invalid solutions use valid:false; scorer failures are IE."
+  },
+  "Visualization runs locally using samples or your own input and output. Private judge inputs are never loaded here.": {
+    "ja": "サンプルまたは自分の入出力を使い、ブラウザ内で描画します。非公開テストの入力は読み込みません。",
+    "en": "Visualization runs locally using samples or your own input and output. Private judge inputs are never loaded here."
+  },
+  "Heuristic judge failed. Contact the problem author.": {
+    "ja": "数値採点に失敗しました。問題の作成者へお問い合わせください。",
+    "en": "Heuristic judge failed. Contact the problem author."
+  },
+  "Visualization input is limited to 64 KiB": {
+    "ja": "描画する入力・出力は各64KiBまでです。",
+    "en": "Visualization input is limited to 64 KiB"
+  },
+  "Use nonnegative integers": {
+    "ja": "非負整数を入力してください。",
+    "en": "Use nonnegative integers"
+  },
+  "Visualization value exceeds limit": {
+    "ja": "描画できる数値の上限を超えています。",
+    "en": "Visualization value exceeds limit"
+  },
+  "Visualize between 1 and 200 items": {
+    "ja": "描画対象は1〜200個です。",
+    "en": "Visualize between 1 and 200 items"
+  },
+  "Output must be a permutation of all point indices": {
+    "ja": "すべての点の添字を一度ずつ出力してください。",
+    "en": "Output must be a permutation of all point indices"
+  },
+  "Output must contain one 0/1 selection per item": {
+    "ja": "各荷物について0または1を出力してください。",
+    "en": "Output must contain one 0/1 selection per item"
+  },
+  "Capacity exceeded": {
+    "ja": "容量を超えています。",
+    "en": "Capacity exceeded"
+  },
+  "My Best Scores by Revision": {
+    "ja": "版ごとの自分の最良記録",
+    "en": "My Best Scores by Revision"
+  },
+  "Evaluation Phase": {
+    "ja": "採点段階",
+    "en": "Evaluation Phase"
+  },
+  "System Test Results": {
+    "ja": "最終テスト結果",
+    "en": "System Test Results"
+  },
+  "Weight": {
+    "ja": "重さ",
+    "en": "Weight"
+  },
+  "Value": {
+    "ja": "価値",
+    "en": "Value"
+  },
+  "WJ": {
+    "ja": "WJ",
+    "en": "WJ"
+  },
+  "This submission was not selected for system tests": {
+    "ja": "この提出は最終テストの対象に選ばれていません。",
+    "en": "This submission was not selected for system tests"
+  },
+  "Published system results not available": {
+    "ja": "最終テスト結果はまだ公開されていません。",
+    "en": "Published system results not available"
+  },
+  "Provisional Test Results": {
+    "ja": "暫定テスト結果",
+    "en": "Provisional Test Results"
+  },
+  "Problem Weight": {
+    "ja": "問題の重み",
+    "en": "Problem Weight"
+  },
+  "No WA penalty": {
+    "ja": "WAペナルティなし",
+    "en": "No WA penalty"
+  },
+  "Capacity": {
+    "ja": "容量",
+    "en": "Capacity"
   }
 }
