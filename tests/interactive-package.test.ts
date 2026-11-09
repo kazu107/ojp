@@ -7,7 +7,7 @@ import AdmZip from "adm-zip";
 import { buildEditorDraftFromExtracted, buildProblemPackageZip, inspectProblemPackageManifestFromZip, buildEditorDraftManifestFromZip, validateProblemPackage, readProblemPackageTestCaseFromZip } from "../lib/problem-package";
 import { buildProblemPackageZipBlob } from "../lib/problem-package-client-zip";
 import { inspectProblemPackageClient } from "../lib/problem-package-client-inspect";
-import { createLazyProblemPackageSourceFromBuffer } from "../lib/problem-package-lazy";
+import { createLazyProblemPackageSourceFromBuffer,buildEditorDraftFromLazySource } from "../lib/problem-package-lazy";
 import { INTERACTOR_SOURCE_TEMPLATES } from "../lib/interactor-source-templates";
 import { parseInteractiveLimits } from "../lib/interactive-config";
 import { visibleInteractionResults, canViewPrivateInteraction } from "../lib/interactive-privacy";
@@ -69,6 +69,10 @@ test("large-package lazy path materializes only requested private input and an e
   try {
     assert.equal(source.manifest.checkerType, "interactive");
     assert.equal(source.manifest.interactive?.wallTimeLimitMs, 3000);
+    const editor=buildEditorDraftFromLazySource(source);
+    assert.deepEqual(editor.interactive,source.manifest.interactive);
+    assert.equal(editor.heuristic,undefined);
+    assert.ok(editor.isPartial&&editor.groups[0].tests[0].isLoaded===false);
     assert.match(source.manifest.sampleCases[0].interaction!, /EQUAL/);
     assert.equal((await source.readTestCase("group1","case01")).output, "");
     const files = await source.materializeTestCaseFiles("group1","case01",directory);

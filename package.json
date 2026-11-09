@@ -46,7 +46,7 @@
     "test:workspace": "tsx --test tests/local-drafts.test.ts tests/draft-recovery.test.mjs tests/problem-workspace.test.ts tests/workspace-ui.test.tsx tests/problem-package-immutability.test.ts",
     "test:workspace:integration": "tsx --test tests/workspace-http.integration.test.ts",
     "db:heuristic": "node scripts/prisma-with-default-db-url.mjs db execute --schema prisma/schema.prisma --file prisma/heuristic-schema.sql",
-    "test:heuristic": "tsx --test tests/heuristic.test.ts",
+    "test:heuristic": "tsx --test tests/heuristic.test.ts tests/heuristic-ui.test.mjs",
     "template:heuristic-zip": "tsx scripts/create-heuristic-examples.ts",
     "test:heuristic:integration": "tsx --test tests/heuristic-http.integration.test.ts"
   },

@@ -17,6 +17,7 @@ import {
   validatePairs,
 } from "@/lib/problem-package";
 import { getProblemPackageZipStream, type ProblemPackageStorageRef } from "@/lib/problem-package-storage";
+import type {ProblemPackageEditorDraft} from "./problem-package-types";
 
 const MAX_ZIP_BYTES = 256 * 1024 * 1024;
 const MAX_SINGLE_FILE_BYTES = 32 * 1024 * 1024;
@@ -57,6 +58,24 @@ export interface LazyProblemPackageSource {
     outputPath: string;
   }>;
   cleanup: () => Promise<void>;
+}
+
+export function buildEditorDraftFromLazySource(source:Pick<LazyProblemPackageSource,"manifest"|"checkerSourceCode"|"groups">):ProblemPackageEditorDraft{
+  return {
+    sourceLabel:source.manifest.validation.fileName,
+    checkerType:source.manifest.checkerType,
+    heuristic:source.manifest.heuristic,
+    interactive:source.manifest.interactive,
+    checkerLanguage:source.manifest.checkerLanguage??"python",
+    checkerSourceCode:source.checkerSourceCode??"",
+    compareMode:source.manifest.compareMode,
+    zipSizeBytes:source.manifest.validation.zipSizeBytes,
+    fileCount:source.manifest.validation.fileCount,
+    isPartial:true,
+    samples:source.manifest.sampleCases.map((sample,index)=>({id:`sample-${index+1}`,name:sample.name,description:sample.description,interaction:sample.interaction,input:sample.input,output:sample.output})),
+    warnings:[...source.manifest.validation.warnings],
+    groups:source.groups.map((group,index)=>({id:`group-${index+1}`,name:group.name,score:source.manifest.scoringType==="sum_of_groups"?group.score:null,tests:group.caseNames.map((name,i)=>({id:`group-${index+1}-case-${i+1}`,name,input:"",output:"",isLoaded:false}))})),
+  };
 }
 
 function pushToSetMap(target: Map<string, Set<string>>, key: string, value: string): void {

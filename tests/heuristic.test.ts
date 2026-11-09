@@ -20,7 +20,10 @@ import {
 } from "../lib/problem-package";
 import { inspectProblemPackageClient } from "../lib/problem-package-client-inspect";
 import { buildProblemPackageZipBlob } from "../lib/problem-package-client-zip";
-import { createLazyProblemPackageSourceFromBuffer } from "../lib/problem-package-lazy";
+import {
+  createLazyProblemPackageSourceFromBuffer,
+  buildEditorDraftFromLazySource,
+} from "../lib/problem-package-lazy";
 import { executePackageJudge } from "../lib/judge-runtime";
 import { SCORER_SOURCE_TEMPLATES } from "../lib/scorer-source-templates";
 import { parseVisualization } from "../lib/heuristic-visualization";
@@ -257,6 +260,16 @@ test("heuristic examples round trip eager, manifest, lazy and browser ZIP paths"
       assert.equal(lazy.groups[0].caseNames.length, 10);
       assert.equal((await lazy.readTestCase("system", "case01")).output, "");
       assert.deepEqual(lazy.manifest.heuristic, data.heuristic);
+      const lazyEditor = buildEditorDraftFromLazySource(lazy);
+      assert.deepEqual(lazyEditor.heuristic, data.heuristic);
+      assert.equal(lazyEditor.isPartial, true);
+      assert.ok(
+        lazyEditor.groups.every((group) =>
+          group.tests.every(
+            (c) => c.isLoaded === false && c.input === "" && c.output === "",
+          ),
+        ),
+      );
     } finally {
       await lazy.cleanup();
     }

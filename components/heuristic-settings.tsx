@@ -16,10 +16,15 @@ export function HeuristicSettings({
 }) {
   const { t } = useI18n();
   const config = value ?? DEFAULT_HEURISTIC_CONFIG;
-  const [seedText, setSeedText] = useState(
-      JSON.stringify(config.seeds, null, 2),
-    ),
-    [seedError, setSeedError] = useState("");
+  const serializedSeeds = JSON.stringify(config.seeds, null, 2);
+  const [seedDraft, setSeedDraft] = useState({
+    base: serializedSeeds,
+    text: serializedSeeds,
+    error: "",
+  });
+  const seedText =
+    seedDraft.base === serializedSeeds ? seedDraft.text : serializedSeeds;
+  const seedError = seedDraft.base === serializedSeeds ? seedDraft.error : "";
   return (
     <section className="panel stack">
       <h3>{t("Heuristic Scoring")}</h3>
@@ -87,7 +92,6 @@ export function HeuristicSettings({
           className="textarea"
           value={seedText}
           onChange={(e) => {
-            setSeedText(e.target.value);
             try {
               const seeds = JSON.parse(e.target.value);
               if (
@@ -97,12 +101,19 @@ export function HeuristicSettings({
                 Object.values(seeds).some((x) => typeof x !== "string")
               )
                 throw new Error();
+              setSeedDraft({
+                base: JSON.stringify(seeds, null, 2),
+                text: e.target.value,
+                error: "",
+              });
               onChange({ ...config, seeds });
-              setSeedError("");
             } catch {
-              setSeedError(
-                "Invalid seed JSON; the last valid metadata is retained.",
-              );
+              setSeedDraft({
+                base: serializedSeeds,
+                text: e.target.value,
+                error:
+                  "Invalid seed JSON; the last valid metadata is retained.",
+              });
             }
           }}
         />
