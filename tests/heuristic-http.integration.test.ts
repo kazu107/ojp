@@ -194,6 +194,10 @@ test(
         assert.equal(view.run.groups[0].completed, 3);
         assert.equal(view.run.groups[0].cases[0].name, "1");
         assert.equal(view.run.groups[0].cases[0].diagnostic, undefined);
+        const guest=await request(`/api/submissions/${optimalId}/heuristic`,"");
+        assert.equal(guest.run.groups[0].completed,3);
+        assert.equal(guest.run.history.length,0);
+        assert.ok(guest.run.groups[0].cases.every((c:{name:string;diagnostic?:string},i:number)=>c.name===String(i+1)&&c.diagnostic===undefined));
         for (const id of ids)
           assert.equal(
             (
@@ -425,6 +429,8 @@ test(
       );
       assert.equal(hugeView.run.score, exact);
       assert.equal(hugeView.run.groups[0].cases[0].score, exact);
+      await request(`/api/problems/${huge.problem.id}`,admin,"PATCH",{visibility:"private"});
+      await request(`/api/submissions/${created.submission.id}/heuristic`,"","GET",undefined,404);
     } finally {
       for (const w of workers) w.kill();
       await Promise.all(

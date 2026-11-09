@@ -27,6 +27,7 @@ const PUBLIC_API_GET_PATTERNS: RegExp[] = [
   /^\/api\/contests\/[^/]+\/scoreboard$/,
   /^\/api\/submissions$/,
   /^\/api\/submissions\/[^/]+$/,
+  /^\/api\/submissions\/[^/]+\/heuristic$/,
   /^\/api\/learning\/courses$/,
   /^\/api\/learning\/courses\/[^/]+$/,
   /^\/api\/learning\/courses\/[^/]+\/items\/[^/]+$/,
