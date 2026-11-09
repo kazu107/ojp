@@ -1,4 +1,5 @@
 import { enqueueHeuristicRun, workOneHeuristicRun, heuristicStandings, assertHeuristicAvailable, isHeuristicRevision } from "./heuristic-store";
+import {publicHeuristicSettings} from "./heuristic-config";
 import { captureProblemRevision, revisionById, retainedPackage } from "./problem-revisions";
 import { saveProblemTags } from "./problem-workspace-store";
 import { visibleInteractionResults, canViewPrivateInteraction } from "./interactive-privacy";
@@ -2756,6 +2757,7 @@ function findContestsIncludingProblem(problemId: string): Contest[] {
 }
 
 function maskProblemExplanationByViewer(problem: Problem, viewerId: string): Problem {
+  if(problem.heuristic)problem={...problem,heuristic:publicHeuristicSettings(problem.heuristic)};
   if (canViewProblemExplanation(problem, viewerId)) {
     return problem;
   }
@@ -3009,7 +3011,7 @@ async function applyProblemPackageExtractedInternal(
     validatedAt: nowIso(),
   };
   problem.judgeType = packageData.checkerType === "interactive" ? "interactive" : "batch";
-  problem.heuristic = packageData.heuristic;
+  problem.heuristic = publicHeuristicSettings(packageData.heuristic);
   problem.sampleCases = packageData.samples.map((sample) => ({
     name: sample.name,
     description: sample.description,
@@ -3055,7 +3057,7 @@ async function applyProblemPackageManifestInternal(
     validatedAt: nowIso(),
   };
   problem.judgeType = manifest.checkerType === "interactive" ? "interactive" : "batch";
-  problem.heuristic = manifest.heuristic;
+  problem.heuristic = publicHeuristicSettings(manifest.heuristic);
   problem.sampleCases = manifest.sampleCases.map((sample) => ({
     name: sample.name,
     description: sample.description,

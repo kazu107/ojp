@@ -140,7 +140,7 @@ export async function enqueueHeuristicRun(
           evaluationId,
           phase,
           status: "queued",
-          config: config as unknown as Prisma.InputJsonValue,
+          config: { ...config, seeds: {} } as unknown as Prisma.InputJsonValue,
           sourceCode: submission.sourceCode,
           language: submission.language,
         },

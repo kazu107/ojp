@@ -111,6 +111,27 @@ test(
           assert.equal(response.status, 201, await response.text());
         }
         await upload(example.zip);
+        const publicResponse = await fetch(
+          `${origin}/api/problems/${problem.id}`,
+        );
+        assert.equal(publicResponse.status, 200);
+        const publicBody = await publicResponse.json();
+        assert.deepEqual(publicBody.problem.heuristic.seeds, {});
+        assert.ok(!JSON.stringify(publicBody).includes("system/case01"));
+        const ownerManifest = await request(
+          `/api/problems/${problem.id}/package/manifest`,
+        );
+        assert.equal(
+          Object.keys(ownerManifest.draft.heuristic.seeds).length,
+          8,
+        );
+        await request(
+          `/api/problems/${problem.id}/package/manifest`,
+          bob,
+          "GET",
+          undefined,
+          403,
+        );
         const endAt = new Date(Date.now() + 22000).toISOString();
         const { contest } = await request(
           "/api/contests",

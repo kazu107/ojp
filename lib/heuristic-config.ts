@@ -18,6 +18,12 @@ export const DEFAULT_HEURISTIC_CONFIG: HeuristicConfig = {
   visualizer: "none",
 };
 
+export function publicHeuristicSettings(
+  value: HeuristicConfig | undefined,
+): HeuristicConfig | undefined {
+  return value ? { ...value, seeds: {} } : undefined;
+}
+
 export function parseHeuristicConfig(raw: unknown): HeuristicConfig {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new Error("config.heuristic must be an object");
