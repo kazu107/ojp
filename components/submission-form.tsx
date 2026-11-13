@@ -127,7 +127,7 @@ export function SubmissionForm({
       {virtualParticipationId ? <p className="text-soft">{t("Virtual submissions do not affect official standings or ratings.")}</p> : null}
 
       <div className="button-row">
-        <button className="button" type="submit" disabled={isSubmitting}>
+        <button className="button button-primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? t("提出中...") : t("提出する")}
         </button>
       </div>

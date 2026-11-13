@@ -48,14 +48,14 @@ export default async function ProblemsPage({searchParams}:{searchParams:Promise<
         </div>
         <div className="button-row">
           {canCreateProblem ? (
-            <Link href="/problems/new" className="button">
+            <Link href="/problems/new" className="button button-primary">
               {t("新規作成")}</Link>
           ) : null}
         </div>
       </section>
 
       <ProblemFilters filters={filters} tags={[...new Set([...tags.values()].flat())].sort()} loggedIn={!!me} />
-      <p className="text-soft">{t("Matching problems: {count}",{count:filtered.length})}</p>
+      <p className="list-summary">{t("Matching problems: {count}",{count:filtered.length})}</p>
       <section className="panel">
         {problems.length === 0 ? (
           <p className="empty">{t("表示できる問題がありません。")}</p>
@@ -116,7 +116,7 @@ export default async function ProblemsPage({searchParams}:{searchParams:Promise<
           </div>
         )}
       </section>
-      <div className="button-row">{page>1?<Link className="link" href={pageUrl(page-1)}>{t("Previous")}</Link>:null}<span>{page} / {pages}</span>{page<pages?<Link className="link" href={pageUrl(page+1)}>{t("Next")}</Link>:null}</div>
+      <nav className="pagination" aria-label={t("Pagination")}>{page>1?<Link className="button button-secondary" href={pageUrl(page-1)}>{t("Previous")}</Link>:null}<span>{page} / {pages}</span>{page<pages?<Link className="button button-secondary" href={pageUrl(page+1)}>{t("Next")}</Link>:null}</nav>
     </div>
   );
 }

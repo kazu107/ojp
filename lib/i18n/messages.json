@@ -4886,5 +4886,57 @@
   "Capacity": {
     "ja": "容量",
     "en": "Capacity"
+  },
+  "Skip to content": {
+    "ja": "本文へスキップ",
+    "en": "Skip to content"
+  },
+  "Menu": {
+    "ja": "メニュー",
+    "en": "Menu"
+  },
+  "Close Menu": {
+    "ja": "閉じる",
+    "en": "Close menu"
+  },
+  "Your problems, learning, and contests in one place.": {
+    "ja": "問題、学習、コンテスト。ここから、次の一歩を。",
+    "en": "Your problems, learning, and contests in one place."
+  },
+  "Browse Problems": {
+    "ja": "問題を探す",
+    "en": "Browse problems"
+  },
+  "Quick access": {
+    "ja": "クイックアクセス",
+    "en": "Quick access"
+  },
+  "Find your next challenge.": {
+    "ja": "難易度やタグから、次の一問を。",
+    "en": "Find your next challenge."
+  },
+  "Learn step by step with runnable code.": {
+    "ja": "コードを動かしながら、一歩ずつ学ぶ。",
+    "en": "Learn step by step with runnable code."
+  },
+  "Compete, practice, and track your progress.": {
+    "ja": "コンテストに挑戦し、実力を試す。",
+    "en": "Compete, practice, and track your progress."
+  },
+  "End:": {
+    "ja": "終了:",
+    "en": "End:"
+  },
+  "Pagination": {
+    "ja": "ページ切り替え",
+    "en": "Pagination"
+  },
+  "Problem editor sections": {
+    "ja": "問題の編集項目",
+    "en": "Problem editor sections"
+  },
+  "Competitive Programming Platform": {
+    "ja": "競技プログラミングプラットフォーム",
+    "en": "Competitive programming platform"
   }
 }

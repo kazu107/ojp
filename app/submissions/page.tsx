@@ -175,7 +175,7 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
           </div>
 
           <div className="button-row">
-            <button className="button" type="submit">
+            <button className="button button-primary" type="submit">
               {t("Apply")}</button>
             <Link href="/submissions" className="button button-secondary">
               {t("Reset")}</Link>

@@ -31,6 +31,7 @@ jobs:
       - run: npm run test:heuristic
       - run: npm run test:interactive
       - run: npm run test:workspace
+      - run: npm run test:design
       - run: npm run test:ops
       - run: npm run lint
 

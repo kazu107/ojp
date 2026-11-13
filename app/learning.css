@@ -11,7 +11,7 @@
   gap: 1rem;
 }
 .learning-course-card {
-  border-top: 3px solid var(--accent);
+  border-top: 2px solid var(--accent);
   background:
     linear-gradient(135deg, rgba(255, 143, 47, 0.06), transparent 65%),
     var(--panel);
@@ -67,8 +67,8 @@
   overflow-x: auto;
   padding: 0.7rem;
   border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  background: rgba(8, 19, 32, 0.96);
+  border-radius: 9px;
+  background: var(--surface-input);
   scrollbar-width: thin;
 }
 .learning-tab {
@@ -77,8 +77,8 @@
   text-align: left;
   white-space: nowrap;
   border: 1px solid var(--panel-border);
-  border-radius: 9px;
-  background: var(--panel);
+  border-radius: 6px;
+  background: transparent;
   color: var(--text-soft);
   padding: 0.6rem 1rem;
   cursor: pointer;
@@ -86,7 +86,7 @@
 .learning-tab.is-active {
   border-color: var(--accent);
   color: var(--text);
-  background: rgba(255, 143, 47, 0.12);
+  background: rgba(243, 164, 93, 0.08);
 }
 .learning-tab.is-complete:not(.is-active) {
   border-color: rgba(92, 214, 168, 0.5);

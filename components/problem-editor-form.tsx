@@ -986,36 +986,37 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <DraftRecovery draft={recovery} />
-      <section className="panel stack">
-        <div className="button-row">
+      <div className="editor-tabs" role="group" aria-label={t("Problem editor sections")}>
           <button
             type="button"
-            className={activeTab === "content" ? "button" : "button button-secondary"}
+            className="editor-tab"
+            aria-pressed={activeTab === "content"}
             onClick={() => setActiveTab("content")}
           >
             {t("問題文など")}</button>
           <button
             type="button"
-            className={activeTab === "settings" ? "button" : "button button-secondary"}
+            className="editor-tab"
+            aria-pressed={activeTab === "settings"}
             onClick={() => setActiveTab("settings")}
           >
             {t("問題の設定など")}</button>
           <button
             type="button"
-            className={activeTab === "tests" ? "button" : "button button-secondary"}
+            className="editor-tab"
+            aria-pressed={activeTab === "tests"}
             onClick={() => setActiveTab("tests")}
           >
             {t("テストケース")}</button>
           <button
             type="button"
-            className={activeTab === "testrun" ? "button" : "button button-secondary"}
+            className="editor-tab"
+            aria-pressed={activeTab === "testrun"}
             onClick={() => setActiveTab("testrun")}
           >
             {t("テスト run")}</button>
-        </div>
-      </section>
-
-      {props.mode === "edit" ? <div className="button-row"><button type="button" className={activeTab === "history" ? "button" : "button button-secondary"} onClick={()=>setActiveTab("history")}>{t("Revision History")}</button></div> : null}
+        {props.mode === "edit" ? <button type="button" className="editor-tab" aria-pressed={activeTab === "history"} onClick={()=>setActiveTab("history")}>{t("Revision History")}</button> : null}
+      </div>
       {activeTab === "history" && props.mode === "edit" ? <ProblemRevisionHistory problemId={props.initialProblem.id} /> : null}
       {activeTab === "content" ? (
         <section className="stack">
@@ -1476,7 +1477,7 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
       ) : null}
 
       <div className="button-row">
-        <button className="button" type="submit" disabled={isSaving || isInspectingPackage}>
+        <button className="button button-primary" type="submit" disabled={isSaving || isInspectingPackage}>
           {isSaving ? t("Saving...") : props.mode === "edit" ? t("Update") : t("Create")}
         </button>
       </div>

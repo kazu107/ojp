@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:design": "tsx --test tests/site-navigation.test.mjs tests/site-navigation-interactions.test.mjs",
     "test:judge": "tsx --test tests/language-ui.test.tsx tests/competitive-languages.test.ts tests/brainfuck.test.ts tests/judge-process.test.ts tests/judge-runtime.test.ts tests/judge-sandbox.test.ts",
     "test:ops": "node --test tests/judge-host-probe.test.mjs",
     "judge:doctor": "tsx scripts/judge-doctor.ts",
