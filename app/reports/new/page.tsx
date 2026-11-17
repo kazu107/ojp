@@ -28,8 +28,6 @@ export default async function NewReportPage({ searchParams }: NewReportPageProps
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Create Report")}</h1>
-          <p className="page-subtitle">
-            {t("不適切コンテンツや問題不備の通報を管理者に送信します。")}</p>
         </div>
       </section>
       <section className="panel">

@@ -20,8 +20,6 @@ export default async function NewCoursePage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("コースを作成")}</h1>
-          <p className="page-subtitle">
-            {t("サンプルを編集するか、Markdownを取り込んで教材を登録してください。")}</p>
         </div>
       </section>
       <LearningCourseEditor />

@@ -94,8 +94,6 @@ export default async function SubmissionsPage({ searchParams }: SubmissionsPageP
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Submissions")}</h1>
-          <p className="page-subtitle">
-            {t("Filter by user/problem/contest/status/language. Source code is visible only to submitter and admin.")}</p>
         </div>
       </section>
 

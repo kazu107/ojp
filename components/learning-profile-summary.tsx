@@ -41,7 +41,7 @@ export async function LearningProfileSummary({ user }: { user: User }) {
         ))
       ) : (
         <p className="text-soft">
-          {t("教材の読了・クイズ合格・練習問題のACをここで確認できます。")}</p>
+          {t("No learning progress yet.")}</p>
       )}
     </section>
   );

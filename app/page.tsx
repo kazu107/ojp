@@ -21,7 +21,6 @@ export default async function HomePage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Dashboard")}</h1>
-          <p className="page-subtitle">{t("Your problems, learning, and contests in one place.")}</p>
         </div>
         <div className="button-row">
           {me && canCreateProblemByRole(me.role) ? <Link href="/problems/new" className="button button-secondary"><SiteIcon name="plus" />{t("Create Problem")}</Link> : null}
@@ -30,12 +29,12 @@ export default async function HomePage() {
       </section>
       <nav className="dashboard-shortcuts" aria-label={t("Quick access")}>
         {[
-          { href: "/problems", label: "Problems", description: "Find your next challenge.", icon: "problems" as const },
-          { href: "/learn", label: "Learn", description: "Learn step by step with runnable code.", icon: "learn" as const },
-          { href: "/contests", label: "Contests", description: "Compete, practice, and track your progress.", icon: "contests" as const },
+          { href: "/problems", label: "Problems", icon: "problems" as const },
+          { href: "/learn", label: "Learn", icon: "learn" as const },
+          { href: "/contests", label: "Contests", icon: "contests" as const },
         ].map(item => <Link key={item.href} className="dashboard-shortcut" href={item.href}>
           <SiteIcon name={item.icon} className="dashboard-shortcut-icon" />
-          <div><strong>{t(item.label)}</strong><p>{t(item.description)}</p></div><SiteIcon name="arrow" />
+          <div><strong>{t(item.label)}</strong></div><SiteIcon name="arrow" />
         </Link>)}
       </nav>
       <section className="metric-grid dashboard-metrics" aria-label={t("Platform Snapshot")}>

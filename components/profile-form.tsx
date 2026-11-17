@@ -83,7 +83,6 @@ export function ProfileForm({ user }: { user: User }) {
       <label className="field">
         <span className="field-label">{t("Bio")}</span>
         <textarea className="textarea" value={bio} onChange={(event) => setBio(event.target.value)} />
-        <span className="field-help">{t("Profile text shown on your user page.")}</span>
       </label>
       {error ? <p className="badge badge-red">{t(error)}</p> : null}
       {success ? <p className="badge badge-green">{t(success)}</p> : null}

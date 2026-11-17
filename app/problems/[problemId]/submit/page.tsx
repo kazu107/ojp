@@ -49,9 +49,6 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Submit: ")}{problem.title}</h1>
-          <p className="page-subtitle">
-            {virtualParticipationId ? t("Virtual submissions do not affect official standings or ratings.") : contest ? t("Contest submissions count only during the official window. After it ends, submissions are treated as practice.") : t("提出後に非同期ジャッジを実行し、提出詳細画面でテストケース別結果を確認できます。")}
-          </p>
         </div>
         <div className="button-row">
           <Link className="button button-secondary" href={`/problems/${problem.id}${contestId?`?contestId=${contestId}${virtualParticipationId?`&virtualParticipationId=${virtualParticipationId}`:""}`:""}`}>

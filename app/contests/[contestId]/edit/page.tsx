@@ -35,7 +35,6 @@ export default async function EditContestPage({ params }: EditContestPageProps) 
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Edit Contest")}</h1>
-          <p className="page-subtitle">{t("Update contest window, settings, and problem set.")}</p>
         </div>
       </section>
 

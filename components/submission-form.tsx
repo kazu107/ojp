@@ -115,11 +115,9 @@ export function SubmissionForm({
         />
       </div>
 
-      <p className="text-soft">
-        {t("提出は非同期ジャッジされます。対象問題に ZIP パッケージ（tests/config）が未設定の場合は `internal_error` になります。")}</p>
-      {contestId ? (
+      {contestId && !virtualParticipationId ? (
         <p className="text-soft">
-          {t("Contest submission mode: contestId=")}{contestId}
+          {t("Contest submissions count only during the official window. After it ends, submissions are treated as practice.")}
         </p>
       ) : null}
 

@@ -29,8 +29,6 @@ export default async function ContestsPage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Contests")}</h1>
-          <p className="page-subtitle">
-            {t("コンテスト一覧です。状態遷移（scheduled/running/ended）と順位表公開設定を確認できます。")}</p>
         </div>
         <div className="button-row">
           {canCreateContest ? (

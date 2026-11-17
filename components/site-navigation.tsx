@@ -47,7 +47,7 @@ export function SiteNavigation({ signedIn, isAdmin, canCreateProblem, children }
       <div className="site-header-inner">
         <Link className="site-logo" href="/" onClick={closeMenu}>
           <span className="site-logo-mark"><SiteIcon name="submissions" /></span>
-          <span className="site-logo-name">{t("OJP")}<span className="site-logo-sub">{t("Competitive Programming Platform")}</span></span>
+          <span className="site-logo-name">{t("OJP")}</span>
         </Link>
         <button ref={toggle} className="site-menu-toggle" type="button" aria-expanded={open} aria-controls="site-navigation site-header-actions" onClick={() => setMenu({ path: pathname, open: !open })}>
           <SiteIcon name={open ? "close" : "menu"} /><span>{t(open ? "Close Menu" : "Menu")}</span>

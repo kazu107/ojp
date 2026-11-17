@@ -197,8 +197,6 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Submission ")}{submission.id}</h1>
-          <p className="page-subtitle">
-            {t("提出の詳細結果です。テストケースごとの判定を確認できます。")}</p>
         </div>
         <div className="button-row">
           {problem ? (
@@ -320,8 +318,6 @@ export default async function SubmissionDetailPage({ params }: SubmissionDetailP
         <h2 className="panel-title">{t("Rejudge Request")}</h2>
         {canRequestRejudge ? (
           <>
-            <p className="text-soft">
-              {t("理由は必須で、`judge update / testcase fix / scoring bug / manual review` を選択できます。")}</p>
             <RejudgeRequestForm submissionId={submission.id} />
           </>
         ) : (

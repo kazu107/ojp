@@ -43,8 +43,6 @@ export default async function ProblemsPage({searchParams}:{searchParams:Promise<
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Problems")}</h1>
-          <p className="page-subtitle">
-            {t("問題一覧です。公開範囲と制約情報を確認できます。")}</p>
         </div>
         <div className="button-row">
           {canCreateProblem ? (

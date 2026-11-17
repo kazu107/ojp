@@ -34,8 +34,6 @@ export default async function EditProblemPage({ params }: EditProblemPageProps) 
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Edit Problem")}</h1>
-          <p className="page-subtitle">
-            {t("Update statement, limits, and the judge package, including manual test groups and ZIP import.")}</p>
         </div>
       </section>
 

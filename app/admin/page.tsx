@@ -33,8 +33,6 @@ export default async function AdminPage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Admin")}</h1>
-          <p className="page-subtitle">
-            {t("お知らせ、通報管理、ユーザー凍結、問題/解説/コンテスト非公開化、再ジャッジ要求履歴を管理します。")}</p>
         </div>
       </section>
 

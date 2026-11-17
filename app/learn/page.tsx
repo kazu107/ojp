@@ -20,8 +20,6 @@ export default async function LearningPage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("学習")}</h1>
-          <p className="page-subtitle">
-            {t("教材、確認クイズ、練習問題を章の中で切り替えながら学べます。")}</p>
         </div>
         {canAuthorLearning(user) ? (
           <Link href="/learn/new" className="button">
@@ -81,8 +79,6 @@ export default async function LearningPage() {
       ) : (
         <section className="panel stack">
           <h2 className="panel-title">{t("まだ公開されているコースはありません")}</h2>
-          <p className="text-soft">
-            {t("教材が登録されると、ここから学習を始められます。")}</p>
         </section>
       )}
     </div>

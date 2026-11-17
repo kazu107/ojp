@@ -25,8 +25,6 @@ export default async function EditCoursePage({
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("教材を編集")}</h1>
-          <p className="page-subtitle">
-            {t("下書きを保存しても公開版は変わりません。「保存して公開」で新しい版を公開します。")}</p>
         </div>
       </section>
       <LearningCourseEditor initial={initial} />

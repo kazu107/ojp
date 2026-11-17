@@ -19,7 +19,6 @@ export default async function RatingsPage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Ratings")}</h1>
-          <p className="page-subtitle">{t("OJP Elo Rating")}</p>
         </div>
         <Link className="button button-secondary" href="/contests">
           {t("Contests")}

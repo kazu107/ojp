@@ -1210,8 +1210,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         <section className="panel stack">
           <div>
             <h2 className="panel-title">{t("Judge Package")}</h2>
-            <p className="panel-subtitle">
-              {t("ZIP import / export と、サンプル・グループ・ケース・checker 設定をここで管理します。")}</p>
           </div>
 
           <label className="field">
@@ -1227,8 +1225,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
                 }
               }}
             />
-            <p className="text-soft">
-              {t("Selecting a ZIP inspects `statement.md` and `config.json`, fills the problem fields, and converts its tests into the editor below.")}</p>
           </label>
 
           <div className="button-row">
@@ -1344,8 +1340,6 @@ export function ProblemEditorForm(props: ProblemEditorFormProps) {
         <section className="panel stack">
           <div>
             <h2 className="panel-title">{t("Package Test Run")}</h2>
-            <p className="panel-subtitle">
-              {t("現在のテストケースと special judge 設定を使って、保存前にコードを試せます。")}</p>
           </div>
 
           <label className="field">

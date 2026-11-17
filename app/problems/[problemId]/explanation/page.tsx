@@ -59,7 +59,6 @@ export default async function ProblemExplanationPage({
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Explanation: ")}{problem.title}</h1>
-          <p className="page-subtitle">{t("解説専用ページです。公開条件に応じて内容が表示されます。")}</p>
         </div>
         <div className="button-row">
           <Link href={`/problems/${problem.id}${contextQuery}`} className="button button-secondary">

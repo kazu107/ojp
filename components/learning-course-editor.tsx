@@ -343,6 +343,7 @@ export function LearningCourseEditor({ initial }: Props) {
           {dirty ? t("未保存の変更あり") : t("保存済み")}
         </span>
       </div>
+      <p className="learning-caption">{t("下書きを保存しても公開版は変わりません。「保存して公開」で新しい版を公開します。")}</p>
       {message ? (
         <p role="status" className="badge badge-green">
           {t(message)}
@@ -792,8 +793,6 @@ export function LearningCourseEditor({ initial }: Props) {
                     }
                   >
                     {t("選択肢を追加")}</button>
-                  <p className="learning-caption">
-                    {t("ラジオボタンで正解を指定します。")}</p>
                   <label className="field">
                     <span className="field-label">
                       {t("回答後の解説（Markdown）")}</span>

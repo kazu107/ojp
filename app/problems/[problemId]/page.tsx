@@ -59,7 +59,6 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
       <section className="page-head">
         <div>
           <h1 className="page-title">{problem.title}</h1>
-          <p className="page-subtitle">{t("問題詳細と制約を確認し、そのまま提出できます。")}</p>
         </div>
         <div className="button-row">
           <StatusBadge className={badgeClassForVisibility(problem.visibility)}>
@@ -135,8 +134,6 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
         <h2 className="panel-title">{t("Submit")}</h2>
         {me ? (
           <>
-            <p className="text-soft">
-              {t("このページの下から直接提出できます。提出後は非同期ジャッジされ、提出詳細で結果を確認できます。")}</p>
             <SubmissionForm interactive={problem.judgeType === "interactive"} problemId={problem.id} contestId={contestId ?? null} virtualParticipationId={virtualParticipationId ?? null}/>
           </>
         ) : (

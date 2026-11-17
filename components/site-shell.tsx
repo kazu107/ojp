@@ -24,7 +24,6 @@ export async function SiteShell({ children }: { children: React.ReactNode }) {
         <div className="site-footer-inner">
           <div className="site-footer-copy">
             <p className="site-footer-title">{t("OJP")}</p>
-            <p className="site-footer-text">{t("Competitive Programming Platform")}</p>
           </div>
           <div className="site-footer-links">
             <a

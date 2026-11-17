@@ -255,11 +255,6 @@ export function ContestLivePanel({
             {t("Sign in to join")}
           </Link>
         ) : null}
-        <p className="text-soft">
-          {t(
-            "Standings refresh automatically every 5 seconds while this tab is visible.",
-          )}
-        </p>
         {error ? (
           <p role="alert" className="badge badge-red">
             {t(error)}

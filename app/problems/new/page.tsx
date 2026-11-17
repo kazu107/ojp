@@ -15,10 +15,6 @@ export default async function NewProblemPage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Create Problem")}</h1>
-          <p className="page-subtitle">
-            {t("Create a new problem, import a ZIP to auto-fill fields, or build test groups and cases manually on the page.")}</p>
-          <p className="text-soft">
-            {t("ZIP import and manual test case editing are both handled from the main form below.")}</p>
         </div>
       </section>
       <section className="panel">

@@ -28,7 +28,6 @@ export default async function ContestDetailPage({
       <section className="page-head">
         <div>
           <h1 className="page-title">{contest.title}</h1>
-          <p className="page-subtitle">{t("Contest Details")}</p>
         </div>
         <div className="button-row">
           {user && canEditContestByViewer(contest, user.id) ? (

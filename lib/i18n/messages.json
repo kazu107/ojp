@@ -1744,8 +1744,8 @@
     "en": "Passing percentage must be 1-100."
   },
   "Passing score: {percent}%. Answers are graded on the server.": {
-    "ja": "合格基準：{percent}%。採点はサーバー側で行います。",
-    "en": "Passing score: {percent}%. Answers are graded on the server."
+    "ja": "合格基準：{percent}%",
+    "en": "Passing score: {percent}%"
   },
   "Peak Memory": {
     "ja": "最大メモリ",
@@ -1894,6 +1894,10 @@
   "Profile": {
     "ja": "プロフィール",
     "en": "Profile"
+  },
+  "No learning progress yet.": {
+    "ja": "学習の進捗はまだありません。",
+    "en": "No learning progress yet."
   },
   "Profile text shown on your user page.": {
     "ja": "プロフィールに表示される自己紹介です。",

@@ -88,8 +88,6 @@ export default async function MePage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Profile")}</h1>
-          <p className="page-subtitle">
-            {t("プロフィール編集と、自分の提出・作成・参加状況の統計をまとめて確認できます。")}</p>
         </div>
       </section>
 

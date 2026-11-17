@@ -26,11 +26,6 @@ export default async function NewContestPage() {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Create Contest")}</h1>
-          <p className="page-subtitle">
-            {t(
-              "開催期間、問題セット、順位表公開設定を入力してコンテストを作成します。",
-            )}
-          </p>
         </div>
       </section>
       <section className="panel">

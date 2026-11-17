@@ -28,7 +28,6 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       <section className="page-head">
         <div>
           <h1 className="page-title">{t("Sign in")}</h1>
-          <p className="page-subtitle">{t("Sign in with your GitHub or Google account to use OJP.")}</p>
         </div>
       </section>
 
