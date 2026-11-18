@@ -57,6 +57,7 @@ export function ContestEditorForm({
   }));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const legacy = !!form.heuristic && !form.heuristic.scoring;
   function problemChange(index: number, change: Partial<ContestProblem>) {
     setForm((current) => ({
       ...current,
@@ -66,9 +67,8 @@ export function ContestEditorForm({
     }));
   }
   function toggle(id: string) {
-    setForm((current) => ({
-      ...current,
-      problems: (current.problems.some((p) => p.problemId === id)
+    setForm((current) => {
+      const problems = (current.problems.some((p) => p.problemId === id)
         ? current.problems.filter((p) => p.problemId !== id)
         : [
             ...current.problems,
@@ -79,8 +79,11 @@ export function ContestEditorForm({
               orderIndex: current.problems.length,
             },
           ]
-      ).map((p, i) => ({ ...p, orderIndex: i })),
-    }));
+      ).map((p, i) => ({ ...p, orderIndex: i }));
+      const hasHeuristic = problems.some(p => availableProblems.find(item => item.id === p.problemId)?.heuristic);
+      const heuristic = hasHeuristic ? current.heuristic ?? {selection: "best" as const, scoring: "normalized" as const} : undefined;
+      return {...current, problems, heuristic, rated: hasHeuristic ? false : current.rated};
+    });
   }
   function move(index: number, offset: number) {
     setForm((current) => {
@@ -108,6 +111,7 @@ export function ContestEditorForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...form,
+            heuristic: form.heuristic ?? null,
             startAt: structureLocked
               ? initialContest!.startAt
               : new Date(`${form.startAt}:00+09:00`).toISOString(),
@@ -133,8 +137,6 @@ export function ContestEditorForm({
   }
   return (
     <form className="form" onSubmit={save}>
-      <label className="field"><span>{t("Contest Scoring Mode")}</span><select className="select" disabled={structureLocked||!!initialContest?.heuristic} value={form.heuristic?"heuristic":"algorithm"} onChange={e=>setForm({...form,rated:false,heuristic:e.target.value==="heuristic"?{selection:"best"}:undefined})}><option value="algorithm">{t("Algorithmic")}</option><option value="heuristic">{t("Heuristic Scoring")}</option></select></label>
-      {form.heuristic?<label className="field"><span>{t("Submission Selection")}</span><select className="select" disabled={structureLocked} value={form.heuristic.selection} onChange={e=>setForm({...form,heuristic:{selection:e.target.value as "best"|"last"}})}><option value="best">{t("Best Submission")}</option><option value="last">{t("Latest Non-CE Submission")}</option></select></label>:null}
       <div className="form-grid">
         <label className="field">
           <span className="field-label">{t("タイトル")}</span>
@@ -256,7 +258,7 @@ export function ContestEditorForm({
         <input
           type="checkbox"
           checked={form.rated}
-          disabled={structureLocked}
+          disabled={structureLocked || !!form.heuristic}
           onChange={(e) => setForm({ ...form, rated: e.target.checked })}
         />
         {t("Rated contest (OJP Elo)")}
@@ -280,18 +282,35 @@ export function ContestEditorForm({
                 checked={form.problems.some((p) => p.problemId === problem.id)}
                 onChange={() => toggle(problem.id)}
               />
-              {problem.title}
+              {problem.title}{problem.heuristic ? <span className="badge badge-blue">{t("Heuristic Scoring")}</span> : null}
             </label>
           ))}
         </div>
       </fieldset>
+      {form.heuristic ? <div className="stack">
+        {legacy ? <div className="meta-inline">
+          <span>{t("Legacy Heuristic Scoring")}</span>
+          {!structureLocked ? <button type="button" className="button button-secondary" onClick={() =>
+            setForm({...form, heuristic: {selection: form.heuristic!.selection, scoring: "normalized"}})
+          }>{t("Use Normalized Points")}</button> : null}
+        </div> : <p className="text-soft">{t("Heuristic points use the average of case scores relative to the contest best, scaled to the maximum points. This contest is Unrated.")}</p>}
+        <label className="field">
+          <span className="field-label">{t("Heuristic Submission Selection")}</span>
+          <select className="select" disabled={structureLocked} value={form.heuristic.selection} onChange={e =>
+            setForm({...form, heuristic: {...form.heuristic!, selection: e.target.value as "best"|"last"}})
+          }>
+            <option value="best">{t("Best Submission")}</option>
+            <option value="last">{t("Latest Non-CE Submission")}</option>
+          </select>
+        </label>
+      </div> : null}
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
               <th>{t("Label")}</th>
               <th>{t("Title")}</th>
-              <th>{t("Maximum Points")}</th>
+              <th>{t(legacy ? "Problem Weight" : "Maximum Points")}</th>
               <th>{t("Order")}</th>
             </tr>
           </thead>

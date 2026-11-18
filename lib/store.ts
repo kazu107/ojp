@@ -3283,6 +3283,8 @@ export async function createContest(input: CreateContestInput): Promise<Contest>
   const user = await getCurrentUser();
   assertActiveUser(user);
   assertContestOrganizerOrAdmin(user);
+  if (!input.heuristic && input.problems.some(item => getProblemById(item.problemId)?.heuristic))
+    input = {...input, heuristic: {selection: "best", scoring: "normalized"}};
   validateContest(input, store.problems, user);
   uniqueSlugOrThrow("contest", input.slug);
   if (input.rated && Date.parse(input.startAt) <= Date.now())
@@ -3325,7 +3327,8 @@ export async function updateContest(
     throw new HttpError("you cannot edit this contest", 403);
   }
 
-  const next = {...contest, ...Object.fromEntries(Object.entries(input).filter(([,value]) => value !== undefined))};
+  const next: Contest = {...contest, ...Object.fromEntries(Object.entries(input).filter(([,value]) => value !== undefined)),
+    heuristic: input.heuristic === null ? undefined : input.heuristic ?? contest.heuristic};
   let validationProblems=store.problems;
   if(contest.heuristic&&contestStatus(contest)!=="scheduled"){
     const fixed=await prisma.heuristicContest.findUnique({where:{contestId:contest.id}});
@@ -3337,7 +3340,11 @@ export async function updateContest(
   validateContest(next, validationProblems, user);
   assertContestStructureEditable(contest, next);
   uniqueSlugOrThrow("contest", next.slug, contestId);
-  if(contestStatus(contest)==="scheduled")await configureHeuristicContest(next,user.id);
+  if (contestStatus(contest) === "scheduled") {
+    await configureHeuristicContest(next,user.id);
+    if (contest.heuristic && !next.heuristic)
+      await prisma.heuristicContest.deleteMany({where:{contestId}});
+  }
   Object.assign(contest, next, {slug:toSlug(next.slug), title:next.title.trim(),
     problems:[...next.problems].sort((a,b) => a.orderIndex-b.orderIndex), updatedAt:nowIso()});
   await persistStoreSnapshotNow();
@@ -3533,10 +3540,13 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
       }
     }
   }
-  const heuristicContest=contestId ? await prisma.heuristicContest.findUnique({where:{contestId}}) : null;
+  const usesPinnedJudge = !!(contestId && getContestById(contestId)?.heuristic);
+  const heuristicContest=contestId && usesPinnedJudge ? await prisma.heuristicContest.findUnique({where:{contestId}}) : null;
+  if (usesPinnedJudge && !(heuristicContest?.revisions as Record<string,string>|undefined)?.[problem.id])
+    throw new HttpError("Pinned contest revision unavailable", 409);
   const pinnedContestId=(heuristicContest?.revisions as Record<string,string>|undefined)?.[problem.id];
   const revision=pinnedContestId ? {id:pinnedContestId} : await recordCurrentProblemRevision(problem,currentUser.id,"submission");
-  const numeric=!!pinnedContestId||!!problem.heuristic;
+  const numeric=pinnedContestId ? await isHeuristicRevision(problem.id, pinnedContestId) : !!problem.heuristic;
   if(numeric)await assertHeuristicAvailable();
   const submission: Submission = {
     ...(numeric?{heuristic:true as const}:{}),
@@ -3637,7 +3647,7 @@ export async function getContestLiveData(contestId: string, user: User | null): 
   const session = user ? await readVirtualParticipation(contestId,user.id) : null;
   const status = getContestStatus(contest);
   const canOpen = status !== "scheduled" || (!!user && canEditContestByViewer(contest,user.id));
-  return {heuristic:heuristicBoard?{state:heuristicBoard.state,canFinalize:!!user&&canEditContestByViewer(contest,user.id)&&status==="ended"}:undefined,contestId, serverNow:nowIso(),startAt:contest.startAt,endAt:contest.endAt,status,
+  return {heuristic:heuristicBoard?{state:heuristicBoard.state,scoring:contest.heuristic?.scoring,canFinalize:heuristicBoard.hasSystemTests&&!!user&&canEditContestByViewer(contest,user.id)&&status==="ended"}:undefined,contestId, serverNow:nowIso(),startAt:contest.startAt,endAt:contest.endAt,status,
     rated:!!contest.rated, joined:!!user && contest.participantUserIds.includes(user.id), visibility:contest.scoreboardVisibility,
     canJoin:!!user && user.status === "active" && status !== "ended",
     canVirtual:!contest.heuristic && !!user && user.status === "active" && status === "ended",
@@ -3645,7 +3655,8 @@ export async function getContestLiveData(contestId: string, user: User | null): 
     rows:board.rows.map(row => ({...row,displayName:findUser(row.userId)?.displayName ?? row.userId})),
     ratingResult:ratings.results.get(contestId) ?? {status:"unrated",changes:[]},
     problems:[...contest.problems].sort((a,b) => a.orderIndex-b.orderIndex).map(p => ({...p,
-      title:canOpen ? getProblemById(p.problemId)?.title ?? p.problemId : null,canOpen})),
+      title:canOpen ? getProblemById(p.problemId)?.title ?? p.problemId : null,canOpen,
+      heuristic:canOpen && heuristicBoard?.numericProblemIds.includes(p.problemId) ? true : undefined})),
     virtual:session ? {session, rows:calculateStandings(contest,submissions,session).map(row=>({...row,displayName:findUser(row.userId)?.displayName ?? row.userId}))} : null,
   };
 }

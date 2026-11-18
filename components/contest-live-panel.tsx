@@ -158,6 +158,7 @@ export function ContestLivePanel({
     full: boolean,
     rated = false,
   ) {
+    const legacy = !!data.heuristic && !data.heuristic.scoring;
     return (
       <div className="table-wrap">
         <table className="table">
@@ -166,7 +167,7 @@ export function ContestLivePanel({
               <th>{t("Rank")}</th>
               <th>{t("User")}</th>
               <th>{t("Total")}</th>
-              {!data.heuristic?<th>{t("Penalty")}</th>:null}
+              {!legacy?<th>{t("Penalty")}</th>:null}
               {full
                 ? data.problems.map((p) => <th key={p.problemId}>{p.label}</th>)
                 : null}
@@ -179,14 +180,14 @@ export function ContestLivePanel({
                 <td>{row.rank||"-"}</td>
                 <td>{row.displayName ?? row.userId}</td>
                 <td>{row.heuristicScore!==undefined?row.heuristicScore??"-":row.totalScore}</td>
-                {!data.heuristic?<td>{row.penalty}</td>:null}
+                {!legacy?<td>{row.penalty}</td>:null}
                 {full
                   ? row.cells.map((cell) => (
                       <td key={cell.label}>
                         <strong>{cell.heuristicScore!==undefined?cell.heuristicScore??"-":cell.score}</strong>
                         <div className="text-soft">
                           {t("Fail:")}
-                          {data.heuristic?"-":cell.wrongSubmissions}
+                          {legacy || cell.normalizedHeuristic ? "-" : cell.wrongSubmissions}
                         </div>
                       </td>
                     ))
@@ -269,7 +270,7 @@ export function ContestLivePanel({
               <tr>
                 <th>{t("Label")}</th>
                 <th>{t("Title")}</th>
-                <th>{t(data.heuristic?"Problem Weight":"Maximum Points")}</th>
+                <th>{t(data.heuristic && !data.heuristic.scoring ? "Problem Weight" : "Maximum Points")}</th>
                 <th>{t("Action")}</th>
               </tr>
             </thead>
@@ -277,7 +278,7 @@ export function ContestLivePanel({
               {data.problems.map((p) => (
                 <tr key={p.problemId}>
                   <td>{p.label}</td>
-                  <td>{p.title ?? t("Available after the contest starts")}</td>
+                  <td>{p.title ?? t("Available after the contest starts")}{p.heuristic ? <span className="badge badge-blue">{t("Heuristic Scoring")}</span> : null}</td>
                   <td>{p.score}</td>
                   <td>
                     {p.canOpen ? (

@@ -5,6 +5,8 @@ import { prisma } from "./db/prisma";
 import { parseHeuristicConfig } from "./heuristic-config";
 import { absoluteScore, scoreString } from "./heuristic-score";
 import { rankHeuristicRuns } from "./heuristic-run-ranking";
+import { isOfficialSubmission } from "./contest";
+import { combineMixedStandings, normalizedContestPoints } from "./mixed-contest-scoring";
 import { revisionById } from "./problem-revisions";
 import { createLazyProblemPackageSourceFromStorageRef } from "./problem-package-lazy";
 import { executePackageJudge } from "./judge-runtime";
@@ -381,6 +383,19 @@ export async function workOneHeuristicRun(): Promise<boolean> {
   return true;
 }
 
+async function contestJudgeConfigs(contest: Contest, revisions: Record<string, string>) {
+  const ids = contest.problems.map(p => revisions[p.problemId]).filter(Boolean);
+  const rows = ids.length ? await prisma.$queryRaw<{id: string; problemId: string; heuristic: Prisma.JsonValue}[]>`
+    SELECT id, "problemId", snapshot#>'{problem,heuristic}' AS heuristic
+    FROM "ProblemRevision" WHERE id IN (${Prisma.join(ids)})` : [];
+  const byId = new Map(rows.map(row => [row.id, row]));
+  return new Map(contest.problems.flatMap(p => {
+    const row = byId.get(revisions[p.problemId]);
+    if (!row || row.problemId !== p.problemId) throw new Error("Pinned contest revision unavailable");
+    return row.heuristic ? [[p.problemId, parseHeuristicConfig(row.heuristic)] as const] : [];
+  }));
+}
+
 export async function heuristicStandings(
   contest: Contest,
   submissions: Submission[],
@@ -393,14 +408,16 @@ export async function heuristicStandings(
       rows: [] as ScoreboardRow[],
       state: "provisional",
       selected: [] as string[],
+      hasSystemTests: false,
+      numericProblemIds: [] as string[],
     };
+  const normalized = contest.heuristic?.scoring === "normalized";
+  const revisionIds = settings.revisions as Record<string, string>;
+  const configs = await contestJudgeConfigs(contest, revisionIds);
+  const hasSystemTests = [...configs.values()].some(config => config.finalGroups.length > 0);
   const official = submissions.filter(
     (s) =>
-      s.contestId === contest.id &&
-      !s.virtualParticipationId &&
-      contest.participantUserIds.includes(s.userId) &&
-      Date.parse(s.submittedAt) >= Date.parse(contest.startAt) &&
-      Date.parse(s.submittedAt) < Date.parse(contest.endAt) &&
+      configs.has(s.problemId) && isOfficialSubmission(s, contest) &&
       !["compilation_error", "cancelled"].includes(s.status),
   );
   const all = await prisma.heuristicRun.findMany({
@@ -432,7 +449,7 @@ export async function heuristicStandings(
       data: { finalizedAt: new Date() },
     });
   const runs =
-    settings.evaluationId && !finalReady
+    settings.evaluationId && (!finalReady || normalized)
       ? await prisma.heuristicRun.findMany({
           where: {
             submissionId: { in: official.map((s) => s.id) },
@@ -450,35 +467,36 @@ export async function heuristicStandings(
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         })
       : all;
-  const ids = new Set<string>();
-  const unique = runs.filter((r) => {
-    if (ids.has(r.submissionId)) return false;
-    ids.add(r.submissionId);
-    return r.status === "completed";
-  });
+  function completedLatest(rows: typeof runs) {
+    const ids = new Set<string>();
+    return rows.filter((r) => {
+      if (ids.has(r.submissionId)) return false;
+      ids.add(r.submissionId);
+      return r.status === "completed";
+    });
+  }
+  const unique = completedLatest(runs);
+  const fixedFinal = finalReady ? completedLatest(all) : [];
+  const byId = new Map(official.map(s => [s.id, s]));
   const selected: string[] = [];
   const totals = new Map<string, Prisma.Decimal>();
   const cells = new Map<string, ScoreboardRow["cells"]>();
   for (const problem of contest.problems) {
-    const revisionIds = settings.revisions as Record<string, string>;
-    const revision = await revisionById(
-      problem.problemId,
-      revisionIds[problem.problemId],
-    );
-    if (!revision?.problem.heuristic) continue;
-    const config = parseHeuristicConfig(revision.problem.heuristic);
-    let candidates = unique.filter(
+    const config = configs.get(problem.problemId);
+    if (!config) continue;
+    const useFinal = finalReady && (!normalized || config.finalGroups.length > 0);
+    let candidates = (useFinal ? fixedFinal : unique).filter(
       (r) =>
         r.problemId === problem.problemId &&
         r.revisionId === revisionIds[problem.problemId],
     );
-    if (finalReady || settings.selection === "last") {
+    if (useFinal || settings.selection === "last") {
       const latest = new Map<string, (typeof candidates)[number]>();
       for (const run of candidates) {
-        const sub = official.find((s) => s.id === run.submissionId)!;
+        const sub = byId.get(run.submissionId)!;
         const old = latest.get(sub.userId);
         const previous = old
-          ? official.find((s) => s.id === old.submissionId)
+          ? byId.get(old.submissionId)
           : null;
         if (
           !previous ||
@@ -489,14 +507,22 @@ export async function heuristicStandings(
       }
       candidates = [...latest.values()];
     }
-    const byId = new Map(official.map(s => [s.id, s]));
-    const ranked = await rankHeuristicRuns(config, candidates.map(run => {
+    const scoring = normalized ? { ...config, evaluation: "relative" as const, aggregate: "mean" as const } : config;
+    const ranked = await rankHeuristicRuns(scoring, candidates.map(run => {
       const submission = byId.get(run.submissionId)!;
       return { ...run, userId: submission.userId, submittedAt: submission.submittedAt };
     }));
     for (const row of ranked) {
-      selected.push(row.submissionId);
-      const normalized =
+      if (!normalized || config.finalGroups.length) selected.push(row.submissionId);
+      const entries = cells.get(row.userId) ?? [];
+      if (normalized) {
+        const score = normalizedContestPoints(row.score, problem.score);
+        entries.push({label: problem.label, score, normalizedHeuristic: true,
+          acceptedAt: score > 0 ? row.submittedAt : null, wrongSubmissions: 0});
+        cells.set(row.userId, entries);
+        continue;
+      }
+      const weighted =
         row.score === null
           ? null
           : new Prisma.Decimal(row.score)
@@ -507,12 +533,11 @@ export async function heuristicStandings(
                   ? -1
                   : 1,
               );
-      if (normalized)
+      if (weighted)
         totals.set(
           row.userId,
-          (totals.get(row.userId) ?? new Prisma.Decimal(0)).plus(normalized),
+          (totals.get(row.userId) ?? new Prisma.Decimal(0)).plus(weighted),
         );
-      const entries = cells.get(row.userId) ?? [];
       entries.push({
         label: problem.label,
         score: 0,
@@ -523,6 +548,11 @@ export async function heuristicStandings(
       cells.set(row.userId, entries);
     }
   }
+  const state = settings.evaluationId ? (finalReady ? "final" : "system_pending") : "provisional";
+  if (normalized) return {
+    rows: combineMixedStandings(contest, submissions, new Set(configs.keys()), cells),
+    state, selected, hasSystemTests, numericProblemIds: [...configs.keys()],
+  };
   // Homogeneous scoring is required; missing/invalid problems never win a minimization contest.
   const rows = contest.participantUserIds.map((userId) => ({
     userId,
@@ -557,12 +587,10 @@ export async function heuristicStandings(
   });
   return {
     rows,
-    state: settings.evaluationId
-      ? finalReady
-        ? "final"
-        : "system_pending"
-      : "provisional",
+    state,
     selected,
+    hasSystemTests,
+    numericProblemIds: [...configs.keys()],
   };
 }
 
@@ -576,16 +604,13 @@ export async function startHeuristicSystemTest(
     where: { contestId: contest.id },
   });
   if (!current) throw new Error("Not a heuristic contest");
-  for (const p of contest.problems) {
-    const revision = await revisionById(
-      p.problemId,
-      (current.revisions as Record<string, string>)[p.problemId],
-    );
-    if (!revision?.problem.heuristic?.finalGroups.length)
-      throw new Error(
+  const configs = await contestJudgeConfigs(contest, current.revisions as Record<string,string>);
+  const systemProblemIds = new Set([...configs].filter(([,config]) => config.finalGroups.length).map(([id]) => id));
+  const normalized = contest.heuristic?.scoring === "normalized";
+  if (!systemProblemIds.size || (!normalized && systemProblemIds.size !== contest.problems.length))
+    throw new Error(
         "Every heuristic problem needs system test groups before finalizing",
-      );
-  }
+    );
   if (current.evaluationId) {
     for (const id of (current.finalSubmissionIds as string[]) ?? []) {
       const submission = submissions.find((s) => s.id === id);
@@ -596,9 +621,7 @@ export async function startHeuristicSystemTest(
   }
   const candidates = submissions.filter(
     (s) =>
-      s.contestId === contest.id &&
-      !s.virtualParticipationId &&
-      Date.parse(s.submittedAt) < Date.parse(contest.endAt),
+      isOfficialSubmission(s, contest) && (!normalized || systemProblemIds.has(s.problemId)),
   );
   if (
     candidates.some((s) =>

@@ -54,7 +54,7 @@ export default async function ContestDetailPage({
           {formatDate(contest.startAt, locale)}
           {t(" / 終了: ")}
           {formatDate(contest.endAt, locale)}
-          {contest.heuristic?<span> / {t("No WA penalty")}</span>:<>{t(" / Penalty:")}{contest.penaltyMinutes}{t(" minutes")}</>}
+          {contest.heuristic && !contest.heuristic.scoring?<span> / {t("No WA penalty")}</span>:<>{t(" / Penalty:")}{contest.penaltyMinutes}{t(" minutes")}{contest.heuristic?.scoring ? <> ({t("Standard Problems Only")})</> : null}</>}
         </p>
       </section>
       <ContestLivePanel initial={initial} signedIn={!!user} />

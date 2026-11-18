@@ -89,6 +89,7 @@ test(
             workerLog += data.toString();
           });
       for (const kind of ["knapsack", "route"] as const) {
+        const mixed = kind === "route";
         const example = createHeuristicExample(kind, {
           provisional: 3,
           system: 5,
@@ -137,6 +138,19 @@ test(
           undefined,
           403,
         );
+        let provisionalOnlyId: string | undefined;
+        if (mixed) {
+          const short = createHeuristicExample("knapsack", {provisional: 1, system: 1});
+          short.draft.heuristic!.finalGroups = [];
+          const {problem: extra} = await request("/api/problems", admin, "POST",
+            {...short.settings, slug: slug + "-no-system"}, 201);
+          provisionalOnlyId = extra.id;
+          const form = new FormData();
+          form.set("file", new Blob([new Uint8Array(buildProblemPackageZip(short.settings))]), "no-system.zip");
+          const uploaded = await fetch(`${origin}/api/problems/${extra.id}/package`,
+            {method:"POST",headers:{Cookie:admin},body:form});
+          assert.equal(uploaded.status, 201, await uploaded.text());
+        }
         const endAt = new Date(Date.now() + 22000).toISOString();
         const { contest } = await request(
           "/api/contests",
@@ -152,9 +166,11 @@ test(
             penaltyMinutes: 5,
             scoreboardVisibility: "full",
             rated: false,
-            heuristic: { selection: kind === "route" ? "last" : "best" },
+            heuristic: mixed ? {selection: "last", scoring: "normalized"} : {selection: "best"},
             problems: [
-              { problemId: problem.id, label: "A", score: 1, orderIndex: 0 },
+              { problemId: problem.id, label: "A", score: mixed ? 300 : 1, orderIndex: 0 },
+              ...(mixed ? [{problemId: "p1000", label: "B", score: 200, orderIndex: 1}] : []),
+              ...(provisionalOnlyId ? [{problemId: provisionalOnlyId, label: "C", score: 50, orderIndex: 2}] : []),
             ],
           },
           201,
@@ -184,6 +200,26 @@ test(
         }
         await submit(alice, example.solutions.baseline);
         const optimalId = await submit(bob, example.solutions.optimal);
+        let ordinaryId: string | undefined;
+        if (mixed) {
+          const {submission} = await request("/api/submissions", bob, "POST", {
+            problemId: "p1000", contestId: contest.id, language: "python", sourceCode: "print(input())",
+          }, 201);
+          ordinaryId = submission.id;
+          assert.equal(submission.heuristic, undefined);
+          assert.equal(submission.problemRevisionId, (snapshot.revisions as Record<string,string>).p1000);
+          await until(() => request(`/api/submissions/${submission.id}`, bob), x => x.submission.status === "accepted");
+          assert.equal(await prisma.heuristicRun.count({where: {submissionId: ordinaryId}}), 0);
+          await request("/api/submissions", bob, "POST", {
+            problemId: provisionalOnlyId, contestId: contest.id, language: "python",
+            sourceCode: createHeuristicExample("knapsack").solutions.optimal,
+          }, 201);
+          const live = await until(() => request(`/api/contests/${contest.id}/scoreboard`, bob), x => x.rows.some((r: {totalScore:number}) => r.totalScore === 550));
+          const top = live.rows[0];
+          assert.equal(top.totalScore, 550);
+          assert.deepEqual(top.cells.map((c: {score:number}) => c.score), [300,200,50]);
+          assert.equal(live.heuristic.scoring, "normalized");
+        }
         const standingsPath = `/problems/${problem.id}/standings`;
         const problemHtml = await page(`/problems/${problem.id}?contestId=${contest.id}`);
         assert.ok(problemHtml.includes(`/submissions?problemId=${problem.id}&amp;contestId=${contest.id}`));
@@ -364,11 +400,8 @@ test(
           () => request(`/api/contests/${contest.id}/scoreboard`),
           (x) => x.heuristic?.state === "final",
         );
-        assert.ok(
-          board.rows.some(
-            (r: { heuristicScore: string | null }) => r.heuristicScore !== null,
-          ),
-        );
+        if (mixed) assert.equal(board.rows[0].totalScore, 550);
+        else assert.ok(board.rows.some((r: { heuristicScore: string | null }) => r.heuristicScore != null));
         const final = await prisma.heuristicContest.findUniqueOrThrow({
           where: { contestId: contest.id },
         });
@@ -380,6 +413,7 @@ test(
           system.length,
           (final.finalSubmissionIds as string[]).length,
         );
+        assert.ok(system.every(r => r.submissionId !== ordinaryId && r.problemId === problem.id));
         assert.ok(
           system.every((r) => r.status === "completed" && r.cases.length === 5),
         );

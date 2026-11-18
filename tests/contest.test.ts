@@ -19,6 +19,9 @@ import type {
   User,
   VirtualParticipation,
 } from "../lib/types";
+import { DEFAULT_HEURISTIC_CONFIG } from "../lib/heuristic-config";
+import { combineMixedStandings, normalizedContestPoints } from "../lib/mixed-contest-scoring";
+import { newContestInput } from "../lib/contest-api";
 
 const start = Date.parse("2026-01-01T00:00:00Z"),
   end = start + 3600_000,
@@ -94,6 +97,34 @@ test("points scale partial scores to arbitrary maxima with two decimal precision
   assert.equal(contestPoints(120, 500), 500);
   assert.equal(contestPoints(-1, 500), 0);
   assert.equal(contestPoints(NaN, 500), 0);
+});
+test("normalized mode accepts mixed scoring policies, is Unrated and locks after the start", () => {
+  const c = event({
+    rated: false,
+    heuristic: { selection: "best", scoring: "normalized" },
+    problems: [...event().problems, { problemId: "h1", label: "B", score: 300, orderIndex: 1 }, { problemId: "h2", label: "C", score: 100, orderIndex: 2 }],
+  });
+  const choices = [problem, { ...problem, id: "h1", heuristic: DEFAULT_HEURISTIC_CONFIG }, { ...problem, id: "h2", heuristic: { ...DEFAULT_HEURISTIC_CONFIG, direction: "minimize" as const } }];
+  validateContest(c, choices, user);
+  assert.deepEqual(newContestInput({...c}).heuristic, c.heuristic);
+  assert.throws(() => newContestInput({...c, heuristic: {selection: "best", scoring: "unknown"}}));
+  assert.throws(() => validateContest({...c, rated: true}, choices, user));
+  assert.throws(() => validateContest({...c, heuristic: {selection: "best"}}, choices, user));
+  assert.throws(() => assertContestStructureEditable(c, {...c, heuristic: undefined}, now));
+});
+test("normalized points combine with standard partial scores and never penalize numeric attempts", () => {
+  const c = event({problems: [...event().problems, {problemId: "h", label: "B", score: 300, orderIndex: 1}]});
+  assert.equal(normalizedContestPoints("1000000000", 300), 300);
+  assert.equal(normalizedContestPoints("466666666.666666666667", 300), 140);
+  assert.equal(normalizedContestPoints(null, 300), 0);
+  const rows = combineMixedStandings(c, [
+    submission("wa", "a", 0, 1),
+    submission("ac", "a", 100, 2),
+    submission("partial", "b", 50, 3),
+    submission("h", "b", 100, 1, {problemId: "h"}),
+  ], new Set(["h"]), new Map([["b", [{label: "B", score: 300, normalizedHeuristic: true, acceptedAt: iso(240000), wrongSubmissions: 0}]]]));
+  assert.deepEqual(rows.slice(0,2).map(r => [r.userId,r.rank,r.totalScore,r.penalty]), [["b",1,550,3],["a",2,500,7]]);
+  assert.equal(rows[1].cells[1].score, 0);
 });
 test("server windows are start-inclusive and end-exclusive", () => {
   const c = event();

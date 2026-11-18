@@ -96,8 +96,13 @@ export interface ContestProblem {
   orderIndex: number;
 }
 
+export interface ContestHeuristicSettings {
+  selection: "best" | "last";
+  scoring?: "normalized";
+}
+
 export interface Contest {
-  heuristic?: { selection: "best" | "last" };
+  heuristic?: ContestHeuristicSettings;
   id: string;
   organizerId: string;
   title: string;
@@ -223,6 +228,7 @@ export interface RejudgeRequest {
 }
 
 export interface ScoreboardProblemCell {
+  normalizedHeuristic?: true;
   heuristicScore?: string | null;
   label: string;
   score: number;
@@ -259,7 +265,7 @@ export interface CreateProblemInput {
 export type UpdateProblemInput = Partial<CreateProblemInput>;
 
 export interface CreateContestInput {
-  heuristic?: { selection: "best" | "last" };
+  heuristic?: ContestHeuristicSettings;
   title: string;
   slug: string;
   descriptionMarkdown: string;
@@ -272,7 +278,9 @@ export interface CreateContestInput {
   problems: ContestProblem[];
 }
 
-export type UpdateContestInput = Partial<CreateContestInput>;
+export type UpdateContestInput = Omit<Partial<CreateContestInput>, "heuristic"> & {
+  heuristic?: ContestHeuristicSettings | null;
+};
 
 export interface CreateSubmissionInput {
   problemId: string;
@@ -308,7 +316,7 @@ export interface ContestRatingResult {
 }
 
 export interface ContestLiveData {
-  heuristic?: {state:string;canFinalize:boolean};
+  heuristic?: {state:string;canFinalize:boolean;scoring?:"normalized"};
   contestId: string;
   serverNow: string;
   startAt: string;
@@ -322,7 +330,7 @@ export interface ContestLiveData {
   visibility: ScoreboardVisibility;
   rows: Array<ScoreboardRow & {displayName:string}>;
   ratingResult: ContestRatingResult;
-  problems: Array<ContestProblem & {title:string|null;canOpen:boolean}>;
+  problems: Array<ContestProblem & {title:string|null;canOpen:boolean;heuristic?:true}>;
   virtual: {session:VirtualParticipation;rows:ScoreboardRow[]} | null;
 }
 

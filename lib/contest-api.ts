@@ -32,8 +32,14 @@ export function readContestInput(
     result[key] = body[key];
   }
   if(body.heuristic!==undefined){
-    if(!body.heuristic||typeof body.heuristic!=="object"||!["best","last"].includes(String((body.heuristic as Record<string,unknown>).selection)))throw new ContestError("Invalid heuristic contest selection");
-    result.heuristic={selection:(body.heuristic as Record<string,unknown>).selection};
+    if (body.heuristic === null) result.heuristic = null;
+    else {
+      if (!body.heuristic || typeof body.heuristic !== "object") throw new ContestError("Invalid heuristic contest selection");
+      const {selection, scoring} = body.heuristic as Record<string, unknown>;
+      if ((selection !== "best" && selection !== "last") || (scoring !== undefined && scoring !== "normalized"))
+        throw new ContestError("Invalid heuristic contest selection");
+      result.heuristic = {selection, ...(scoring ? {scoring} : {})};
+    }
   }
   if (body.problems !== undefined)
     result.problems = parseContestProblems(body.problems);
@@ -43,6 +49,7 @@ export function readContestInput(
 export function newContestInput(
   body: Record<string, unknown>,
 ): CreateContestInput {
+  const {heuristic, ...input} = readContestInput(body);
   return {
     title: "",
     slug: "",
@@ -54,6 +61,7 @@ export function newContestInput(
     scoreboardVisibility: "full",
     rated: false,
     problems: [],
-    ...readContestInput(body),
+    ...input,
+    heuristic: heuristic ?? undefined,
   };
 }
