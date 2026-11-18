@@ -27,9 +27,38 @@ import {
 import { executePackageJudge } from "../lib/judge-runtime";
 import { SCORER_SOURCE_TEMPLATES } from "../lib/scorer-source-templates";
 import { parseVisualization } from "../lib/heuristic-visualization";
+import { rankHeuristicRuns } from "../lib/heuristic-run-ranking";
+import { eligibleForProblemStandings } from "../lib/problem-standings";
 import type { Language } from "../lib/types";
 
 const config = { ...DEFAULT_HEURISTIC_CONFIG };
+test("permanent standings exclude virtual, unfinished and non-public contests", () => {
+  const ended = new Set(["ended-public"]);
+  const entry = { status: "accepted" as const, contestId: null };
+  assert.ok(eligibleForProblemStandings(entry, ended));
+  assert.ok(eligibleForProblemStandings({ ...entry, contestId: "ended-public" }, ended));
+  for (const contestId of ["ongoing", "private", "unlisted", "deleted"]) {
+    assert.ok(!eligibleForProblemStandings({ ...entry, contestId }, ended));
+  }
+  assert.ok(!eligibleForProblemStandings({ ...entry, virtualParticipationId: "v1" }, ended));
+});
+
+test("problem ranks use exact decimals, best per user, shared places and earliest tie", async () => {
+  const inputs = [
+    ["a", "u1", "100000000000000000000000.000000000001"],
+    ["b", "u1", "0"],
+    ["c", "u2", "0"],
+    ["d", "u1", "0"],
+    ["e", "u3", "100000000000000000000000.000000000002"],
+  ];
+  const runs = inputs.map(([id, userId, score], i) => ({
+    id, submissionId: id, userId, score: new Prisma.Decimal(score), submittedAt: new Date(i).toISOString(),
+  }));
+  const rank = async (direction: "minimize" | "maximize") =>
+    (await rankHeuristicRuns({ ...config, direction }, runs)).map(row => [row.rank, row.submissionId]);
+  assert.deepEqual(await rank("minimize"), [[1, "b"], [1, "c"], [3, "e"]]);
+  assert.deepEqual(await rank("maximize"), [[1, "e"], [2, "a"], [3, "c"]]);
+});
 test("invalid scorer output is IE without leaking stdout; valid zero remains AC", async () => {
   const example = createHeuristicExample("knapsack", {
     provisional: 1,

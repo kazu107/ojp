@@ -3,15 +3,8 @@ import { WorkspaceError } from "./workspace-error";
 import { Prisma, type HeuristicRun } from "@prisma/client";
 import { prisma } from "./db/prisma";
 import { parseHeuristicConfig } from "./heuristic-config";
-import {
-  absoluteScore,
-  rankAggregates,
-  addBaseline,
-  relativeScore,
-  scoreString,
-  type ScoredCase,
-  type AggregateAttempt,
-} from "./heuristic-score";
+import { absoluteScore, scoreString } from "./heuristic-score";
+import { rankHeuristicRuns } from "./heuristic-run-ranking";
 import { revisionById } from "./problem-revisions";
 import { createLazyProblemPackageSourceFromStorageRef } from "./problem-package-lazy";
 import { executePackageJudge } from "./judge-runtime";
@@ -42,6 +35,7 @@ export async function isHeuristicRevision(problemId: string, id: string) {
 export async function loadHeuristicContestProblem(
   contestId: string,
   problemId: string,
+  { includeSamples = true } = {},
 ) {
   const settings = await prisma.heuristicContest.findUnique({
     where: { contestId },
@@ -53,7 +47,7 @@ export async function loadHeuristicContestProblem(
   const snapshot = await revisionById(problemId, revisionId);
   if (!snapshot) throw new Error("Pinned contest revision unavailable");
   const problem = { ...snapshot.problem };
-  if (snapshot.storageRef && !problem.sampleCases.length) {
+  if (includeSamples && snapshot.storageRef && !problem.sampleCases.length) {
     const key = snapshot.storageRef.key;
     const cached = publicSamples.get(key);
     if (cached) problem.sampleCases = cached;
@@ -74,7 +68,7 @@ export async function loadHeuristicContestProblem(
       }
     }
   }
-  return { problem, tags: snapshot.tags };
+  return { problem, tags: snapshot.tags, revisionId };
 }
 
 export async function enqueueHeuristicRun(
@@ -495,49 +489,11 @@ export async function heuristicStandings(
       }
       candidates = [...latest.values()];
     }
-    const baseline = new Map<string, Prisma.Decimal>();
-    async function scan(
-      visit: (run: (typeof candidates)[number], cases: ScoredCase[]) => void,
-    ) {
-      for (let i = 0; i < candidates.length; i += 10) {
-        const batch = candidates.slice(i, i + 10);
-        const scores = await prisma.heuristicCaseScore.findMany({
-          where: { runId: { in: batch.map((r) => r.id) } },
-          select: { runId: true, caseKey: true, verdict: true, rawScore: true },
-        });
-        for (const run of batch)
-          visit(
-            run,
-            scores
-              .filter((c) => c.runId === run.id)
-              .map((c) => ({
-                key: c.caseKey,
-                verdict: c.verdict,
-                rawScore: c.rawScore ? scoreString(c.rawScore) : null,
-              })),
-          );
-      }
-    }
-    const aggregates: AggregateAttempt[] = [];
-    const add = (run: (typeof candidates)[number], score: string | null) => {
-      const sub = official.find((s) => s.id === run.submissionId)!;
-      aggregates.push({
-        userId: sub.userId,
-        submissionId: sub.id,
-        submittedAt: sub.submittedAt,
-        score,
-        rank: 0,
-      });
-    };
-    if (config.evaluation === "relative") {
-      await scan((_run, cases) => addBaseline(config, baseline, cases));
-      await scan((run, cases) =>
-        add(run, relativeScore(config, cases, baseline)),
-      );
-    } else
-      for (const run of candidates)
-        add(run, run.score ? scoreString(run.score) : null);
-    const ranked = rankAggregates(config, aggregates);
+    const byId = new Map(official.map(s => [s.id, s]));
+    const ranked = await rankHeuristicRuns(config, candidates.map(run => {
+      const submission = byId.get(run.submissionId)!;
+      return { ...run, userId: submission.userId, submittedAt: submission.submittedAt };
+    }));
     for (const row of ranked) {
       selected.push(row.submissionId);
       const normalized =

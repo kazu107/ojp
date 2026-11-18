@@ -4,6 +4,7 @@ import {listSubmissionsForViewer} from "@/lib/store";
 import {HeuristicVisualizer} from "@/components/heuristic-visualizer";
 import { problemTags, studyEntry } from "@/lib/problem-workspace-store";
 import { ProblemStudy } from "@/components/problem-study";
+import { ProblemResultLinks } from "@/components/problem-result-links";
 
 import { getI18n } from "@/lib/i18n/server";
 ﻿import Link from "next/link";
@@ -66,6 +67,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
           </StatusBadge>
           <Link href={`/problems/${problem.id}/submit${contextQuery}`} className="button">
             {t("提出する")}</Link>
+          <ProblemResultLinks problemId={problem.id} contestId={contestId} virtualParticipationId={virtualParticipationId} heuristic={!!problem.heuristic} />
           <Link href={`/problems/${problem.id}/explanation${contextQuery}`} className="button button-secondary">
             {t("解説")}</Link>
           {canEditProblem ? (

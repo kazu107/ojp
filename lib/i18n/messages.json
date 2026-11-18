@@ -1,4 +1,16 @@
 {
+  "Problem Submissions": {
+    "en": "Submissions",
+    "ja": "提出一覧"
+  },
+  "Problem Standings": {
+    "en": "Problem Standings",
+    "ja": "常設順位表"
+  },
+  "No ranked submissions yet.": {
+    "en": "No ranked submissions yet.",
+    "ja": "順位表に掲載する提出はまだありません。"
+  },
   "_No preview yet._": {
     "ja": "_プレビューはまだありません。_",
     "en": "_No preview yet._"

@@ -3420,7 +3420,8 @@ export function listSubmissionsForViewer(
   const filtered = [...store.submissions]
     .map((submission) => applySubmissionRuntimeSummary(submission))
     .filter((submission) => {
-    if (!canViewSubmissionRecord(submission,viewerId,!!options.contestId)) return false;
+    const direct = !!options.contestId || (!submission.contestId && options.problemId === submission.problemId);
+    if (!canViewSubmissionRecord(submission,viewerId,direct)) return false;
     if (options.userId && submission.userId !== options.userId) {
       return false;
     }

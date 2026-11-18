@@ -59,6 +59,11 @@ test(
       } while (Date.now() < deadline);
       throw new Error("Timed out: " + JSON.stringify(value));
     }
+    async function page(path: string, status = 200) {
+      const res = await fetch(origin + path, { headers: { Cookie: "ojp_locale=en" }, redirect: "manual" });
+      assert.equal(res.status, status, path);
+      return (await res.text()).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+    }
     try {
       for (const auth of [admin, alice, bob])
         await request("/api/problems", auth);
@@ -141,7 +146,7 @@ test(
             title: `Heuristic ${kind}`,
             slug,
             descriptionMarkdown: "integration",
-            visibility: "unlisted",
+            visibility: kind === "knapsack" ? "public" : "unlisted",
             startAt: new Date(Date.now() - 1000).toISOString(),
             endAt,
             penaltyMinutes: 5,
@@ -179,6 +184,11 @@ test(
         }
         await submit(alice, example.solutions.baseline);
         const optimalId = await submit(bob, example.solutions.optimal);
+        const standingsPath = `/problems/${problem.id}/standings`;
+        const problemHtml = await page(`/problems/${problem.id}?contestId=${contest.id}`);
+        assert.ok(problemHtml.includes(`/submissions?problemId=${problem.id}&amp;contestId=${contest.id}`));
+        assert.ok(problemHtml.includes(`${standingsPath}?contestId=${contest.id}`));
+        assert.ok(!(await page(standingsPath)).includes(`/submissions/${optimalId}"`));
         await submit(admin, example.solutions.baseline);
         await submit(admin, example.solutions.optimal);
         await submit(admin, example.solutions.invalid);
@@ -373,6 +383,13 @@ test(
         assert.ok(
           system.every((r) => r.status === "completed" && r.cases.length === 5),
         );
+        const permanent = await page(standingsPath);
+        assert.equal(permanent.includes(`/submissions/${optimalId}"`), kind === "knapsack");
+        if (kind === "knapsack") {
+          assert.ok(permanent.includes(frozenRevision.slice(0, 8)));
+          // The optimal solution sets the baseline on all three provisional cases.
+          assert.ok(permanent.includes(">3000000000<"));
+        }
         assert.ok(
           system.every((r) => r.cases.every((c) => c.groupName === "system")),
         );
@@ -429,7 +446,27 @@ test(
       );
       assert.equal(hugeView.run.score, exact);
       assert.equal(hugeView.run.groups[0].cases[0].score, exact);
+      const problemPath = `/problems/${huge.problem.id}`;
+      const html = await page(problemPath);
+      assert.ok(html.includes(`href="/submissions?problemId=${huge.problem.id}"`));
+      assert.ok(html.includes(`href="${problemPath}/standings"`));
+      const filtered = await page(`/submissions?problemId=${huge.problem.id}`);
+      assert.ok(filtered.includes(`href="/submissions/${created.submission.id}"`));
+      assert.deepEqual([...filtered.matchAll(/href="\/submissions\/(s\d+)"/g)].map(m => m[1]), [created.submission.id]);
+      const standings = await page(problemPath + "/standings");
+      assert.ok(standings.includes(`>${exact}<`));
+      assert.ok(standings.includes(`href="/submissions/${created.submission.id}"`));
+      const firstRun = await prisma.heuristicRun.findFirstOrThrow({where: {submissionId: created.submission.id}});
+      await prisma.heuristicRun.create({data: {
+        id: randomUUID(), submissionId: firstRun.submissionId, problemId: firstRun.problemId,
+        revisionId: firstRun.revisionId, phase: "provisional", evaluationId: "failed-rejudge",
+        status: "failed", config: firstRun.config as Prisma.InputJsonValue,
+        sourceCode: firstRun.sourceCode, language: firstRun.language,
+      }});
+      assert.ok(!(await page(problemPath + "/standings")).includes(`>${exact}<`));
+      await page("/problems/p1000/standings", 404);
       await request(`/api/problems/${huge.problem.id}`,admin,"PATCH",{visibility:"private"});
+      await page(problemPath + "/standings", 404);
       await request(`/api/submissions/${created.submission.id}/heuristic`,"","GET",undefined,404);
     } finally {
       for (const w of workers) w.kill();

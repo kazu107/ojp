@@ -6,6 +6,7 @@ const PUBLIC_PAGE_PATTERNS: RegExp[] = [
   /^\/signin$/,
   /^\/problems$/,
   /^\/problems\/[^/]+$/,
+  /^\/problems\/[^/]+\/standings$/,
   /^\/contests$/,
   /^\/contests\/[^/]+$/,
   /^\/submissions$/,
