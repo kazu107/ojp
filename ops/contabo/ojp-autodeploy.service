@@ -1,0 +1,11 @@
+[Unit]
+Description=Deploy a tested OJP main commit
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/local/libexec/ojp-autodeploy --poll
+TimeoutStartSec=20min
+TimeoutStopSec=150s

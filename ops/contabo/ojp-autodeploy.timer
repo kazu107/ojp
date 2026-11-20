@@ -1,0 +1,10 @@
+[Unit]
+Description=Check GitHub for an approved OJP release
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=3min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

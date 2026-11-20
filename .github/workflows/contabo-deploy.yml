@@ -1,0 +1,56 @@
+name: Contabo deployment
+
+on:
+  workflow_run:
+    workflows: ["Judge Checks"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-main
+  cancel-in-progress: true
+
+jobs:
+  authorize:
+    name: Authorize release
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_sha == github.sha
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve the tested commit for the VPS pull timer
+        env:
+          RELEASE: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          [[ "$RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          echo "Authorized Contabo release: $RELEASE" >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: Confirm live origin
+    needs: authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Wait for the public site to serve this commit
+        env:
+          RELEASE: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          [[ "$RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          for attempt in $(seq 1 68); do
+            if curl -fsS --max-time 10 -H 'Cache-Control: no-cache' -D headers.txt -o health.json \
+              "https://ojp.kazu107.xyz/api/health/db?release_check=$RELEASE-$attempt" &&
+              tr -d '\r' < headers.txt | grep -qiFx "x-ojp-origin: contabo-$RELEASE" &&
+              jq -e '.ok == true' health.json >/dev/null; then
+              echo "Contabo is serving $RELEASE" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Contabo did not confirm the release yet. Check the VPS deployment journal (database changes, active contests or queues can defer a release)."
+          exit 1
