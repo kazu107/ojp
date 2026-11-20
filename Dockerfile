@@ -2,7 +2,12 @@ FROM node:24-bookworm-slim
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apt-get update \
+# Use the official Node image's bundled trust roots before Debian's CA package
+# is present. Bound mirror timeouts so a stalled fetch cannot block deployment.
+RUN node -e 'require("node:fs").writeFileSync("/tmp/apt-ca.pem", require("node:tls").rootCertificates.join("\n") + "\n")' \
+  && sed -i 's|http://deb.debian.org/|https://deb.debian.org/|g' /etc/apt/sources.list.d/debian.sources \
+  && printf '%s\n' 'Acquire::https::CaInfo "/tmp/apt-ca.pem";' 'Acquire::https::Timeout "25";' 'Acquire::Retries "2";' 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99-ojp-build \
+  && apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     g++ \
@@ -21,6 +26,7 @@ RUN apt-get update \
     util-linux \
     time \
     tini \
+  && rm -f /etc/apt/apt.conf.d/99-ojp-build /tmp/apt-ca.pem \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

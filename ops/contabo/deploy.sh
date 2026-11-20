@@ -113,7 +113,10 @@ if [ ! -f "$work/prepared" ]; then
   mkdir -p "$work/source"
   git -C source.git archive "$target" | tar -xpf - -C "$work/source"
   say "Building $target without production credentials"
-  docker build --progress=plain --label "org.opencontainers.image.revision=$target" -t "$newtag" "$work/source" >"$work/build.log" 2>&1
+  if ! timeout --kill-after=30 15m docker build --progress=plain --label "org.opencontainers.image.revision=$target" -t "$newtag" "$work/source" >"$work/build.log" 2>&1; then
+    touch "$work/failed"
+    fail "Candidate build failed; production was not changed. See $work/build.log."
+  fi
   if [ -e "$newroot" ]; then fail "Unverified worker root already exists. Review $newroot"; fi
   temp_root=$(mktemp -d /opt/ojp-export.XXXXXX)
   chmod 755 "$temp_root"
