@@ -22,6 +22,7 @@ import {
   gamePreviewPayload,
   gamePreviewPackage,
   readGamePreviewRequest,
+  allowsGamePreviewOrigin,
 } from "../lib/grid-game-preview";
 import {
   gridGameExample,
@@ -50,6 +51,18 @@ const config = {
   board: structuredClone(DEFAULT_BOARD_CONFIG),
   game: { ...DEFAULT_GRID_GAME },
 };
+test("game previews accept the configured HTTPS origin behind an HTTP proxy", () => {
+  const internal = "http://127.0.0.1:3000/api/problems/p1/game-preview";
+  const publicUrl = "https://judge.example.test/api/auth";
+  assert.ok(allowsGamePreviewOrigin("https://judge.example.test", internal, publicUrl));
+  assert.ok(!allowsGamePreviewOrigin("http://127.0.0.1:3000", internal, publicUrl));
+  assert.ok(!allowsGamePreviewOrigin("https://untrusted.example.test", internal, publicUrl));
+  assert.ok(!allowsGamePreviewOrigin("null", internal, publicUrl));
+  assert.ok(!allowsGamePreviewOrigin("http://127.0.0.1:3000", internal, "invalid"));
+  assert.ok(allowsGamePreviewOrigin("http://127.0.0.1:3000", internal));
+  assert.ok(allowsGamePreviewOrigin(null, internal, publicUrl));
+});
+
 test("board config and input are versioned, bounded and declarative", () => {
   assert.deepEqual(
     parseBoardConfig(DEFAULT_BOARD_CONFIG),

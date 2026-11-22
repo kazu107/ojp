@@ -3,6 +3,22 @@ import { parseHeuristicConfig, type HeuristicConfig } from "./heuristic-config";
 import { GridGame, isWellFormedText } from "./board-visualization";
 import type { ProblemPackageExtracted } from "./problem-package";
 
+export function allowsGamePreviewOrigin(
+  origin: string | null,
+  requestUrl: string,
+  publicUrl?: string,
+): boolean {
+  if (origin === null) return true;
+  try {
+    // A reverse proxy can leave requestUrl with the internal HTTP origin.
+    const expected = new URL(publicUrl ?? requestUrl);
+    return (expected.protocol === "https:" || expected.protocol === "http:") &&
+      origin === expected.origin;
+  } catch {
+    return false;
+  }
+}
+
 export interface GamePreviewPayload {
   provider: "grid-game-preview-v1";
   config: HeuristicConfig;

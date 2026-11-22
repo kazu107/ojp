@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
-import { readGamePreviewRequest } from "@/lib/grid-game-preview";
+import { allowsGamePreviewOrigin, readGamePreviewRequest } from "@/lib/grid-game-preview";
 import { loadHeuristicContestProblem } from "@/lib/heuristic-store";
 import {
   getCurrentUser,
@@ -15,12 +15,14 @@ export async function POST(
   { params }: { params: Promise<{ problemId: string }> },
 ) {
   try {
+    if (!allowsGamePreviewOrigin(
+      request.headers.get("origin"),
+      request.url,
+      process.env.AUTH_URL || process.env.NEXTAUTH_URL,
+    )) throw new HttpError("Cross-origin game previews are not allowed", 403);
     const user = await getCurrentUser();
     if (user.status !== "active")
       throw new HttpError("user account is not active", 403);
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
-      throw new HttpError("Cross-origin game previews are not allowed", 403);
     let body: Awaited<ReturnType<typeof readGamePreviewRequest>>;
     try {
       body = await readGamePreviewRequest(request);
