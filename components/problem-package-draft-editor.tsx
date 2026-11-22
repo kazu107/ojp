@@ -1,5 +1,6 @@
 "use client";
 import { HeuristicSettings } from "./heuristic-settings";
+import {GRID_GAME_CHECKER_MARKER} from "@/lib/grid-game-templates";
 import { DEFAULT_HEURISTIC_CONFIG } from "@/lib/heuristic-config";
 import { SCORER_SOURCE_TEMPLATES, isDefaultScorerTemplate } from "@/lib/scorer-source-templates";
 import { useI18n } from "@/components/i18n-provider";
@@ -317,7 +318,7 @@ export function ProblemPackageDraftEditor({
             <option value="interactive">{t("Interactive")}</option>
           </select>
         </label>
-        {draft.checkerType !== "exact" ? (
+        {draft.checkerType !== "exact" && !draft.heuristic?.game ? (
           <label className="field">
             <span className="field-label">{draft.checkerType === "interactive" ? t("Interactor Language") : t("Checker Language")}</span>
             <select
@@ -373,8 +374,8 @@ export function ProblemPackageDraftEditor({
         </label>
       </div>
 
-      {draft.checkerType === "heuristic" ? <HeuristicSettings value={draft.heuristic} groups={draft.groups.map(g=>g.name)} onChange={heuristic=>patchDraft(current=>({...current,heuristic}))}/> : null}
-      {draft.checkerType !== "exact" ? (
+      {draft.checkerType === "heuristic" ? <HeuristicSettings value={draft.heuristic} groups={draft.groups.map(g=>g.name)} sampleInput={draft.samples[0]?.input} sampleOutput={draft.samples[0]?.output} onUseSample={(input,output)=>patchDraft(current=>({...current,samples:[{...(current.samples[0]??{id:crypto.randomUUID(),name:"sample1",description:""}),input,output},...current.samples.slice(1)]}))} onChange={heuristic=>patchDraft(current=>({...current,heuristic,checkerSourceCode:!heuristic.game&&current.checkerSourceCode.trim()===GRID_GAME_CHECKER_MARKER.trim()?SCORER_SOURCE_TEMPLATES[current.checkerLanguage]:current.checkerSourceCode}))}/> : null}
+      {draft.checkerType !== "exact" && !draft.heuristic?.game ? (
         <div className="stack">
           <p className="text-soft">
             {draft.checkerType === "heuristic" ? t("Scorer receives input, reference and contestant output paths. Exit 0 and print JSON with version:1, valid:boolean, score:decimal-string. Invalid solutions use valid:false; scorer failures are IE.") : draft.checkerType === "interactive" ? t("Interactor receives the private input path as argv[1]. Communicate over stdin/stdout and flush each response. Exit 0 for AC, 1 for WA, otherwise IE.") : t("Special judge is called with three arguments: input file path, reference output path, and contestant output path. Exit `0` for AC, `1` for WA, and any other code for judge error.")}</p>

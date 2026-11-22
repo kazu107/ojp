@@ -1,6 +1,8 @@
 "use client";
 import { useI18n } from "./i18n-provider";
 import { useState } from "react";
+import {DEFAULT_BOARD_CONFIG} from "@/lib/board-visualization";
+import {BoardSettings} from "./board-settings";
 import {
   DEFAULT_HEURISTIC_CONFIG,
   type HeuristicConfig,
@@ -9,10 +11,16 @@ export function HeuristicSettings({
   value,
   groups,
   onChange,
+  sampleInput,
+  sampleOutput,
+  onUseSample,
 }: {
   value?: HeuristicConfig;
   groups: string[];
   onChange: (config: HeuristicConfig) => void;
+  sampleInput?: string;
+  sampleOutput?: string;
+  onUseSample?: (input:string,output:string)=>void;
 }) {
   const { t } = useI18n();
   const config = value ?? DEFAULT_HEURISTIC_CONFIG;
@@ -44,7 +52,7 @@ export function HeuristicSettings({
               "Failed Case Policy",
               ["case_zero", "submission_zero"],
             ],
-            ["visualizer", "Visualizer", ["none", "knapsack", "route"]],
+            ["visualizer", "Visualizer", ["none", "knapsack", "route", "board"]],
           ] as const
         ).map(([key, label, options]) => (
           <label className="field" key={key}>
@@ -52,7 +60,8 @@ export function HeuristicSettings({
             <select
               className="select"
               value={config[key]}
-              onChange={(e) => onChange({ ...config, [key]: e.target.value })}
+              disabled={key === "direction" && !!config.game}
+              onChange={(e) => onChange({ ...config, [key]: e.target.value, ...(key === "visualizer" ? {board:e.target.value==="board"?(config.board??structuredClone(DEFAULT_BOARD_CONFIG)):config.board,game:e.target.value==="board"?config.game:undefined}: {}) })}
             >
               {options.map((option) => (
                 <option key={option} value={option}>
@@ -63,6 +72,7 @@ export function HeuristicSettings({
           </label>
         ))}
       </div>
+      {config.visualizer === "board" ? <BoardSettings value={config} onChange={onChange} sampleInput={sampleInput} sampleOutput={sampleOutput} onUseSample={onUseSample}/> : null}
       <h4>{t("System Test Groups")}</h4>
       <p className="text-soft">
         {t(

@@ -1,5 +1,7 @@
 import { enqueueHeuristicRun, workOneHeuristicRun, heuristicStandings, assertHeuristicAvailable, isHeuristicRevision } from "./heuristic-store";
 import {publicHeuristicSettings} from "./heuristic-config";
+import {gamePreviewPayload, gamePreviewPackage, isGamePreviewPayload} from "./grid-game-preview";
+import {isWellFormedText} from "./board-visualization";
 import { captureProblemRevision, revisionById, retainedPackage } from "./problem-revisions";
 import { saveProblemTags } from "./problem-workspace-store";
 import { visibleInteractionResults, canViewPrivateInteraction } from "./interactive-privacy";
@@ -3077,6 +3079,16 @@ async function applyProblemPackageManifestInternal(
 }
 
 async function runPackageJobInternal(job: PackageJobRecord): Promise<void> {
+  if (job.type === "preview" && isGamePreviewPayload(job.storageRef)) {
+    try {
+      let counter = 0;
+      const result = await executePackageJudge({sourceCode:job.sourceCode,language:job.language,timeLimitMs:job.timeLimitMs,memoryLimitMb:job.memoryLimitMb,packageData:gamePreviewPackage(job.storageRef),includeBoardReplay:true,nextTestResultId:()=>`game-preview-${++counter}`});
+      await finishPackageJobDb({id:job.id,status:"completed",result:result as unknown as Prisma.InputJsonValue});
+    } catch(error) {
+      await finishPackageJobDb({id:job.id,status:"failed",error:error instanceof Error?error.message:"Game preview failed"});
+    }
+    return;
+  }
   try {
     const packageSource = await createLazyProblemPackageSourceFromStorageRef({
       ref: job.storageRef,
@@ -3215,6 +3227,22 @@ export async function createProblemPackagePreviewJob(input: {
     const row = await prisma.packageJob.findUnique({ where: { id: job.id } });
     return row ? toPackageJobRecord(row) : job;
   }
+  return job;
+}
+
+export async function createGridGamePreviewJob(input:{problem:Problem;input:unknown;language:Language;sourceCode:string}):Promise<PackageJobRecord> {
+  const actor=await getCurrentUser();assertActiveUser(actor);
+  if(process.env.GAME_EXECUTION_ENABLED!=="1")throw new HttpError("Game execution requires an enabled isolated game worker",503);
+  let payload:ReturnType<typeof gamePreviewPayload>;
+  try{payload=gamePreviewPayload(input.problem.heuristic,input.input)}catch(error){throw new HttpError(error instanceof Error?error.message:"Invalid game preview",400)}
+  const row=await prisma.$transaction(async tx=>{
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`game-preview:${actor.id}`}))::text`;
+    if(await tx.packageJob.count({where:{requestedBy:actor.id,status:{in:["queued","running"]}}})>=2)throw new HttpError("Wait for your running previews to finish",429);
+    if(await tx.packageJob.count({where:{requestedBy:actor.id,createdAt:{gte:new Date(Date.now()-60000)}}})>=6)throw new HttpError("Game preview rate limit reached",429);
+    return tx.packageJob.create({data:{id:nextPackageJobId(),type:"preview",requestedBy:actor.id,problemId:input.problem.id,fileName:"public-grid-preview",status:"queued",storageRef:payload as unknown as Prisma.InputJsonValue,language:input.language,sourceCode:input.sourceCode,timeLimitMs:Math.min(input.problem.timeLimitMs,5000),memoryLimitMb:Math.min(input.problem.memoryLimitMb,256)}});
+  });
+  const job=toPackageJobRecord(row);
+  if(JUDGE_PROCESS_MODE==="inline"){await runPackageJobInternal(job);return toPackageJobRecord(await prisma.packageJob.findUniqueOrThrow({where:{id:job.id}}));}
   return job;
 }
 
@@ -3545,6 +3573,9 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   if (usesPinnedJudge && !(heuristicContest?.revisions as Record<string,string>|undefined)?.[problem.id])
     throw new HttpError("Pinned contest revision unavailable", 409);
   const pinnedContestId=(heuristicContest?.revisions as Record<string,string>|undefined)?.[problem.id];
+  const targetGame=pinnedContestId?(await revisionById(problem.id,pinnedContestId))?.problem.heuristic?.game:problem.heuristic?.game;
+  if(targetGame&&(input.sourceCode.includes("\0")||!isWellFormedText(input.sourceCode)))throw new HttpError("Source code must be valid text without NUL characters",400);
+  if(targetGame&&process.env.GAME_EXECUTION_ENABLED!=="1")throw new HttpError("Game execution requires an enabled isolated game worker",503);
   const revision=pinnedContestId ? {id:pinnedContestId} : await recordCurrentProblemRevision(problem,currentUser.id,"submission");
   const numeric=pinnedContestId ? await isHeuristicRevision(problem.id, pinnedContestId) : !!problem.heuristic;
   if(numeric)await assertHeuristicAvailable();

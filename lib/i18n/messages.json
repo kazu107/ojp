@@ -4978,5 +4978,345 @@
   "Competitive Programming Platform": {
     "ja": "競技プログラミングプラットフォーム",
     "en": "Competitive programming platform"
+  },
+  "Actions or replay JSON": {
+    "ja": "移動命令またはリプレイJSON",
+    "en": "Actions or replay JSON"
+  },
+  "Add symbol": {
+    "ja": "記号を追加",
+    "en": "Add symbol"
+  },
+  "Board and game settings": {
+    "ja": "盤面・ゲームの設定",
+    "en": "Board and game settings"
+  },
+  "Board input": {
+    "ja": "盤面データ",
+    "en": "Board input"
+  },
+  "Board visualization": {
+    "ja": "盤面の表示",
+    "en": "Board visualization"
+  },
+  "Board visualizer": {
+    "ja": "盤面ビジュアライザー",
+    "en": "Board visualizer"
+  },
+  "Brainfuck supports the protocol but has no generic turn-based starter. Implement the input loop yourself.": {
+    "ja": "Brainfuckでも実行できますが、ターン制用の汎用テンプレートはありません。入力処理を実装してください。",
+    "en": "Brainfuck supports the protocol but has no generic turn-based starter. Implement the input loop yourself."
+  },
+  "Circle": {
+    "ja": "円",
+    "en": "Circle"
+  },
+  "Color": {
+    "ja": "色",
+    "en": "Color"
+  },
+  "Control a robot with code, inspect its replay, and improve your score.": {
+    "ja": "コードでロボットを動かし、リプレイを確認しながらスコアを改善できます。",
+    "en": "Control a robot with code, inspect its replay, and improve your score."
+  },
+  "Create a game problem": {
+    "ja": "ゲーム問題を作成",
+    "en": "Create a game problem"
+  },
+  "Define a grid with symbols, pieces and paths. No uploaded JavaScript is executed by the viewer.": {
+    "ja": "マス目、記号、駒、経路を設定できます。ビジュアライザーは登録されたJavaScriptを実行しません。",
+    "en": "Define a grid with symbols, pieces and paths. No uploaded JavaScript is executed by the viewer."
+  },
+  "Diamond": {
+    "ja": "ひし形",
+    "en": "Diamond"
+  },
+  "Enable built-in grid game": {
+    "ja": "内蔵の盤面ゲームを有効にする",
+    "en": "Enable built-in grid game"
+  },
+  "Frame": {
+    "ja": "コマ",
+    "en": "Frame"
+  },
+  "Game judging uses the built-in referee, not the checker source. An isolated worker is required for server execution.": {
+    "ja": "ゲームの判定には内蔵ルールを使用します。checkerのコードは使いません。サーバー実行には隔離workerが必要です。",
+    "en": "Game judging uses the built-in referee, not the checker source. An isolated worker is required for server execution."
+  },
+  "Game objective": {
+    "ja": "ゲームの目標",
+    "en": "Game objective"
+  },
+  "Game protocol": {
+    "ja": "入出力形式",
+    "en": "Game protocol"
+  },
+  "Game test run": {
+    "ja": "ゲームの試走",
+    "en": "Game test run"
+  },
+  "Games": {
+    "ja": "ゲーム",
+    "en": "Games"
+  },
+  "Glyph": {
+    "ja": "表示文字",
+    "en": "Glyph"
+  },
+  "Maze robot": {
+    "ja": "迷路ロボット",
+    "en": "Maze robot"
+  },
+  "Next frame": {
+    "ja": "次のコマ",
+    "en": "Next frame"
+  },
+  "No game problems have been published yet.": {
+    "ja": "公開されているゲーム問題はまだありません。",
+    "en": "No game problems have been published yet."
+  },
+  "One action per observation": {
+    "ja": "観測ごとに1つの行動を返す",
+    "en": "One action per observation"
+  },
+  "Open game": {
+    "ja": "ゲームを開く",
+    "en": "Open game"
+  },
+  "Output all actions": {
+    "ja": "移動命令をまとめて出力する",
+    "en": "Output all actions"
+  },
+  "Previous frame": {
+    "ja": "前のコマ",
+    "en": "Previous frame"
+  },
+  "Problem statement": {
+    "ja": "問題文",
+    "en": "Problem statement"
+  },
+  "Public sample or own board": {
+    "ja": "公開サンプルまたは自分の盤面",
+    "en": "Public sample or own board"
+  },
+  "Remove symbol": {
+    "ja": "記号を削除",
+    "en": "Remove symbol"
+  },
+  "Replay position": {
+    "ja": "リプレイの位置",
+    "en": "Replay position"
+  },
+  "Run your code on a public sample or your own board. Test runs never count toward standings or learning completion.": {
+    "ja": "公開サンプルまたは自分の盤面で試走します。試走結果は順位表や学習の完了判定には使いません。",
+    "en": "Run your code on a public sample or your own board. Test runs never count toward standings or learning completion."
+  },
+  "Shape": {
+    "ja": "形",
+    "en": "Shape"
+  },
+  "Show coordinates": {
+    "ja": "座標を表示",
+    "en": "Show coordinates"
+  },
+  "Show movement trail": {
+    "ja": "移動経路を表示",
+    "en": "Show movement trail"
+  },
+  "Sign in to run code and submit a game bot.": {
+    "ja": "コードの試走・提出にはログインが必要です。",
+    "en": "Sign in to run code and submit a game bot."
+  },
+  "Speed": {
+    "ja": "再生速度",
+    "en": "Speed"
+  },
+  "Symbol": {
+    "ja": "記号",
+    "en": "Symbol"
+  },
+  "Test runs use only the board you provide. Official submissions are judged separately on the fixed problem revision.": {
+    "ja": "試走は指定した盤面だけを使います。正式提出は固定された問題の版で別途判定されます。",
+    "en": "Test runs use only the board you provide. Official submissions are judged separately on the fixed problem revision."
+  },
+  "The code or board changed after this test run. Run again to refresh the replay.": {
+    "ja": "試走後にコードまたは盤面が変わりました。再度実行してリプレイを更新してください。",
+    "en": "The code or board changed after this test run. Run again to refresh the replay."
+  },
+  "Tile": {
+    "ja": "マス",
+    "en": "Tile"
+  },
+  "Treasure collector": {
+    "ja": "宝集め",
+    "en": "Treasure collector"
+  },
+  "Update board preview": {
+    "ja": "盤面プレビューを更新",
+    "en": "Update board preview"
+  },
+  "Use public samples or your own data. Private judge inputs and replays are never loaded here.": {
+    "ja": "公開サンプルや自分のデータで表示します。非公開テストの入力・リプレイは読み込みません。",
+    "en": "Use public samples or your own data. Private judge inputs and replays are never loaded here."
+  },
+  "Zoom": {
+    "ja": "表示倍率",
+    "en": "Zoom"
+  },
+  "Play replay": {
+    "ja": "再生",
+    "en": "Play replay"
+  },
+  "Pause replay": {
+    "ja": "一時停止",
+    "en": "Pause replay"
+  },
+  "Running game...": {
+    "ja": "ゲームを実行中...",
+    "en": "Running game..."
+  },
+  "Run public game": {
+    "ja": "この盤面で試走",
+    "en": "Run public game"
+  },
+  "Maximum turns": {
+    "ja": "最大ターン数",
+    "en": "Maximum turns"
+  },
+  "Turn timeout (ms)": {
+    "ja": "1ターンの制限時間（ms）",
+    "en": "Turn timeout (ms)"
+  },
+  "First turn timeout (ms)": {
+    "ja": "初回の制限時間（ms）",
+    "en": "First turn timeout (ms)"
+  },
+  "Wall symbols": {
+    "ja": "壁の記号",
+    "en": "Wall symbols"
+  },
+  "Player symbol": {
+    "ja": "プレイヤーの記号",
+    "en": "Player symbol"
+  },
+  "Goal symbol": {
+    "ja": "ゴールの記号",
+    "en": "Goal symbol"
+  },
+  "Item symbol": {
+    "ja": "アイテムの記号",
+    "en": "Item symbol"
+  },
+  "board": {
+    "ja": "盤面",
+    "en": "board"
+  },
+  "Goal reached": {
+    "ja": "ゴールに到達しました",
+    "en": "Goal reached"
+  },
+  "Unknown game action": {
+    "ja": "不明な行動です",
+    "en": "Unknown game action"
+  },
+  "Stopped before reaching the goal": {
+    "ja": "ゴール前に停止しました",
+    "en": "Stopped before reaching the goal"
+  },
+  "Move hits a wall or leaves the board": {
+    "ja": "壁または盤面の外へ移動しました",
+    "en": "Move hits a wall or leaves the board"
+  },
+  "Turn limit reached": {
+    "ja": "ターン数の上限に達しました",
+    "en": "Turn limit reached"
+  },
+  "Output ended before reaching the goal": {
+    "ja": "ゴールに到達する前に出力が終了しました",
+    "en": "Output ended before reaching the goal"
+  },
+  "Start board input with rows and columns": {
+    "ja": "盤面データの先頭に行数と列数を指定してください",
+    "en": "Start board input with rows and columns"
+  },
+  "Board dimensions do not match the grid": {
+    "ja": "行数・列数と盤面データが一致しません",
+    "en": "Board dimensions do not match the grid"
+  },
+  "Invalid replay": {
+    "ja": "リプレイの形式が不正です",
+    "en": "Invalid replay"
+  },
+  "Use a six-digit hex color": {
+    "ja": "色は6桁の16進表記で指定してください",
+    "en": "Use a six-digit hex color"
+  },
+  "Duplicate board symbol": {
+    "ja": "盤面の記号が重複しています",
+    "en": "Duplicate board symbol"
+  },
+  "Board value exceeds limit": {
+    "ja": "盤面の設定値が上限を超えています",
+    "en": "Board value exceeds limit"
+  },
+  "Board input is limited to 8 KiB": {
+    "ja": "盤面データは8 KiB以下にしてください",
+    "en": "Board input is limited to 8 KiB"
+  },
+  "Replay output is limited to 256 KiB": {
+    "ja": "リプレイは256 KiB以下にしてください",
+    "en": "Replay output is limited to 256 KiB"
+  },
+  "Game previews require an enabled isolated game worker": {
+    "ja": "ゲームの実行には有効な隔離workerが必要です",
+    "en": "Game previews require an enabled isolated game worker"
+  },
+  "Game execution requires an enabled isolated game worker": {
+    "ja": "ゲームの実行には有効な隔離workerが必要です",
+    "en": "Game execution requires an enabled isolated game worker"
+  },
+  "Unable to start game preview": {
+    "ja": "ゲームの試走を開始できませんでした",
+    "en": "Unable to start game preview"
+  },
+  "Unable to load game preview": {
+    "ja": "試走結果を取得できませんでした",
+    "en": "Unable to load game preview"
+  },
+  "Game preview is still running; retry later": {
+    "ja": "試走が継続中です。しばらくしてから再確認してください",
+    "en": "Game preview is still running; retry later"
+  },
+  "A game board requires one player and at least one goal": {
+    "ja": "ゲームの盤面にはプレイヤーを1つ、ゴールを1つ以上配置してください",
+    "en": "A game board requires one player and at least one goal"
+  },
+  "x": {
+    "ja": "倍",
+    "en": "x"
+  },
+  "Use as first public sample": {
+    "ja": "最初の公開サンプルに反映",
+    "en": "Use as first public sample"
+  },
+  "Preview input is temporary. Use the public-sample button to copy it into the draft; test cases are edited separately below.": {
+    "ja": "プレビュー用の入力は一時的なものです。公開サンプルに反映するボタンで下書きへコピーできます。テストケースは下の編集欄で別途設定してください。",
+    "en": "Preview input is temporary. Use the public-sample button to copy it into the draft; test cases are edited separately below."
+  },
+  "Program diagnostics": {
+    "ja": "プログラムの実行ログ",
+    "en": "Program diagnostics"
+  },
+  "Final result": {
+    "ja": "最終結果",
+    "en": "Final result"
+  },
+  "Hex color": {
+    "ja": "色コード",
+    "en": "Hex color"
+  },
+  "Source code must be valid text without NUL characters": {
+    "ja": "ソースコードにはNUL文字や不正な文字列を使用できません",
+    "en": "Source code must be valid text without NUL characters"
   }
 }

@@ -2,7 +2,15 @@
 import { useState } from "react";
 import { parseVisualization } from "@/lib/heuristic-visualization";
 import { useI18n } from "./i18n-provider";
-export function HeuristicVisualizer({
+import {BoardVisualizer} from "./board-visualizer";
+import {DEFAULT_BOARD_CONFIG} from "@/lib/board-visualization";
+import type {HeuristicConfig} from "@/lib/heuristic-config";
+export function HeuristicVisualizer(props:{kind:HeuristicConfig["visualizer"];config?:HeuristicConfig;sampleInput:string;sampleOutput:string}) {
+  if(props.kind==="board")return <BoardVisualizer config={props.config?.board??DEFAULT_BOARD_CONFIG} game={props.config?.game} sampleInput={props.sampleInput} sampleOutput={props.sampleOutput}/>;
+  if(props.kind==="none")return null;
+  return <BuiltinVisualizer kind={props.kind} sampleInput={props.sampleInput} sampleOutput={props.sampleOutput}/>;
+}
+function BuiltinVisualizer({
   kind,
   sampleInput,
   sampleOutput,

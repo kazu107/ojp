@@ -8,6 +8,7 @@ import {
   getSubmissionWithAccess,
 } from "./store";
 import type { User } from "./types";
+import {loadPublicBoardSamples} from "./game-public-samples";
 import {
   gradeLearningQuiz,
   LearningError,
@@ -413,9 +414,10 @@ export async function getLearningItem(
   if (row.storageKey)
     visible.markdown = await getLearningMarkdown(row.storageKey);
   if (item.kind !== "problem") return { item: visible, problem: null };
-  const problem = getProblemForViewer(item.problemId, user?.id ?? "guest");
+  let problem = getProblemForViewer(item.problemId, user?.id ?? "guest");
   if (!problem)
     throw new LearningError("The linked problem is no longer available.", 404);
+  problem=await loadPublicBoardSamples(problem);
   return {
     item: visible,
     problem: {
@@ -426,6 +428,7 @@ export async function getLearningItem(
       outputDescription: problem.outputDescription,
       constraintsMarkdown: problem.constraintsMarkdown,
       sampleCases: problem.sampleCases,
+      heuristic: problem.heuristic,
       samplePairCount:
         problem.latestPackageSummary?.samplePairs ?? problem.sampleCases.length,
     },

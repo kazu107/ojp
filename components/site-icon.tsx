@@ -1,4 +1,5 @@
 const paths = {
+  games: "M4 4h16v16H4z M4 10h16 M4 16h16 M10 4v16 M16 4v16 M7 7h.01 M13 13h.01 M19 19h.01",
   dashboard: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",
   problems: "M8 4H5a2 2 0 0 0-2 2v14h18V6a2 2 0 0 0-2-2h-3 M8 2h8v5H8z M7 12h10 M7 16h6",
   learn: "M12 5C8 2 4 3 2 4v15c3-1 6-1 10 1 4-2 7-2 10-1V4c-2-1-6-2-10 1z M12 5v15",

@@ -6,19 +6,23 @@ import { useI18n } from "@/components/i18n-provider";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MarkdownBlock } from "@/components/markdown-block";
 import { ProblemSamplesSection } from "@/components/problem-samples-section";
 import { learningRequest } from "@/lib/learning-client";
 import { SOURCE_CODE_TEMPLATES } from "@/lib/source-code-templates";
 import { submissionStatusLabel } from "@/lib/presentation";
 import type { Language, ProblemSampleCase, Submission } from "@/lib/types";
+import type {HeuristicConfig} from "@/lib/heuristic-config";
+import {GamePreview} from "./game-preview";
+import {gridGameTemplates} from "@/lib/grid-game-templates";
 
 const CodeEditor = dynamic(
   () => import("./code-editor").then((module) => module.CodeEditor),
   { ssr: false },
 );
 export interface LearningProblem {
+  heuristic?: HeuristicConfig;
   id: string;
   title: string;
   statementMarkdown: string;
@@ -43,8 +47,10 @@ export function LearningPractice({
   complete: (submissionId: string) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const protocol=problem.heuristic?.game?.protocol;
+  const templates=useMemo(()=>protocol?gridGameTemplates(protocol):SOURCE_CODE_TEMPLATES,[protocol]);
   const [language, setLanguage] = useState<Language>("python");
-  const [drafts, setDrafts] = useState(SOURCE_CODE_TEMPLATES);
+  const [drafts, setDrafts] = useState(templates);
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -56,7 +62,7 @@ export function LearningPractice({
     if (disposed) return;
     try {
       const saved = JSON.parse(localStorage.getItem(key) ?? "{}");
-      const next = { ...SOURCE_CODE_TEMPLATES };
+      const next = { ...templates };
       for (const value of SUBMISSION_LANGUAGES)
         if (
           typeof saved.drafts?.[value] === "string" &&
@@ -77,7 +83,7 @@ export function LearningPractice({
     }
     });
     return () => { disposed = true; };
-  }, [key]);
+  }, [key,templates]);
   function persist(
     nextDrafts: typeof drafts,
     nextLanguage: Language,
@@ -206,6 +212,7 @@ export function LearningPractice({
             )}
           </select>
         </label>
+        {problem.heuristic?.game?<GamePreview config={problem.heuristic} problemId={problem.id} sampleInput={problem.sampleCases[0]?.input??""} sourceCode={drafts[language]} language={language}/>:null}
         <CodeEditor
           language={language}
           value={drafts[language]}

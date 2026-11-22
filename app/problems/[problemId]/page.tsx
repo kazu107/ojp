@@ -1,4 +1,5 @@
 import {loadHeuristicContestProblem} from "@/lib/heuristic-store";
+import {loadPublicBoardSamples} from "@/lib/game-public-samples";
 import {HeuristicPersonalBest} from "@/components/heuristic-personal-best";
 import {listSubmissionsForViewer} from "@/lib/store";
 import {HeuristicVisualizer} from "@/components/heuristic-visualizer";
@@ -49,6 +50,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
   }
   const fixed=contestId?await loadHeuristicContestProblem(contestId,problemId):null;
   if(fixed)problem=fixed.problem;
+  if(!contestId)problem=await loadPublicBoardSamples(problem);
 
   const tags=fixed?.tags??(await problemTags([problem.id])).get(problem.id)??[];
   const study=me ? await studyEntry(me.id, problem.id) : null;
@@ -136,7 +138,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
         <h2 className="panel-title">{t("Submit")}</h2>
         {me ? (
           <>
-            <SubmissionForm interactive={problem.judgeType === "interactive"} problemId={problem.id} contestId={contestId ?? null} virtualParticipationId={virtualParticipationId ?? null}/>
+            <SubmissionForm gameConfig={problem.heuristic?.game?problem.heuristic:undefined} sampleInput={problem.sampleCases[0]?.input??""} interactive={problem.judgeType === "interactive"} problemId={problem.id} contestId={contestId ?? null} virtualParticipationId={virtualParticipationId ?? null}/>
           </>
         ) : (
           <>
@@ -150,7 +152,7 @@ export default async function ProblemDetailPage({ params, searchParams }: Proble
         )}
       </section>
       {me&&problem.heuristic?<HeuristicPersonalBest problemId={problem.id} submissionIds={listSubmissionsForViewer(me.id,{userId:me.id,problemId:problem.id}).map(s=>s.id)}/>:null}
-      {problem.heuristic?.visualizer&&problem.heuristic.visualizer!=="none"?<HeuristicVisualizer kind={problem.heuristic.visualizer} sampleInput={problem.sampleCases[0]?.input??""} sampleOutput={problem.sampleCases[0]?.output??""}/>:null}
+      {problem.heuristic?.visualizer&&problem.heuristic.visualizer!=="none"?<HeuristicVisualizer key={problem.id} config={problem.heuristic} kind={problem.heuristic.visualizer} sampleInput={problem.sampleCases[0]?.input??""} sampleOutput={problem.sampleCases[0]?.output??""}/>:null}
       {me ? <ProblemStudy problemId={problem.id} initial={study ? {...study,reviewAt:study.reviewAt?.toISOString() ?? null} : null} /> : null}
     </div>
   );

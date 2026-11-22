@@ -29,6 +29,7 @@ jobs:
       - run: npm run db:generate
       - run: npm run test:judge
       - run: npm run test:heuristic
+      - run: npm run test:game
       - run: npm run test:interactive
       - run: npm run test:workspace
       - run: npm run test:design
@@ -227,3 +228,55 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3103/api/health/db >/dev/null
           npm run test:heuristic:integration
+
+  games:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: game-test
+          POSTGRES_DB: ojp_game_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:game-test@127.0.0.1:5432/ojp_game_test
+      GAME_TEST_ORIGIN: http://127.0.0.1:3108
+      GAME_EXECUTION_ENABLED: "1"
+      AUTH_SECRET: game-local-validation-only
+      AUTH_URL: http://127.0.0.1:3108
+      AUTH_TRUST_HOST: "true"
+      ADMIN_GITHUB_LOGINS: game-test
+      JUDGE_PROCESS_MODE: web
+      JUDGE_SANDBOX: bubblewrap
+      STORE_DB_SYNC: "1"
+      LEARNING_STORAGE: db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y bubblewrap util-linux g++ python3 time
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run db:push
+      - run: npm run build
+        env:
+          STORE_DB_SYNC: "0"
+      - name: Isolated game preview, submission, learning and system test lifecycle
+        run: |
+          node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3108 >/tmp/ojp-game-web.log 2>&1 &
+          web=$!
+          trap 'kill "$web" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3108/api/health/db >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3108/api/health/db >/dev/null
+          npm run test:game:integration

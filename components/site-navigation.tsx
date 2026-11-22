@@ -9,6 +9,7 @@ import { SiteIcon, type SiteIconName } from "@/components/site-icon";
 const links: { href: string; label: string; icon: SiteIconName }[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/problems", label: "Problems", icon: "problems" },
+  { href: "/games", label: "Games", icon: "games" },
   { href: "/learn", label: "Learn", icon: "learn" },
   { href: "/contests", label: "Contests", icon: "contests" },
   { href: "/submissions", label: "Submissions", icon: "submissions" },

@@ -1,3 +1,5 @@
+import { parseBoardConfig, parseGridGameConfig, type BoardConfig, type GridGameConfig } from "./board-visualization";
+
 export interface HeuristicConfig {
   direction: "maximize" | "minimize";
   evaluation: "absolute" | "relative";
@@ -5,7 +7,9 @@ export interface HeuristicConfig {
   failurePolicy: "case_zero" | "submission_zero";
   finalGroups: string[];
   seeds: Record<string, string>;
-  visualizer: "none" | "knapsack" | "route";
+  visualizer: "none" | "knapsack" | "route" | "board";
+  board?: BoardConfig;
+  game?: GridGameConfig;
 }
 
 export const DEFAULT_HEURISTIC_CONFIG: HeuristicConfig = {
@@ -34,7 +38,7 @@ export function parseHeuristicConfig(raw: unknown): HeuristicConfig {
     evaluation: ["absolute", "relative"],
     aggregate: ["sum", "mean"],
     failurePolicy: ["case_zero", "submission_zero"],
-    visualizer: ["none", "knapsack", "route"],
+    visualizer: ["none", "knapsack", "route", "board"],
   })) {
     if (value[key] !== undefined && !allowed.includes(String(value[key])))
       throw new Error(`Invalid heuristic.${key}`);
@@ -50,6 +54,11 @@ export function parseHeuristicConfig(raw: unknown): HeuristicConfig {
   )
     throw new Error("Invalid heuristic.finalGroups");
   result.finalGroups = [...new Set((value.finalGroups ?? []) as string[])];
+  if (value.board !== undefined && result.visualizer === "board") result.board = parseBoardConfig(value.board);
+  if (value.game !== undefined) result.game = parseGridGameConfig(value.game);
+  if (result.visualizer === "board" && !result.board) throw new Error("Board visualizer configuration is required");
+  if (result.game && (result.visualizer !== "board" || !result.board)) throw new Error("Grid games require a board visualizer");
+  if (result.game && result.direction !== "maximize") throw new Error("Grid games require maximize scoring");
   if (
     value.seeds !== undefined &&
     (!value.seeds ||

@@ -9,6 +9,9 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CodeEditor } from "@/components/code-editor";
 import { SOURCE_CODE_TEMPLATES } from "@/lib/source-code-templates";
+import {gridGameTemplates} from "@/lib/grid-game-templates";
+import type {HeuristicConfig} from "@/lib/heuristic-config";
+import {GamePreview} from "./game-preview";
 import { Language } from "@/lib/types";
 
 interface SubmissionFormProps {
@@ -16,6 +19,8 @@ interface SubmissionFormProps {
   contestId?: string | null;
   virtualParticipationId?: string | null;
   interactive?: boolean;
+  gameConfig?: HeuristicConfig;
+  sampleInput?: string;
 }
 
 
@@ -26,21 +31,25 @@ export function SubmissionForm({
   contestId = null,
   virtualParticipationId = null,
   interactive = false,
+  gameConfig,
+  sampleInput = "",
 }: SubmissionFormProps) {
   const { t } = useI18n();
   const router = useRouter();
+  const protocol=gameConfig?.game?.protocol;
+  const templates=useMemo(()=>protocol?gridGameTemplates(protocol):SOURCE_CODE_TEMPLATES,[protocol]);
   const [language, setLanguage] = useState<Language>(DEFAULT_SUBMISSION_LANGUAGE);
   const [draftsByLanguage, setDraftsByLanguage] = useState<Record<Language, string>>(
-    SOURCE_CODE_TEMPLATES,
+    templates,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const sourceCode = draftsByLanguage[language];
 
   const draftValue = useMemo(() => ({language,draftsByLanguage}), [language,draftsByLanguage]);
-  const recovery = useDraftRecovery({name: `submission:${problemId}:${contestId ?? "practice"}:${virtualParticipationId ?? "official"}`,base:"1",value:draftValue,enabled:!isSubmitting,restore(saved){
+  const recovery = useDraftRecovery({name: `submission:${problemId}:${contestId ?? "practice"}:${virtualParticipationId ?? "official"}`,base:protocol?`grid-${protocol}-1`:"1",value:draftValue,enabled:!isSubmitting,restore(saved){
     if (!saved || !SUBMISSION_LANGUAGES.includes(saved.language) || !saved.draftsByLanguage) throw new Error("Invalid local draft.");
-    const next={...SOURCE_CODE_TEMPLATES};
+    const next={...templates};
     for(const key of SUBMISSION_LANGUAGES)if(typeof saved.draftsByLanguage[key]==="string")next[key]=saved.draftsByLanguage[key];
     setLanguage(saved.language);setDraftsByLanguage(next);
   }});
@@ -84,6 +93,9 @@ export function SubmissionForm({
   return (
     <form className="form" onSubmit={onSubmit}>
       <DraftRecovery draft={recovery} />
+      <div className={gameConfig?.game?"game-workspace":"form"}>
+      {gameConfig?.game ? <GamePreview config={gameConfig} problemId={problemId} contestId={contestId} sampleInput={sampleInput} sourceCode={sourceCode} language={language}/> : null}
+      <div className="form">
       {interactive ? <p className="badge badge-blue">{t("This is an interactive problem. Flush every query and read responses incrementally; do not wait for EOF.")}</p> : null}
       <label className="field">
         <span className="field-label">{t("Language")}</span>
@@ -128,6 +140,8 @@ export function SubmissionForm({
         <button className="button button-primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? t("提出中...") : t("提出する")}
         </button>
+      </div>
+      </div>
       </div>
     </form>
   );

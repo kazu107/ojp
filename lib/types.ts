@@ -121,6 +121,7 @@ export interface Contest {
 }
 
 export interface SubmissionTestResult {
+  boardReplay?: import("./board-visualization").BoardReplay;
   rawScore?: string | null;
   scorerDiagnostic?: string;
   interactionLog?: string;

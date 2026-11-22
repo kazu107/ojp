@@ -2,7 +2,9 @@ import { createReadStream } from "node:fs";
 import { brainfuckNodeRunner } from "./brainfuck-node";
 import { absoluteScore, parseScorerResult } from "./heuristic-score";
 import { runInteractiveCase } from "./judge-interactive";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import {parseHeuristicConfig,validateHeuristicGroups,type HeuristicConfig} from "./heuristic-config";
+import { assertGameExecutionAllowed, runGridGameCase } from "./grid-game-runtime";
+import { mkdir, mkdtemp, writeFile, readFile, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -606,6 +608,8 @@ async function isOutputAcceptedFiles(
 }
 
 export async function executePackageJudge(input: {
+  heuristicOverride?: HeuristicConfig;
+  includeBoardReplay?: boolean;
   phase?: "provisional" | "system";
   sourceCode: string;
   language: Language;
@@ -655,6 +659,12 @@ export async function executePackageJudge(input: {
   if (!packageMeta) {
     throw new Error("package data is required");
   }
+  if(input.heuristicOverride){
+    if(packageMeta.checkerType!=="heuristic")throw new Error("Numeric settings require a heuristic package");
+    packageMeta.heuristic=parseHeuristicConfig(input.heuristicOverride);
+    validateHeuristicGroups(packageMeta.heuristic,packageMeta.groups.map(group=>group.name));
+  }
+  if (packageMeta.heuristic?.game) assertGameExecutionAllowed();
   if (packageMeta.checkerType === "heuristic" && !packageMeta.heuristic) throw new Error("Heuristic configuration is required");
   if (packageMeta.heuristic) {
     packageMeta.groups = packageMeta.groups.filter(group => packageMeta.heuristic!.finalGroups.includes(group.name) === (input.phase === "system"));
@@ -717,7 +727,7 @@ export async function executePackageJudge(input: {
 
     let checkerRuntime: CommandTemplate | null = null;
     let checkerWorkspace: string | null = null;
-    if (packageMeta.checkerType !== "exact") {
+    if (packageMeta.checkerType !== "exact" && !packageMeta.heuristic?.game) {
       if (!packageMeta.checkerLanguage || !packageMeta.checkerSourceCode) {
         return {
           status: "internal_error",
@@ -842,6 +852,10 @@ export async function executePackageJudge(input: {
               })();
           await input.onPhaseChange?.("running");
           const contestantOutputPath = path.join(caseWorkspace, "stdout.txt");
+          if (packageMeta.heuristic?.game && (await stat(testCaseFiles.inputPath)).size > 8192) throw new Error("Grid game input exceeds 8 KiB");
+          const gridGame = packageMeta.heuristic?.game && packageMeta.heuristic.board
+            ? await runGridGameCase({ ...runtimeTemplate, args: [...runtimeTemplate.args, ...(input.language === "brainfuck" ? ["--interactive"] : [])], cwd: submissionWorkspace, board: packageMeta.heuristic.board, game: packageMeta.heuristic.game, input: await readFile(testCaseFiles.inputPath, "utf8"), timeLimitMs: input.timeLimitMs, memoryLimitMb: input.memoryLimitMb })
+            : null;
           const interaction = packageMeta.checkerType === "interactive" && checkerRuntime && checkerWorkspace
             ? await runInteractiveCase({
                 contestant: { ...runtimeTemplate, args: [...runtimeTemplate.args, ...(input.language === "brainfuck" ? ["--interactive"] : [])], cwd: submissionWorkspace },
@@ -853,7 +867,7 @@ export async function executePackageJudge(input: {
                 logLimitBytes: remainingLogBytes,
               })
             : null;
-          const executed = interaction ?? await runWithFallback(runtimeTemplate, {
+          const executed = gridGame ?? interaction ?? await runWithFallback(runtimeTemplate, {
             cwd: submissionWorkspace,
             stdin: "",
             stdinFilePath: testCaseFiles.inputPath,
@@ -872,7 +886,12 @@ export async function executePackageJudge(input: {
           let rawScore: string | null = null;
           let scorerDiagnostic: string | undefined;
 
-          if (interaction) {
+          if (gridGame) {
+            verdict = gridGame.verdict;
+            message = gridGame.message;
+            rawScore = gridGame.rawScore;
+            scorerDiagnostic = (gridGame.message + (runResult.stderr ? "\n" + runResult.stderr.slice(0, 3900) : "")).replace(/\0/g,"\uFFFD");
+          } else if (interaction) {
             verdict = interaction.verdict;
             message = interaction.message;
           } else if (runResult.spawnErrorCode === "ENOENT") {
@@ -950,6 +969,7 @@ export async function executePackageJudge(input: {
             memoryKb: runResult.memoryKb,
             message,
             ...(packageMeta.heuristic ? { rawScore, scorerDiagnostic } : {}),
+            ...(gridGame && input.includeBoardReplay ? { boardReplay: gridGame.replay } : {}),
             ...(interaction ? { interactionLog: interaction.interactionLog } : {}),
           };
           remainingLogBytes = Math.max(0, remainingLogBytes - Buffer.byteLength(interaction?.interactionLog ?? ""));

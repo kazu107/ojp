@@ -269,6 +269,7 @@ export async function workOneHeuristicRun(): Promise<boolean> {
       });
     };
     const judged = await executePackageJudge({
+      heuristicOverride: config,
       sourceCode: run.sourceCode,
       language: run.language,
       timeLimitMs: revision.problem.timeLimitMs,
@@ -286,7 +287,7 @@ export async function workOneHeuristicRun(): Promise<boolean> {
               data: {
                 status,
                 judgeStartedAt: new Date(run.createdAt),
-                judgeEnvironmentVersion: "heuristic-v1",
+                judgeEnvironmentVersion: config.game ? "grid-game-v1" : "heuristic-v1",
               },
             });
         });
@@ -348,7 +349,7 @@ export async function workOneHeuristicRun(): Promise<boolean> {
             totalTimeMs: judged.totalTimeMs,
             peakMemoryKb: judged.peakMemoryKb,
             judgedAt: new Date(),
-            judgeEnvironmentVersion: "heuristic-v1",
+            judgeEnvironmentVersion: config.game ? "grid-game-v1" : "heuristic-v1",
           },
         });
       }

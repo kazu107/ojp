@@ -16,7 +16,7 @@ const render = (path, locale = "ja", permissions = {}) => React.createElement(Ap
       React.createElement(SiteNavigation, { signedIn: true, isAdmin: true, canCreateProblem: true, ...permissions }, "controls"))));
 
 test("current navigation is unique and recognizes nested pages in both locales", () => {
-  for (const locale of ["ja", "en"]) for (const [path, href] of [["/", "/"], ["/problems/p1/edit", "/problems"], ["/learn/course/chapters/one", "/learn"], ["/submissions/s1", "/submissions"], ["/admin", "/admin"], ["/me", "/me"]]) {
+  for (const locale of ["ja", "en"]) for (const [path, href] of [["/", "/"], ["/problems/p1/edit", "/problems"], ["/games/p1", "/games"], ["/learn/course/chapters/one", "/learn"], ["/submissions/s1", "/submissions"], ["/admin", "/admin"], ["/me", "/me"]]) {
     const html = renderToStaticMarkup(render(path, locale));
     const current = [...html.matchAll(/<a\b[^>]*aria-current="page"[^>]*>/g)];
     assert.equal(current.length, 1, `${locale} ${path}`);

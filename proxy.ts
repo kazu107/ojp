@@ -13,6 +13,8 @@ const PUBLIC_PAGE_PATTERNS: RegExp[] = [
   /^\/submissions\/[^/]+$/,
   /^\/learn$/,
   /^\/ratings$/,
+  /^\/games$/,
+  /^\/games\/[^/]+$/,
   /^\/learn\/[^/]+$/,
   /^\/learn\/[^/]+\/chapters\/[^/]+$/,
 ];

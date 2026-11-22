@@ -1,4 +1,5 @@
 import {loadHeuristicContestProblem} from "@/lib/heuristic-store";
+import {loadPublicBoardSamples} from "@/lib/game-public-samples";
 
 import { getI18n } from "@/lib/i18n/server";
 ﻿import Link from "next/link";
@@ -34,6 +35,7 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
   }
   const fixed=contestId?await loadHeuristicContestProblem(contestId,problemId):null;
   if(fixed)problem=fixed.problem;
+  if(!contestId)problem=await loadPublicBoardSamples(problem);
 
   const contest = contestId ? getContestForViewer(contestId, me.id) : undefined;
   if (contestId && !contest) {
@@ -58,6 +60,8 @@ export default async function SubmitPage({ params, searchParams }: SubmitPagePro
 
       <section className="panel">
         <SubmissionForm
+          gameConfig={problem.heuristic?.game?problem.heuristic:undefined}
+          sampleInput={problem.sampleCases[0]?.input??""}
           interactive={problem.judgeType === "interactive"}
           problemId={problem.id}
           contestId={contest?.id ?? null}
