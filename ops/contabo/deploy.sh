@@ -62,7 +62,13 @@ test ! -f "releases/$target/failed" || fail "This commit failed previously. Insp
 
 idle() {
   docker exec -i "$db" psql -XAt -U postgres -d ojp_live -v ON_ERROR_STOP=1 <<'SQL'
+SELECT (to_regclass('"DeliveryMatch"') IS NOT NULL) AS has_delivery \gset
+\set delivery_pending 0
+\if :has_delivery
+SELECT count(*) AS delivery_pending FROM "DeliveryMatch" WHERE status IN ('queued','running') \gset
+\endif
 SELECT
+  :'delivery_pending'::integer +
   (SELECT count(*) FROM "JudgeJob" WHERE status::text IN ('queued','claimed','running')) +
   (SELECT count(*) FROM "PackageJob" WHERE status::text IN ('queued','claimed','running')) +
   (SELECT count(*) FROM "HeuristicRun" WHERE status IN ('queued','running')) +

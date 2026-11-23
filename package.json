@@ -52,7 +52,11 @@
     "db:heuristic": "node scripts/prisma-with-default-db-url.mjs db execute --schema prisma/schema.prisma --file prisma/heuristic-schema.sql",
     "test:heuristic": "tsx --test tests/heuristic.test.ts tests/heuristic-ui.test.mjs",
     "template:heuristic-zip": "tsx scripts/create-heuristic-examples.ts",
-    "test:heuristic:integration": "tsx --test tests/heuristic-http.integration.test.ts"
+    "test:heuristic:integration": "tsx --test tests/heuristic-http.integration.test.ts",
+    "db:delivery": "node scripts/prisma-with-default-db-url.mjs db execute --schema prisma/schema.prisma --file prisma/delivery-schema.sql",
+    "test:delivery": "tsx --test tests/delivery-game.test.ts tests/delivery-runtime.test.ts",
+    "test:delivery:integration": "tsx --test tests/delivery-store.integration.test.ts",
+    "test:delivery:http": "tsx --test tests/delivery-http.integration.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1008.0",

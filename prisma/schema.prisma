@@ -51,6 +51,58 @@ model HeuristicContest {
   createdAt          DateTime  @default(now())
 }
 
+model DeliveryBotVersion {
+  id         String   @id
+  userId     String
+  name       String
+  language   Language
+  sourceCode String
+  createdAt  DateTime @default(now())
+  validUntil DateTime?
+
+  @@index([userId, validUntil, createdAt])
+}
+
+model DeliveryEvaluation {
+  id          String   @id
+  key         String   @unique
+  kind        String
+  status      String
+  cutoff      DateTime
+  entries     Json
+  standings   Json?
+  createdAt   DateTime @default(now())
+  publishedAt DateTime?
+  matches     DeliveryMatch[]
+
+  @@index([status, createdAt])
+}
+
+model DeliveryMatch {
+  id           String             @id
+  evaluationId String?
+  evaluation   DeliveryEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+  ordinal      Int
+  ownerId      String?
+  versionA     String?
+  versionB     String?
+  trialSource  Json?
+  rules        String
+  seed         Int
+  flipped      Boolean
+  status       String
+  attempts     Int                @default(0)
+  token        String?
+  leaseUntil   DateTime?
+  result       Json?
+  createdAt    DateTime           @default(now())
+  finishedAt   DateTime?
+
+  @@unique([evaluationId, ordinal])
+  @@index([status, createdAt])
+  @@index([ownerId, createdAt])
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

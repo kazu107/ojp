@@ -246,15 +246,16 @@ function resolveLanguageCommands(
   }
 
   if (language === "python") {
+    const commands = process.platform === "win32" ? ["python", "python3"] : ["python3", "python"];
     return {
       sourceFileName: `${baseName}.py`,
       compile: {
-        commands: ["python3", "python"],
+        commands,
         args: ["-m", "py_compile", `${baseName}.py`],
         timeoutMs: 10_000,
       },
       execute: {
-        commands: ["python3", "python"],
+        commands,
         args: [`${baseName}.py`],
       },
     };
@@ -386,6 +387,15 @@ async function compileProgram(
     };
   }
   return { ok: true };
+}
+
+export async function prepareJudgeProgram(cwd: string, language: Language, sourceCode: string, memoryLimitMb: number) {
+  const commands = resolveLanguageCommands(language, "Main", memoryLimitMb);
+  await writeFile(path.join(cwd, commands.sourceFileName), sourceCode, "utf8");
+  if (language === "brainfuck") {
+    await writeFile(path.join(cwd, "brainfuck-runtime.cjs"), brainfuckNodeRunner(), "utf8");
+  }
+  return { compile: await compileProgram(cwd, commands), execute: commands.execute };
 }
 
 async function runSpecialJudgeCase(input: {

@@ -30,11 +30,67 @@ jobs:
       - run: npm run test:judge
       - run: npm run test:heuristic
       - run: npm run test:game
+      - run: npm run test:delivery
       - run: npm run test:interactive
       - run: npm run test:workspace
       - run: npm run test:design
       - run: npm run test:ops
       - run: npm run lint
+
+  delivery:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: delivery-test
+          POSTGRES_DB: ojp_delivery_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:delivery-test@127.0.0.1:5432/ojp_delivery_test
+      DELIVERY_TEST_DATABASE_URL: postgresql://postgres:delivery-test@127.0.0.1:5432/ojp_delivery_test
+      DELIVERY_TEST_ORIGIN: http://127.0.0.1:3118
+      AUTH_URL: http://127.0.0.1:3118
+      AUTH_SECRET: delivery-local-validation-only
+      ADMIN_GITHUB_LOGINS: delivery-admin
+      DELIVERY_ARENA_ENABLED: "1"
+      JUDGE_SANDBOX: bubblewrap
+      STORE_DB_SYNC: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y bubblewrap python3 time util-linux
+      - run: npm ci
+      - run: npm run db:push && npm run db:delivery && npm run db:delivery
+      - run: npm run test:delivery:integration
+      - run: npm run build
+        env:
+          STORE_DB_SYNC: "0"
+      - name: Exercise production-build pages with two isolated workers
+        run: |
+          JUDGE_PROCESS_MODE=web node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3118 >/tmp/ojp-delivery-web.log 2>&1 &
+          web=$!
+          JUDGE_PROCESS_MODE=worker node --import tsx scripts/judge-worker.ts >/tmp/ojp-delivery-worker.log 2>&1 &
+          worker=$!
+          DYNO=delivery-worker-2 JUDGE_PROCESS_MODE=worker node --import tsx scripts/judge-worker.ts >/tmp/ojp-delivery-worker-2.log 2>&1 &
+          worker2=$!
+          trap 'kill "$web" "$worker" "$worker2" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3118/api/health/db >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3118/api/health/db >/dev/null
+          npm run test:delivery:http
+      - if: failure()
+        run: cat /tmp/ojp-delivery-{web,worker,worker-2}.log
 
   learning:
     runs-on: ubuntu-22.04

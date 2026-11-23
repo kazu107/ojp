@@ -1,4 +1,5 @@
 import { enqueueHeuristicRun, workOneHeuristicRun, heuristicStandings, assertHeuristicAvailable, isHeuristicRevision } from "./heuristic-store";
+import { workOneDeliveryMatch } from "./delivery-store";
 import {publicHeuristicSettings} from "./heuristic-config";
 import {gamePreviewPayload, gamePreviewPackage, isGamePreviewPayload} from "./grid-game-preview";
 import {isWellFormedText} from "./board-visualization";
@@ -4610,7 +4611,9 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
         clearInterval(heartbeat);
         store.judgeWorkerRunning = false;
       }
+      return;
     }
+    await workOneDeliveryMatch();
     } finally { ticking=false; }
   };
 

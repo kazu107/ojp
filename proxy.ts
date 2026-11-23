@@ -15,6 +15,7 @@ const PUBLIC_PAGE_PATTERNS: RegExp[] = [
   /^\/ratings$/,
   /^\/games$/,
   /^\/games\/[^/]+$/,
+  /^\/games\/delivery\/matches\/[^/]+$/,
   /^\/learn\/[^/]+$/,
   /^\/learn\/[^/]+\/chapters\/[^/]+$/,
 ];

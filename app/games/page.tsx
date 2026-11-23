@@ -6,6 +6,7 @@ import {
   canCreateProblemByRole,
 } from "@/lib/store";
 import { SiteIcon } from "@/components/site-icon";
+import { deliveryEnabled } from "@/lib/delivery-store";
 
 export const dynamic = "force-dynamic";
 export default async function GamesPage() {
@@ -14,6 +15,7 @@ export default async function GamesPage() {
   const games = listProblemsForListView(user?.id ?? "guest").filter(
     (p) => p.heuristic?.game,
   );
+  const showDelivery = deliveryEnabled();
   return (
     <div className="page">
       <section className="page-head">
@@ -32,6 +34,13 @@ export default async function GamesPage() {
         ) : null}
       </section>
       <div className="learning-course-grid">
+        {showDelivery ? <article className="panel stack game-card">
+          <div className="game-card-icon"><SiteIcon name="games" /><span>{t("Bot vs bot")}</span></div>
+          <h2 className="panel-title">{t("Delivery Duel")}</h2>
+          <div className="button-row"><Link className="button button-primary" href="/games/delivery">
+            {t("Open game")}
+          </Link></div>
+        </article> : null}
         {games.map((problem) => (
           <article className="panel stack game-card" key={problem.id}>
             <div className="game-card-icon">
@@ -69,7 +78,7 @@ export default async function GamesPage() {
           </article>
         ))}
       </div>
-      {!games.length ? (
+      {!games.length && !showDelivery ? (
         <section className="panel">
           <p className="empty">
             {t("No game problems have been published yet.")}
