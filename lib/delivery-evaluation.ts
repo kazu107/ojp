@@ -1,5 +1,14 @@
+import { createHash } from "node:crypto";
 import { DELIVERY_RULES, type DeliveryResult } from "./delivery-game";
 export type ArenaEntry = { userId: string; versionId: string; name: string };
+export const DELIVERY_LIVE_SEEDS = [54832924];
+export function deliveryLiveKey(entries: ArenaEntry[]) {
+  const digest = createHash("sha256").update(JSON.stringify([
+    DELIVERY_RULES, DELIVERY_LIVE_SEEDS,
+    entries.map(entry => entry.versionId).sort(),
+  ])).digest("hex");
+  return "live:" + digest;
+}
 export function weeklyDeliveryCutoff(now = new Date()) {
   const hour = 3600000, day = hour * 24;
   const jst = new Date(now.getTime() + hour * 9);

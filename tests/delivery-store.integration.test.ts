@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { setTimeout as pause } from "node:timers/promises";
+import { deliveryLiveKey } from "../lib/delivery-evaluation";
 
 const url = process.env.DELIVERY_TEST_DATABASE_URL;
 const waitBot = {
@@ -22,6 +24,7 @@ test("versioned enrollment, concurrent worker fencing, complete publication, and
   assert.equal(parsed.pathname, "/ojp_delivery_test");
   process.env.DATABASE_URL = url;
   process.env.DELIVERY_ARENA_ENABLED = "1";
+  process.env.DELIVERY_LIVE_ENABLED = "0";
   process.env.DELIVERY_WEEKLY_ENABLED = "0";
   Object.assign(process.env, { NODE_ENV: "test" });
   process.env.OJP_GAME_UNSAFE_LOCAL_TEST = "1";
@@ -88,6 +91,58 @@ test("versioned enrollment, concurrent worker fencing, complete publication, and
     assert.equal(recovered.status, "completed");
     assert.equal(recovered.attempts, 2);
     assert.equal(recovered.token, null);
+  } finally {
+    try {
+      await prisma.deliveryMatch.deleteMany();
+      await prisma.deliveryEvaluation.deleteMany();
+      await prisma.deliveryBotVersion.deleteMany();
+    } finally { await prisma.$disconnect(); }
+  }
+});
+
+test("live version changes respect a current lease, then supersede stale work", { skip: !url, timeout: 40000 }, async () => {
+  assert.ok(url);
+  const parsed = new URL(url);
+  assert.equal(parsed.hostname, "127.0.0.1");
+  assert.equal(parsed.pathname, "/ojp_delivery_test");
+  process.env.DATABASE_URL = url;
+  process.env.DELIVERY_ARENA_ENABLED = "1";
+  process.env.DELIVERY_WEEKLY_ENABLED = "0";
+  process.env.DELIVERY_LIVE_ENABLED = "1";
+  Object.assign(process.env, { NODE_ENV: "test" });
+  process.env.OJP_GAME_UNSAFE_LOCAL_TEST = "1";
+  const { prisma } = await import("../lib/db/prisma");
+  const arena = await import("../lib/delivery-store");
+  const enroll = async (userId: string) => {
+    const saved = await arena.registerDeliveryBot(userId, userId, waitBot);
+    return { userId, name: saved.name, versionId: saved.id };
+  };
+  try {
+    const a = await enroll("live-a");
+    assert.equal(await arena.workOneDeliveryMatch(), false);
+    await pause(2100);
+    const b = await enroll("live-b");
+    assert.equal(await arena.workOneDeliveryMatch(), true);
+    const original = await prisma.deliveryEvaluation.findUniqueOrThrow({ where: { key: deliveryLiveKey([a, b]) } });
+    assert.equal(original.status, "active");
+    const pending = await prisma.deliveryMatch.findFirstOrThrow({ where: { evaluationId: original.id, status: "queued" } });
+    await prisma.deliveryMatch.update({ where: { id: pending.id }, data: {
+      status: "running", token: "test-in-flight", leaseUntil: new Date(Date.now() + 30000), attempts: 1,
+    } });
+    const c = await enroll("live-c");
+    await pause(2100);
+    assert.equal(await arena.workOneDeliveryMatch(), false);
+    assert.equal(await prisma.deliveryEvaluation.findUnique({ where: { key: deliveryLiveKey([a, b, c]) } }), null);
+    await prisma.deliveryMatch.update({ where: { id: pending.id }, data: { leaseUntil: new Date(Date.now() - 1000) } });
+    await pause(2100);
+    assert.equal(await arena.workOneDeliveryMatch(), true);
+    assert.equal((await prisma.deliveryEvaluation.findUnique({ where: { id: original.id } }))?.status, "superseded");
+    assert.equal((await prisma.deliveryMatch.findUnique({ where: { id: pending.id } }))?.status, "cancelled");
+    await arena.withdrawDeliveryBot(c.userId);
+    await pause(2100);
+    assert.equal(await arena.workOneDeliveryMatch(), true);
+    assert.equal((await prisma.deliveryEvaluation.findUnique({ where: { id: original.id } }))?.status, "published");
+    assert.equal(await prisma.deliveryMatch.count({ where: { evaluationId: original.id, status: "completed", attempts: 1 } }), 2);
   } finally {
     try {
       await prisma.deliveryMatch.deleteMany();

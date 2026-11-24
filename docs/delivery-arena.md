@@ -43,14 +43,24 @@ comparison. The runner allows 2.5s for the first move, 250ms per later move,
 ## Evaluation
 
 - Each user can register one active bot. This beta accepts up to eight active
-  users. An update replaces the active version without changing any scheduled
-  evaluation; withdrawal also preserves scheduled versions.
+  users. Updates and withdrawals do not alter official evaluation snapshots.
+- The **Live standings** tab evaluates the current registered versions without
+  waiting for an official round. An idle worker checks for roster changes every
+  two seconds. Each pair plays a single fixed map (seed 54832924) twice, with
+  starting positions and priority reversed. Results from the last published
+  live round are reused for the same pair of bot versions. For eight bots, a new full roster needs
+  56 games; after one update, only 14 need to run once the old round is complete.
+  Changes can supersede a still-queued live snapshot without stopping its
+  in-flight match. The visible standings refresh automatically. Completion time
+  depends on the queue and the submitted programs.
 - Weekly evaluation uses the versions active at Monday 03:00 JST. A worker
   schedules the latest cutoff when the delivery queue can run. If fewer than
   two bots were active at the cutoff, that week is not evaluated. Administrators
-  can start an extra evaluation using the current versions.
-- Every pair plays three seeded maps twice, with starting positions and
-  initial priority swapped on the second run. Eight bots produce 168 matches.
+  can start an extra evaluation using the current versions. View these rounds
+  under **Official evaluations**.
+- In official rounds every pair plays three seeded maps twice, with starting
+  positions and initial priority swapped on the second run. Eight bots produce
+  168 matches.
   Wins earn three points, draws one, losses zero. Equal points share a rank.
   Raw delivery scores are shown separately. There is no league or rating.
 - No partial standings are published. The previous evaluation stays visible
@@ -71,7 +81,10 @@ comparison. The runner allows 2.5s for the first move, 250ms per later move,
    own sandbox and workspace, and the DB lease admits one arena match globally
    at a time. Ordinary judge/package work is checked first.
 4. Enable `DELIVERY_WEEKLY_ENABLED=1` on workers for automatic weekly rounds.
-   With it off, admin evaluation and private trials still work.
+   With it off, live evaluation, admin evaluation, and private trials still work.
+   Live standings are on by default when the arena is enabled. Set
+   `DELIVERY_LIVE_ENABLED=0` on both the web process and workers to disable
+   scheduling new live rounds without hiding official results.
 
 Run `npm run test:delivery` for rules and process tests. To run the DB integration
 suite, migrate an isolated PostgreSQL database named `ojp_delivery_test`

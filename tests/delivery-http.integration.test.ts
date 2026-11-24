@@ -3,12 +3,13 @@ import { setTimeout as pause } from "node:timers/promises";
 import { test } from "node:test";
 import { encode } from "next-auth/jwt";
 import { PrismaClient } from "@prisma/client";
-import { DELIVERY_PYTHON_TEMPLATE } from "../lib/delivery-templates";
 import type { DeliveryResult } from "../lib/delivery-game";
+import { deliveryLiveKey } from "../lib/delivery-evaluation";
+import { deliveryTestBots as bots } from "./delivery-bots";
 
 const origin = process.env.DELIVERY_TEST_ORIGIN;
-test("HTTP: private trial, two player registrations, admin round, public standings and replay",
-  { skip: !origin, timeout: 120000 }, async () => {
+test("HTTP: six accounts, five languages, incremental live standings and official evaluation",
+  { skip: !origin, timeout: 220000 }, async () => {
     assert.equal(origin, "http://127.0.0.1:3118");
     const url = new URL(process.env.DATABASE_URL!);
     assert.equal(url.hostname, "127.0.0.1");
@@ -20,6 +21,7 @@ test("HTTP: private trial, two player registrations, admin round, public standin
       token: { sub: login, oauthProvider: "github", oauthAccountId: login, oauthLogin: login, oauthName: login },
     })}; ojp_locale=en`;
     const admin = await cookie("delivery-admin"), a = await cookie("delivery-a"), b = await cookie("delivery-b");
+    const [c, d, e, f] = await Promise.all(["c", "d", "e", "f"].map(letter => cookie("delivery-" + letter)));
     async function page(path: string, auth = "ojp_locale=en", status = 200) {
       const response = await fetch(origin + path, { headers: { Cookie: auth }, signal: AbortSignal.timeout(12000) });
       const html = await response.text();
@@ -35,14 +37,35 @@ test("HTTP: private trial, two player registrations, admin round, public standin
       return response.json();
     }
     async function until<T>(read: () => Promise<T>, done: (value: T) => boolean) {
-      for (let count = 0; count < 180; count++) {
+      for (let count = 0; count < 260; count++) {
         const value = await read();
         if (done(value)) return value;
         await pause(300);
       }
       throw new Error("Worker did not finish");
     }
-    const source = { sourceCode: DELIVERY_PYTHON_TEMPLATE, language: "python" };
+    const source = bots.greedy;
+    type Fixtures = Awaited<ReturnType<typeof getFixtures>>;
+    function getFixtures(evaluationId: string) {
+      return db.deliveryMatch.findMany({ where: { evaluationId },
+        select: { id: true, versionA: true, versionB: true, status: true, attempts: true, result: true } });
+    }
+    async function live(expected: string[]) {
+      const key = deliveryLiveKey(expected.map(versionId => ({ versionId, userId: "", name: "" })));
+      const started = Date.now();
+      const saved = await until(() => db.deliveryEvaluation.findUnique({ where: { key } }),
+        row => row?.status === "published" || row?.status === "failed");
+      assert.equal(saved?.status, "published");
+      const fixtures = await getFixtures(saved.id);
+      assert.equal(fixtures.length, expected.length * (expected.length - 1));
+      assert.ok(fixtures.every(m => m.status === "completed" && m.attempts <= 1));
+      const reused = fixtures.filter(m => m.attempts === 0).length;
+      console.log(`[live] ${expected.length} entries, ${fixtures.length - reused} played, ${reused} reused, ${Date.now() - started} ms`);
+      return { fixtures, reused, standings: saved.standings as { name: string; wins: number; points: number; losses: number }[] };
+    }
+    function results(fixtures: Fixtures) {
+      return fixtures.map(match => ({ ...match, result: match.result as unknown as DeliveryResult & { reusedFrom?: string } }));
+    }
     try {
       assert.match(await page("/games"), /Delivery Duel/);
       assert.match(await page("/games/delivery", "ojp_locale=ja"), /デリバリー対決/);
@@ -68,21 +91,55 @@ test("HTTP: private trial, two player registrations, admin round, public standin
       assert.match(owned, /Turn history/);
       await page(privatePath, b, 404);
       const one = "Courier Alpha", two = "Courier Beta";
-      await action(a, { action: "register", ...source, name: one }, 201);
-      await action(b, { action: "register", ...source, name: two }, 201);
+      const first = await action(a, { action: "register", ...source, name: one }, 201);
+      const second = await action(b, { action: "register", ...bots.wait, name: two }, 201);
+      const opening = await live([first.id, second.id]);
+      assert.deepEqual(opening.standings.map(row => [row.name, row.points]), [[one, 6], [two, 0]]);
+      const [third, fourth, fifth, sixth] = await Promise.all([
+        action(c, { action: "register", ...bots.patrol, name: "Patrol C++" }, 201),
+        action(d, { action: "register", ...bots.walk, name: "Walker Ruby" }, 201),
+        action(e, { action: "register", ...bots.vertical, name: "Vertical C" }, 201),
+        action(f, { action: "register", ...bots.invalid, name: "Invalid JavaScript" }, 201),
+      ]);
+      const versions = [first.id, second.id, third.id, fourth.id, fifth.id, sixth.id];
+      const expanded = await live(versions);
+      assert.ok(expanded.reused >= 2);
+      assert.equal(expanded.standings[0].name, one);
+      assert.equal(expanded.standings.find(row => row.name === "Invalid JavaScript")?.losses, 10);
+      for (const fixture of results(expanded.fixtures)) {
+        if (fixture.versionA === sixth.id || fixture.versionB === sixth.id) {
+          assert.equal(fixture.result.outcome, "forfeit");
+        } else if (fixture.attempts === 1) {
+          assert.equal(fixture.result.frames.length, 101);
+          assert.deepEqual(fixture.result.faults, [null, null]);
+        }
+      }
+      const copied = results(expanded.fixtures).find(m => m.result.reusedFrom);
+      assert.ok(copied && copied.attempts === 0);
+      assert.match(await page("/games/delivery/matches/" + copied.id), /Turn history/);
+      const replacementBody = { action: "register", ...bots.wait, name: "Fixed JavaScript" };
+      const fixed = await action(f, replacementBody, 201);
+      assert.equal((await action(f, replacementBody, 201)).id, fixed.id);
+      const updated = await live([...versions.slice(0, 5), fixed.id]);
+      assert.equal(updated.reused, 20);
+      assert.ok(results(updated.fixtures).every(m => m.result.outcome === "score"));
+      assert.match(await page("/games/delivery"), /Fixed JavaScript/);
+      await action(f, { action: "withdraw" }, 200);
+      await live(versions.slice(0, 5));
+      assert.doesNotMatch(await page("/games/delivery"), /Fixed JavaScript/);
+      // Withdraw the extra accounts to check official evaluation independently.
+      await Promise.all([c, d, e].map(auth => action(auth, { action: "withdraw" }, 200)));
       const round = await action(admin, { action: "start" }, 202);
       const saved = await until(
         () => db.deliveryEvaluation.findUniqueOrThrow({ where: { id: round.evaluation.id } }),
         row => row.status === "published" || row.status === "failed",
       );
       assert.equal(saved.status, "published");
-      const fixtures = await db.deliveryMatch.findMany({
-        where: { evaluationId: saved.id }, select: { id: true, status: true, attempts: true, result: true },
-      });
+      const fixtures = await getFixtures(saved.id);
       assert.equal(fixtures.length, 6);
       assert.ok(fixtures.every(m => m.status === "completed" && m.attempts === 1));
       assert.ok(fixtures.every(m => (m.result as unknown as DeliveryResult).frames.length === 101));
-      const standings = await page("/games/delivery");
+      const standings = await page("/games/delivery?view=official");
       assert.match(standings, /Courier Alpha/);
       assert.match(standings, /Courier Beta/);
       assert.doesNotMatch(standings, /from collections import deque/);

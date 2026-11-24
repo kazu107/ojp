@@ -8,13 +8,18 @@ import { DELIVERY_PYTHON_TEMPLATE } from "@/lib/delivery-templates";
 import { SUBMISSION_LANGUAGES, type SubmissionLanguage } from "@/lib/languages";
 import { languageLabel } from "@/lib/presentation";
 
-export function DeliveryRefresh({ pending }: { pending: boolean }) {
+export function DeliveryRefresh({ pending, watch = false }: { pending: boolean; watch?: boolean }) {
   const router = useRouter();
   useEffect(() => {
-    if (!pending) return;
-    const timer = setInterval(() => { if (!document.hidden) router.refresh(); }, 4000);
-    return () => clearInterval(timer);
-  }, [pending, router]);
+    if (!pending && !watch) return;
+    const refresh = () => { if (!document.hidden) router.refresh(); };
+    const timer = setInterval(refresh, pending ? 2000 : 8000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [pending, router, watch]);
   return null;
 }
 
