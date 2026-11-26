@@ -4,9 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { assertGameExecutionAllowed } from "./grid-game-runtime";
 import { assertJudgeSandboxReady, removeJudgeDirectory, runJudgeCommand } from "./judge-process";
-import { prepareJudgeProgram } from "./judge-runtime";
+import { stageJudgeProgram } from "./judge-runtime";
+import { compileDeliveryProgram } from "./delivery-compile-cache";
 import { getJudgeSandboxMode, createJudgeEnvironment, resolveJudgeExecutable } from "./judge-sandbox";
-import { DeliveryGame, parseDeliveryAction, standardDeliveryAction, type DeliveryAction } from "./delivery-game";
+import { DeliveryGame, parseDeliveryAction, standardDeliveryAction, type DeliveryAction, type DeliveryMap, type DeliveryResult } from "./delivery-game";
 import type { Language } from "./types";
 
 export const DELIVERY_SOURCE_BYTES = 65536;
@@ -100,13 +101,21 @@ function spawnPeer(command: string, args: string[], cwd: string) {
 
 export async function playDeliveryMatch(
   seed: number, flipped: boolean, sources: [DeliveryBotSource | null, DeliveryBotSource | null],
-) {
+  options: { map?: DeliveryMap; versions?: [string | null, string | null]; queuedMs?: number } = {},
+): Promise<DeliveryResult> {
   assertGameExecutionAllowed();
   await assertJudgeSandboxReady();
   const dirs: string[] = [];
-  const game = new DeliveryGame(seed, flipped);
+  const game = new DeliveryGame(seed, flipped, undefined, options.map);
   const peers: [ReturnType<typeof spawnPeer> | null, ReturnType<typeof spawnPeer> | null] = [null, null];
   const faults: [string | null, string | null] = [null, null];
+  const preparationStarted = performance.now();
+  let playStarted: number | undefined, compileMs = 0, cacheHits = 0;
+  const result = (): DeliveryResult => {
+    const now = performance.now();
+    return { ...game.result(faults), timing: { queuedMs: options.queuedMs ?? 0, compileMs, cacheHits,
+      prepareMs: Math.round((playStarted ?? now) - preparationStarted), playMs: playStarted === undefined ? 0 : Math.round(now - playStarted) } };
+  };
   try {
     const commands: [{ command: string; args: string[]; cwd: string } | null, { command: string; args: string[]; cwd: string } | null] = [null, null];
     for (const seat of [0, 1] as const) {
@@ -115,15 +124,20 @@ export async function playDeliveryMatch(
       const cwd = await mkdtemp(path.join(os.tmpdir(), "ojp-delivery-"));
       dirs.push(cwd);
       await mkdir(path.join(cwd, "tmp"));
-      const { compile, execute } = await prepareJudgeProgram(cwd, source.language, source.sourceCode, MEMORY_MB);
+      const program = await stageJudgeProgram(cwd, source.language, source.sourceCode, MEMORY_MB);
+      const sandbox = getJudgeSandboxMode();
+      const { result: compile, cacheHit, compileMs: usedMs } = await compileDeliveryProgram(
+        cwd, source.language, source.sourceCode, options.versions?.[seat] ?? null, sandbox, program.compile);
+      compileMs += usedMs;
+      cacheHits += Number(cacheHit);
       if (!compile.ok) {
         if (compile.verdict === "internal_error" || /^bwrap:/m.test(compile.message)) throw new Error("Delivery compiler infrastructure unavailable");
         faults[seat] = "Bot compilation failed";
         continue;
       }
-      const env = createJudgeEnvironment(cwd, getJudgeSandboxMode());
-      const args = source.language === "brainfuck" ? [...execute.args, "--interactive"] : execute.args;
-      for (const name of execute.commands) {
+      const env = createJudgeEnvironment(cwd, sandbox);
+      const args = source.language === "brainfuck" ? [...program.execute.args, "--interactive"] : program.execute.args;
+      for (const name of program.execute.commands) {
         if (await resolveJudgeExecutable(name, cwd, env)) {
           commands[seat] = { command: name, args, cwd };
           break;
@@ -131,7 +145,8 @@ export async function playDeliveryMatch(
       }
       if (!commands[seat]) throw new Error("Delivery language runtime unavailable");
     }
-    if (faults.some(Boolean)) return game.result(faults);
+    if (faults.some(Boolean)) return result();
+    playStarted = performance.now();
     for (const seat of [0, 1] as const) {
       const run = commands[seat];
       if (run) peers[seat] = spawnPeer(run.command, run.args, run.cwd);
@@ -144,11 +159,13 @@ export async function playDeliveryMatch(
       }));
       const [a, b] = responses;
       if ("fault" in a || "fault" in b) {
-        return game.result(["fault" in a ? a.fault : null, "fault" in b ? b.fault : null]);
+        faults[0] = "fault" in a ? a.fault : null;
+        faults[1] = "fault" in b ? b.fault : null;
+        return result();
       }
       game.step([a.action, b.action]);
     }
-    return game.result();
+    return result();
   } finally {
     try { await Promise.all(peers.map(peer => peer?.close())); }
     finally { await Promise.all(dirs.map(removeJudgeDirectory)); }

@@ -3,8 +3,8 @@ import { Prisma, type DeliveryMatch } from "@prisma/client";
 import { prisma } from "./db/prisma";
 import { isSubmissionLanguage } from "./languages";
 import { isWellFormedText } from "./board-visualization";
-import { DELIVERY_MAX_ENTRIES, DELIVERY_RULES, type DeliveryResult } from "./delivery-game";
-import { DELIVERY_LIVE_SEEDS, deliveryLiveKey, planDeliveryMatches, rankDelivery, weeklyDeliveryCutoff, type ArenaEntry, type DeliveryStanding } from "./delivery-evaluation";
+import { DELIVERY_DEFAULT_ENTRIES, DELIVERY_MAX_ENTRIES, DELIVERY_RULES, deliveryMapForRules, type DeliveryResult } from "./delivery-game";
+import { DELIVERY_LIVE_SEEDS, deliveryLiveKey, isSampledDelivery, liveMatchCount, planDeliveryMatches, rankDelivery, weeklyDeliveryCutoff, type ArenaEntry, type DeliveryStanding } from "./delivery-evaluation";
 import { DELIVERY_SOURCE_BYTES, playDeliveryMatch, type DeliveryBotSource } from "./delivery-runtime";
 
 const LEASE_MS = 120000;
@@ -15,6 +15,11 @@ const seed = () => randomBytes(4).readUInt32BE(0) & 0x7fffffff;
 
 export const deliveryEnabled = () => process.env.DELIVERY_ARENA_ENABLED === "1";
 const liveEnabled = () => process.env.DELIVERY_LIVE_ENABLED !== "0";
+export const deliveryConcurrency = () => process.env.DELIVERY_MATCH_CONCURRENCY === "2" ? 2 : 1;
+export function deliveryEntryLimit() {
+  const limit = Number(process.env.DELIVERY_ENTRY_LIMIT);
+  return Number.isInteger(limit) && limit >= 2 && limit <= DELIVERY_MAX_ENTRIES ? limit : DELIVERY_DEFAULT_ENTRIES;
+}
 export class DeliveryError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
 }
@@ -25,7 +30,15 @@ async function locked<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) {
   return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('ojp-delivery-arena-v1'))::text`;
     return fn(tx);
-  });
+  }, { maxWait: 5000, timeout: 15000 });
+}
+async function insertDeliveryMatches(tx: Prisma.TransactionClient, evaluationId: string, matches: ReturnType<typeof planDeliveryMatches>) {
+  const createdAt = new Date();
+  for (let offset = 0; offset < matches.length; offset += 500) {
+    await tx.deliveryMatch.createMany({ data: matches.slice(offset, offset + 500).map(plan => ({
+      id: randomUUID(), evaluationId, createdAt, ...plan,
+    })) });
+  }
 }
 function botSource(raw: unknown): DeliveryBotSource {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new DeliveryError("Invalid delivery bot");
@@ -49,7 +62,7 @@ export async function registerDeliveryBot(userId: string, name: unknown, raw: un
     if (active?.name === label && active.language === source.language && active.sourceCode === source.sourceCode) {
       return { id: active.id, name: active.name, language: active.language, createdAt: active.createdAt };
     }
-    if (!active && await tx.deliveryBotVersion.count({ where: { validUntil: null } }) >= DELIVERY_MAX_ENTRIES)
+    if (!active && await tx.deliveryBotVersion.count({ where: { validUntil: null } }) >= deliveryEntryLimit())
       throw new DeliveryError("Delivery registration is full", 409);
     if (await tx.deliveryBotVersion.count({ where: { userId, createdAt: { gte: new Date(now.getTime() - 3600000) } } }) >= 20)
       throw new DeliveryError("Too many delivery registrations", 429);
@@ -77,7 +90,7 @@ export async function enqueueDeliveryTrial(ownerId: string, raw: unknown) {
       throw new DeliveryError("Delivery trial queue is full", 429);
     return tx.deliveryMatch.create({
       data: { id: randomUUID(), ownerId, ordinal: 0, trialSource: source, rules: DELIVERY_RULES,
-        seed: 11, flipped: false, status: "queued" },
+        seed: 11, flipped: false, status: "queued", createdAt: new Date() },
       select: { id: true, status: true },
     });
   });
@@ -107,10 +120,8 @@ export async function startDeliveryEvaluation(kind: "manual" | "weekly", now = n
     const seeds = new Set<number>();
     while (seeds.size < 3) seeds.add(seed());
     const id = randomUUID();
-    await tx.deliveryEvaluation.create({ data: { id, ...window, kind, status: "active", entries } });
-    await tx.deliveryMatch.createMany({ data: planDeliveryMatches(entries, [...seeds]).map(plan => ({
-      id: randomUUID(), evaluationId: id, ...plan,
-    })) });
+    await tx.deliveryEvaluation.create({ data: { id, ...window, kind, status: "active", entries, createdAt: new Date() } });
+    await insertDeliveryMatches(tx, id, planDeliveryMatches(entries, [...seeds], { official: true }));
     return { id };
   });
 }
@@ -134,11 +145,8 @@ async function syncLiveEvaluation() {
     });
     if (active && active.key === key) return;
     if (active) {
-      // Do not interrupt a leased match. Stop claiming the obsolete batch once it finishes.
-      if (await tx.deliveryMatch.count({ where: {
-        evaluationId: active.id, status: "running", leaseUntil: { gte: new Date() },
-      } })) return;
-      await tx.deliveryMatch.updateMany({ where: { evaluationId: active.id, status: { in: CLAIMABLE } },
+      // In-flight matches keep their leases; obsolete queued matches must not keep a slot busy.
+      await tx.deliveryMatch.updateMany({ where: { evaluationId: active.id, status: "queued" },
         data: { status: "cancelled", token: null, leaseUntil: null } });
       await tx.deliveryEvaluation.update({ where: { id: active.id }, data: { status: "superseded" } });
     }
@@ -151,17 +159,16 @@ async function syncLiveEvaluation() {
     }
     if (existing) return;
     const id = randomUUID();
-    await tx.deliveryEvaluation.create({ data: { id, key, cutoff: new Date(), kind: "live", status: "active", entries } });
-    await tx.deliveryMatch.createMany({ data: planDeliveryMatches(entries, DELIVERY_LIVE_SEEDS).map(plan => ({
-      id: randomUUID(), evaluationId: id, ...plan,
-    })) });
+    const createdAt = new Date();
+    await tx.deliveryEvaluation.create({ data: { id, key, cutoff: createdAt, kind: "live", status: "active", entries, createdAt } });
+    await insertDeliveryMatches(tx, id, planDeliveryMatches(entries, DELIVERY_LIVE_SEEDS, { sampled: isSampledDelivery(entries.length) }));
     const previous = await tx.deliveryEvaluation.findFirst({
       where: { kind: "live", status: "published" }, orderBy: { publishedAt: "desc" }, select: { id: true },
     });
     if (previous) {
       // Reuse summaries and link directly to the original replay, without copying its frames.
       await tx.$executeRaw`
-        UPDATE "DeliveryMatch" next SET status='completed', "finishedAt"=now(),
+        UPDATE "DeliveryMatch" next SET status='completed', "finishedAt"=(now() AT TIME ZONE 'UTC'),
           result=jsonb_build_object('winner', old.result->'winner', 'outcome', old.result->'outcome',
             'totals', old.result->'totals', 'reusedFrom', COALESCE(old.result->>'reusedFrom', old.id))
         FROM "DeliveryMatch" old WHERE next."evaluationId"=${id} AND old."evaluationId"=${previous.id}
@@ -202,8 +209,8 @@ async function settleDeliveryEvaluation(id: string) {
       return;
     }
     const entries = e.entries as ArenaEntry[];
-    const maps = e.kind === "live" ? DELIVERY_LIVE_SEEDS.length : 3;
-    if (matches.length !== entries.length * (entries.length - 1) * maps) throw new Error("Incomplete delivery round robin");
+    const expected = e.kind === "live" ? liveMatchCount(entries.length) * DELIVERY_LIVE_SEEDS.length : entries.length * (entries.length - 1) * 3;
+    if (matches.length !== expected) throw new Error("Incomplete delivery evaluation");
     const rows = rankDelivery(entries, matches.map(m => ({
       versionA: m.versionA!, versionB: m.versionB!, result: m.result!,
     })));
@@ -215,28 +222,39 @@ async function settleDeliveryEvaluation(id: string) {
 async function claimDeliveryMatch() {
   return locked(async tx => {
     const now = new Date();
-    if (await tx.deliveryMatch.count({ where: { status: "running", leaseUntil: { gte: now } } })) return null;
+    await tx.deliveryMatch.updateMany({
+      where: { status: "running", leaseUntil: { lt: now }, evaluation: { status: "superseded" } },
+      data: { status: "cancelled", token: null, leaseUntil: null },
+    });
+    if (await tx.deliveryMatch.count({ where: { status: "running", leaseUntil: { gte: now } } }) >= deliveryConcurrency()) return null;
+    const [priority] = await tx.$queryRaw<{ busy: boolean }[]>`
+      SELECT EXISTS(SELECT 1 FROM "JudgeJob" WHERE status IN ('queued','claimed','running')) OR
+             EXISTS(SELECT 1 FROM "PackageJob" WHERE status IN ('queued','claimed','running')) OR
+             EXISTS(SELECT 1 FROM "HeuristicRun" WHERE status IN ('queued','running')) AS busy`;
+    if (priority?.busy) return null;
     const token = randomUUID(), leaseUntil = new Date(now.getTime() + LEASE_MS);
+    // Prisma DateTime columns are UTC timestamps without time zone.
     const rows = await tx.$queryRaw<DeliveryMatch[]>`
-      UPDATE "DeliveryMatch" SET status='running', token=${token}, "leaseUntil"=${leaseUntil}, attempts=attempts+1
+      UPDATE "DeliveryMatch" SET status='running', token=${token}, "leaseUntil"=CAST(${leaseUntil.toISOString()} AS timestamp), attempts=attempts+1
       WHERE id=(SELECT m.id FROM "DeliveryMatch" m LEFT JOIN "DeliveryEvaluation" e ON e.id=m."evaluationId"
         WHERE m.attempts < ${MAX_ATTEMPTS} AND (m."evaluationId" IS NULL OR e.status='active')
-          AND (m.status='queued' OR (m.status='running' AND m."leaseUntil" < ${now}))
+          AND (m.status='queued' OR (m.status='running' AND m."leaseUntil" < CAST(${now.toISOString()} AS timestamp)))
         ORDER BY CASE WHEN e.kind='live' OR m."evaluationId" IS NULL THEN 0 ELSE 1 END,
           m."createdAt", m.ordinal, m.id LIMIT 1 FOR UPDATE OF m SKIP LOCKED)
       RETURNING *`;
-    return rows[0] ?? null;
+    return rows[0] ? { job: rows[0], claimedAt: now.getTime() } : null;
   });
 }
 
 let lastSchedule = 0;
 let lastLiveSchedule = 0;
-export async function workOneDeliveryMatch(): Promise<boolean> {
-  if (!deliveryEnabled()) return false;
+export async function startDeliveryWork(): Promise<{ done: Promise<void> } | null> {
+  if (!deliveryEnabled()) return null;
   if (Date.now() - lastSchedule >= 60000) {
     lastSchedule = Date.now();
     await prisma.deliveryMatch.updateMany({
-      where: { status: "running", leaseUntil: { lt: new Date() }, attempts: { gte: MAX_ATTEMPTS } },
+      where: { status: "running", leaseUntil: { lt: new Date() }, attempts: { gte: MAX_ATTEMPTS },
+        OR: [{ evaluationId: null }, { evaluation: { status: "active" } }] },
       data: { status: "failed", token: null, leaseUntil: null, finishedAt: new Date(), trialSource: Prisma.DbNull },
     });
     const active = await prisma.deliveryEvaluation.findMany({ where: { status: "active" }, select: { id: true } });
@@ -249,8 +267,18 @@ export async function workOneDeliveryMatch(): Promise<boolean> {
     const live = await prisma.deliveryEvaluation.findFirst({ where: { kind: "live", status: "active" }, select: { id: true } });
     if (live) await settleDeliveryEvaluation(live.id);
   }
-  const job = await claimDeliveryMatch();
-  if (!job) return false;
+  const claim = await claimDeliveryMatch();
+  return claim ? { done: executeDeliveryMatch(claim.job, claim.claimedAt) } : null;
+}
+
+export async function workOneDeliveryMatch(): Promise<boolean> {
+  const work = await startDeliveryWork();
+  if (!work) return false;
+  await work.done;
+  return true;
+}
+
+async function executeDeliveryMatch(job: DeliveryMatch, claimedAt: number) {
   const held = () => ({ id: job.id, token: job.token, status: "running", leaseUntil: { gt: new Date() } });
   const heartbeat = setInterval(() => {
     void prisma.deliveryMatch.updateMany({ where: held(), data: { leaseUntil: new Date(Date.now() + LEASE_MS) } })
@@ -258,31 +286,40 @@ export async function workOneDeliveryMatch(): Promise<boolean> {
   }, 15000);
   heartbeat.unref?.();
   try {
-    if (job.rules !== DELIVERY_RULES) throw new Error("Unexpected delivery rules version");
+    const map = deliveryMapForRules(job.rules);
+    if (!map) throw new Error("Unexpected delivery rules version");
     const load = async (id: string | null) => {
       if (!id) throw new Error("Missing delivery bot version");
       return prisma.deliveryBotVersion.findUniqueOrThrow({ where: { id }, select: { sourceCode: true, language: true } });
     };
     const a = job.evaluationId ? await load(job.versionA) : botSource(job.trialSource);
     const b = job.evaluationId ? await load(job.versionB) : null;
-    const result = await playDeliveryMatch(job.seed, job.flipped, [a, b]);
+    const result = await playDeliveryMatch(job.seed, job.flipped, [a, b], {
+      map, versions: [job.versionA, job.versionB], queuedMs: Math.max(0, claimedAt - job.createdAt.getTime()),
+    });
     await prisma.deliveryMatch.updateMany({ where: held(), data: {
       status: "completed", result: result as unknown as Prisma.InputJsonValue,
       token: null, leaseUntil: null, finishedAt: new Date(), trialSource: Prisma.DbNull,
     } });
   } catch {
     console.error("[delivery] match infrastructure failure", job.id);
-    const retry = job.attempts < MAX_ATTEMPTS;
-    await prisma.deliveryMatch.updateMany({ where: held(), data: {
-      status: retry ? "queued" : "failed", token: null, leaseUntil: null, finishedAt: retry ? null : new Date(),
-      ...(retry ? {} : { trialSource: Prisma.DbNull }),
-    } });
+    await locked(async tx => {
+      const active = !job.evaluationId || (await tx.deliveryEvaluation.findUnique({
+        where: { id: job.evaluationId }, select: { status: true },
+      }))?.status === "active";
+      const retry = active && job.attempts < MAX_ATTEMPTS;
+      await tx.deliveryMatch.updateMany({ where: held(), data: {
+        status: retry ? "queued" : active ? "failed" : "cancelled",
+        token: null, leaseUntil: null, finishedAt: retry ? null : new Date(),
+        ...(retry ? {} : { trialSource: Prisma.DbNull }),
+      } });
+    });
   } finally { clearInterval(heartbeat); }
   if (job.evaluationId) await settleDeliveryEvaluation(job.evaluationId);
-  return true;
 }
 
-export async function deliveryOverview(userId?: string, evaluationId?: string, view: "live" | "official" = "official") {
+export const DELIVERY_REPLAY_PAGE_SIZE = 60;
+export async function deliveryOverview(userId?: string, evaluationId?: string, view: "live" | "official" = "official", replayPage = 1) {
   guardEnabled();
   const liveAvailable = liveEnabled();
   const live = view === "live" && liveAvailable;
@@ -306,11 +343,14 @@ export async function deliveryOverview(userId?: string, evaluationId?: string, v
     history.find(e => e.id === evaluationId) ?? history[0];
   const evaluation = latest ? await prisma.deliveryEvaluation.findFirst({
     where: { id: latest.id, status: "published" }, select: { standings: true, entries: true,
-      matches: { orderBy: { ordinal: "asc" }, select: { id: true, versionA: true, versionB: true, seed: true, flipped: true } },
+      _count: { select: { matches: true } },
+      matches: { orderBy: { ordinal: "asc" }, skip: (replayPage - 1) * DELIVERY_REPLAY_PAGE_SIZE, take: DELIVERY_REPLAY_PAGE_SIZE,
+        select: { id: true, versionA: true, versionB: true, seed: true, flipped: true, rules: true } },
     },
   }) : null;
   const progress = active ? await prisma.deliveryMatch.groupBy({ by: ["status"], where: { evaluationId: active.id }, _count: true }) : [];
   return { history, active, bot, trials, cap, latest, evaluation, progress, live, liveWaiting, liveAvailable,
+    limit: deliveryEntryLimit(), sampled: live && isSampledDelivery(cap),
     entries: evaluation?.entries as ArenaEntry[] | undefined,
     standings: evaluation?.standings as DeliveryStanding[] | undefined };
 }
@@ -328,6 +368,7 @@ export async function readDeliveryMatch(id: string, viewerId?: string) {
   });
   if (!match) return null;
   let result = match.result as unknown as (DeliveryResult & { reusedFrom?: string }) | null;
+  const reused = Boolean(result?.reusedFrom);
   if (result?.reusedFrom) {
     const original = await prisma.deliveryMatch.findFirst({
       where: { id: result.reusedFrom, status: "completed", evaluation: { kind: "live", status: "published" },
@@ -337,7 +378,7 @@ export async function readDeliveryMatch(id: string, viewerId?: string) {
     result = original?.result as unknown as DeliveryResult | null;
     if (!result?.frames) return null;
   }
-  return { status: match.status, result,
+  return { status: match.status, result, reused,
     names: match.evaluation ? [match.versionA, match.versionB].map(v =>
       (match.evaluation!.entries as ArenaEntry[]).find(e => e.versionId === v)?.name) : undefined };
 }

@@ -75,6 +75,8 @@ jobs:
         env:
           STORE_DB_SYNC: "0"
       - name: Exercise production-build pages with two isolated workers
+        env:
+          DELIVERY_MATCH_CONCURRENCY: "2"
         run: |
           JUDGE_PROCESS_MODE=web node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3118 >/tmp/ojp-delivery-web.log 2>&1 &
           web=$!

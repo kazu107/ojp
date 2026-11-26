@@ -89,6 +89,8 @@ test("HTTP: six accounts, five languages, incremental live standings and officia
       const owned = await page(privatePath, a);
       assert.match(owned, /Standard delivery bot/);
       assert.match(owned, /Turn history/);
+      assert.match(owned, /Match timing/);
+      assert.match(owned, /Order events and score breakdown/);
       await page(privatePath, b, 404);
       const one = "Courier Alpha", two = "Courier Beta";
       const first = await action(a, { action: "register", ...source, name: one }, 201);
@@ -117,6 +119,7 @@ test("HTTP: six accounts, five languages, incremental live standings and officia
       const copied = results(expanded.fixtures).find(m => m.result.reusedFrom);
       assert.ok(copied && copied.attempts === 0);
       assert.match(await page("/games/delivery/matches/" + copied.id), /Turn history/);
+      assert.match(await page("/games/delivery/matches/" + copied.id), /Original match timing/);
       const replacementBody = { action: "register", ...bots.wait, name: "Fixed JavaScript" };
       const fixed = await action(f, replacementBody, 201);
       assert.equal((await action(f, replacementBody, 201)).id, fixed.id);
@@ -142,6 +145,7 @@ test("HTTP: six accounts, five languages, incremental live standings and officia
       const standings = await page("/games/delivery?view=official");
       assert.match(standings, /Courier Alpha/);
       assert.match(standings, /Courier Beta/);
+      assert.match(standings, /Bottleneck city/);
       assert.doesNotMatch(standings, /from collections import deque/);
       assert.match(await page("/games/delivery/matches/" + fixtures[0].id), /Turn history/);
     } finally { await db.$disconnect(); }

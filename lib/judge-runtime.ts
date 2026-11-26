@@ -389,13 +389,13 @@ async function compileProgram(
   return { ok: true };
 }
 
-export async function prepareJudgeProgram(cwd: string, language: Language, sourceCode: string, memoryLimitMb: number) {
+export async function stageJudgeProgram(cwd: string, language: Language, sourceCode: string, memoryLimitMb: number) {
   const commands = resolveLanguageCommands(language, "Main", memoryLimitMb);
   await writeFile(path.join(cwd, commands.sourceFileName), sourceCode, "utf8");
   if (language === "brainfuck") {
     await writeFile(path.join(cwd, "brainfuck-runtime.cjs"), brainfuckNodeRunner(), "utf8");
   }
-  return { compile: await compileProgram(cwd, commands), execute: commands.execute };
+  return { compile: () => compileProgram(cwd, commands), execute: commands.execute };
 }
 
 async function runSpecialJudgeCase(input: {

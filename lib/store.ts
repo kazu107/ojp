@@ -1,5 +1,5 @@
 import { enqueueHeuristicRun, workOneHeuristicRun, heuristicStandings, assertHeuristicAvailable, isHeuristicRevision } from "./heuristic-store";
-import { workOneDeliveryMatch } from "./delivery-store";
+import { deliveryConcurrency, startDeliveryWork } from "./delivery-store";
 import {publicHeuristicSettings} from "./heuristic-config";
 import {gamePreviewPayload, gamePreviewPackage, isGamePreviewPayload} from "./grid-game-preview";
 import {isWellFormedText} from "./board-visualization";
@@ -4559,6 +4559,16 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
   globalStore.__ojpDedicatedJudgeLoopStarted = true;
 
   let ticking=false;
+  let deliveryRunning = 0;
+  let wakeQueued = false;
+  const wake = () => {
+    if (wakeQueued) return;
+    wakeQueued = true;
+    setImmediate(() => {
+      wakeQueued = false;
+      void tick().catch(() => console.error("[judge-worker] tick failed; retrying"));
+    });
+  };
   const tick = async () => {
     if(ticking)return;
     ticking=true;
@@ -4613,7 +4623,17 @@ export async function startDedicatedJudgeWorkerLoop(): Promise<void> {
       }
       return;
     }
-    await workOneDeliveryMatch();
+    if (deliveryRunning < deliveryConcurrency()) {
+      const work = await startDeliveryWork();
+      if (!work) return;
+      deliveryRunning++;
+      void work.done.catch(() => console.error("[judge-worker] delivery work failed")).finally(() => {
+        deliveryRunning--;
+        wake();
+      });
+      // Recheck ordinary work before trying to fill a second delivery lane.
+      if (deliveryRunning < deliveryConcurrency()) wake();
+    }
     } finally { ticking=false; }
   };
 

@@ -26,6 +26,7 @@ test("versioned enrollment, concurrent worker fencing, complete publication, and
   process.env.DELIVERY_ARENA_ENABLED = "1";
   process.env.DELIVERY_LIVE_ENABLED = "0";
   process.env.DELIVERY_WEEKLY_ENABLED = "0";
+  process.env.DELIVERY_MATCH_CONCURRENCY = "1";
   Object.assign(process.env, { NODE_ENV: "test" });
   process.env.OJP_GAME_UNSAFE_LOCAL_TEST = "1";
   const { prisma } = await import("../lib/db/prisma");
@@ -132,7 +133,8 @@ test("live version changes respect a current lease, then supersede stale work", 
     const c = await enroll("live-c");
     await pause(2100);
     assert.equal(await arena.workOneDeliveryMatch(), false);
-    assert.equal(await prisma.deliveryEvaluation.findUnique({ where: { key: deliveryLiveKey([a, b, c]) } }), null);
+    assert.equal((await prisma.deliveryEvaluation.findUnique({ where: { key: deliveryLiveKey([a, b, c]) } }))?.status, "active");
+    assert.equal((await prisma.deliveryMatch.findUnique({ where: { id: pending.id } }))?.token, "test-in-flight");
     await prisma.deliveryMatch.update({ where: { id: pending.id }, data: { leaseUntil: new Date(Date.now() - 1000) } });
     await pause(2100);
     assert.equal(await arena.workOneDeliveryMatch(), true);
@@ -145,6 +147,67 @@ test("live version changes respect a current lease, then supersede stale work", 
     assert.equal(await prisma.deliveryMatch.count({ where: { evaluationId: original.id, status: "completed", attempts: 1 } }), 2);
   } finally {
     try {
+      await prisma.deliveryMatch.deleteMany();
+      await prisma.deliveryEvaluation.deleteMany();
+      await prisma.deliveryBotVersion.deleteMany();
+    } finally { await prisma.$disconnect(); }
+  }
+});
+
+test("the entry cap, sampled schedule, two global slots and ordinary judge priority are enforced", { skip: !url, timeout: 45000 }, async () => {
+  assert.ok(url);
+  const parsed = new URL(url);
+  assert.equal(parsed.hostname, "127.0.0.1");
+  assert.equal(parsed.pathname, "/ojp_delivery_test");
+  process.env.DATABASE_URL = url;
+  process.env.DELIVERY_ARENA_ENABLED = "1";
+  process.env.DELIVERY_WEEKLY_ENABLED = "0";
+  process.env.DELIVERY_LIVE_ENABLED = "1";
+  process.env.DELIVERY_MATCH_CONCURRENCY = "2";
+  delete process.env.DELIVERY_ENTRY_LIMIT;
+  Object.assign(process.env, { NODE_ENV: "test" });
+  process.env.OJP_GAME_UNSAFE_LOCAL_TEST = "1";
+  const { prisma } = await import("../lib/db/prisma");
+  const arena = await import("../lib/delivery-store");
+  const normalJobId = "delivery-ordinary-priority-fixture";
+  const slow = { ...waitBot, sourceCode: waitBot.sourceCode.replace("let remaining = 0;", "let remaining = 0, turn = 0;")
+    .replace('else if (!--remaining) console.log("WAIT");',
+      'else if (!--remaining) { if (!turn++) setTimeout(() => console.log("WAIT"), 700); else console.log("WAIT"); }') };
+  const completion: Promise<void>[] = [];
+  try {
+    assert.equal(arena.deliveryEntryLimit(), 16);
+    for (let i = 0; i < 16; i++) await arena.registerDeliveryBot("sample-" + i, "Bot " + i, slow);
+    await assert.rejects(arena.registerDeliveryBot("sample-16", "Over limit", slow), /full/);
+    process.env.DELIVERY_ENTRY_LIMIT = "32";
+    for (let i = 16; i < 32; i++) await arena.registerDeliveryBot("sample-" + i, "Bot " + i, slow);
+    await assert.rejects(arena.registerDeliveryBot("sample-32", "Over limit", slow), /full/);
+    await prisma.judgeJob.create({ data: { id: normalJobId, submissionId: normalJobId, reason: "test", status: "queued" } });
+    await pause(2100);
+    assert.equal(await arena.startDeliveryWork(), null);
+    const live = await prisma.deliveryEvaluation.findFirstOrThrow({ where: { kind: "live", status: "active" } });
+    assert.equal(await prisma.deliveryMatch.count({ where: { evaluationId: live.id, status: "queued", attempts: 0 } }), 256);
+    await prisma.judgeJob.delete({ where: { id: normalJobId } });
+    const started = await Promise.all(Array.from({ length: 4 }, () => arena.startDeliveryWork()));
+    for (const job of started) if (job) completion.push(job.done);
+    assert.equal(completion.length, 2);
+    const running = await prisma.deliveryMatch.findMany({ where: { status: "running" }, select: { leaseUntil: true } });
+    assert.equal(running.length, 2);
+    assert.ok(running.every(row => row.leaseUntil && row.leaseUntil.getTime() - Date.now() > 100000 &&
+      row.leaseUntil.getTime() - Date.now() <= 120000));
+    await Promise.all(completion);
+    assert.equal(await prisma.deliveryMatch.count({ where: { evaluationId: live.id, status: "completed", attempts: 1 } }), 2);
+    const timings = await prisma.deliveryMatch.findMany({ where: { evaluationId: live.id, status: "completed" }, select: { result: true } });
+    assert.ok(timings.every(({ result }) => {
+      const queuedMs = (result as { timing: { queuedMs: number } })?.timing.queuedMs;
+      return Number.isFinite(queuedMs) && queuedMs >= 0 && queuedMs < 10000;
+    }));
+    const official = await arena.startDeliveryEvaluation("manual");
+    assert.ok(official);
+    assert.equal(await prisma.deliveryMatch.count({ where: { evaluationId: official.id } }), 2976);
+  } finally {
+    await Promise.allSettled(completion);
+    try {
+      await prisma.judgeJob.deleteMany({ where: { id: normalJobId } });
       await prisma.deliveryMatch.deleteMany();
       await prisma.deliveryEvaluation.deleteMany();
       await prisma.deliveryBotVersion.deleteMany();

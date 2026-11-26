@@ -3,19 +3,31 @@ import { notFound } from "next/navigation";
 import { DeliveryAdmin, DeliveryBotEditor, DeliveryRefresh } from "@/components/delivery-controls";
 import { getI18n } from "@/lib/i18n/server";
 import { getOptionalCurrentUser } from "@/lib/store";
-import { deliveryEnabled, deliveryOverview } from "@/lib/delivery-store";
-import { DELIVERY_MAX_ENTRIES } from "@/lib/delivery-game";
+import { DELIVERY_REPLAY_PAGE_SIZE, deliveryEnabled, deliveryOverview } from "@/lib/delivery-store";
+import { deliveryMapForRules, deliveryMapLabels } from "@/lib/delivery-game";
 
 export const dynamic = "force-dynamic";
 export default async function DeliveryPage({ searchParams }: {
-  searchParams: Promise<{ evaluation?: string; view?: string }>;
+  searchParams: Promise<{ evaluation?: string; view?: string; replays?: string }>;
 }) {
   if (!deliveryEnabled()) notFound();
   const { locale, t } = await getI18n();
   const user = await getOptionalCurrentUser();
   const eligible = user?.status === "active" ? user : null;
-  const { evaluation: selected, view } = await searchParams;
-  const arena = await deliveryOverview(eligible?.id, selected, view === "official" || selected ? "official" : "live");
+  const { evaluation: selected, view, replays } = await searchParams;
+  const rawPage = Number(replays);
+  const page = Number.isSafeInteger(rawPage) ? Math.max(1, Math.min(rawPage, 250)) : 1;
+  const arena = await deliveryOverview(eligible?.id, selected, view === "official" || selected ? "official" : "live", page);
+  const replayCount = arena.evaluation?._count.matches ?? 0;
+  const replayPages = Math.ceil(replayCount / DELIVERY_REPLAY_PAGE_SIZE);
+  const replayLink = (target: number) => {
+    const params = new URLSearchParams({ replays: String(target) });
+    if (!arena.live) {
+      params.set("view", "official");
+      if (arena.latest) params.set("evaluation", arena.latest.id);
+    }
+    return "/games/delivery?" + params;
+  };
   const format = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Tokyo" });
   const showDate = (time: Date) => format.format(time) + " JST";
   const waiting = arena.trials.some(m => m.status === "queued" || m.status === "running");
@@ -51,8 +63,9 @@ UP | DOWN | LEFT | RIGHT | WAIT | PICKUP id | DELIVER id`}</pre>
         <Link href="/games/delivery?view=official" aria-current={!arena.live ? "page" : undefined}
           className={arena.live ? "button button-secondary" : "button button-primary"}>{t("Official evaluations")}</Link>
       </nav> : null}
-      <p className="text-soft">{t("{count}/{max} registered bots", { count: arena.cap, max: DELIVERY_MAX_ENTRIES })}{" \u00b7 "}
-        {arena.live ? t("Live rankings use one map with swapped starts and update after bot changes.") :
+      <p className="text-soft">{t("{count}/{max} registered bots", { count: arena.cap, max: arena.limit })}{" \u00b7 "}
+        {arena.live ? (arena.sampled ? t("Live standings use eight assigned opponents per bot with swapped starts.") :
+          t("Live rankings use one map with swapped starts and update after bot changes.")) :
           t("Weekly cutoff: Monday 03:00 JST. A win earns 3 points, a draw 1, a loss 0.")}</p>
       {arena.active?.status === "active" ? <p role="status">
         {t("Evaluating matches: {done}/{total}", { done: finished, total })}
@@ -74,16 +87,21 @@ UP | DOWN | LEFT | RIGHT | WAIT | PICKUP id | DELIVER id`}</pre>
         <ul>{arena.history.map(item => <li key={item.id}><Link href={`/games/delivery?view=official&evaluation=${item.id}`}
           aria-current={item.id === arena.latest?.id ? "page" : undefined}>{kind(item.kind)}{" \u00b7 "}{showDate(item.cutoff)}</Link></li>)}</ul>
       </details> : null}
-      {arena.evaluation?.matches.length ? <details>
-        <summary>{t("Match replays")} ({arena.evaluation.matches.length})</summary>
+      {arena.evaluation && replayCount ? <details open={replays ? true : undefined}>
+        <summary>{t("Match replays")} ({replayCount})</summary>
         <div className="table-wrap"><table className="table">
-          <thead><tr><th>{t("Bot A")}</th><th>{t("Bot B")}</th><th>{t("Seed")}</th><th>{t("Starting positions")}</th></tr></thead>
+          <thead><tr><th>{t("Bot A")}</th><th>{t("Bot B")}</th><th>{t("Map")}</th><th>{t("Seed")}</th><th>{t("Starting positions")}</th></tr></thead>
           <tbody>{arena.evaluation.matches.map(match => <tr key={match.id}>
             <td><Link href={`/games/delivery/matches/${match.id}`}>{names.get(match.versionA ?? "")}</Link></td>
-            <td>{names.get(match.versionB ?? "")}</td><td>{match.seed}</td>
+            <td>{names.get(match.versionB ?? "")}</td><td>{t(deliveryMapLabels[deliveryMapForRules(match.rules) ?? "classic"])}</td><td>{match.seed}</td>
             <td>{match.flipped ? t("Swapped") : t("Original")}</td>
           </tr>)}</tbody>
         </table></div>
+        {replayPages > 1 && <nav className="button-row" aria-label={t("Match replays")}>
+          {page > 1 ? <Link className="button button-secondary" href={replayLink(Math.min(page - 1, replayPages))}>{t("Previous replays")}</Link> : null}
+          {t("Replay page {page} of {total}", { page: Math.min(page, replayPages), total: replayPages })}
+          {page < replayPages ? <Link className="button button-secondary" href={replayLink(page + 1)}>{t("Next replays")}</Link> : null}
+        </nav>}
       </details> : null}
     </section>
     <section className="panel stack">

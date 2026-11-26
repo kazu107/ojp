@@ -3,7 +3,20 @@ import type { BoardConfig, BoardReplay, BoardPiece } from "./board-visualization
 export const DELIVERY_RULES = "delivery-v1";
 export const DELIVERY_TURNS = 100;
 export const DELIVERY_CAPACITY = 2;
-export const DELIVERY_MAX_ENTRIES = 8;
+export const DELIVERY_DEFAULT_ENTRIES = 16;
+export const DELIVERY_MAX_ENTRIES = 64;
+export const DELIVERY_OFFICIAL_MAPS = ["short", "long", "bottleneck"] as const;
+export type DeliveryMap = "classic" | (typeof DELIVERY_OFFICIAL_MAPS)[number];
+export const deliveryMapLabels: Record<DeliveryMap, string> = {
+  classic: "Classic city", short: "Short delivery city", long: "Long delivery city", bottleneck: "Bottleneck city",
+};
+export type DeliveryRules = typeof DELIVERY_RULES | `${typeof DELIVERY_RULES}-${Exclude<DeliveryMap, "classic">}`;
+export function deliveryRulesForMap(map: DeliveryMap): DeliveryRules {
+  return map === "classic" ? DELIVERY_RULES : `${DELIVERY_RULES}-${map}`;
+}
+export function deliveryMapForRules(rules: string): DeliveryMap | undefined {
+  return rules === DELIVERY_RULES ? "classic" : DELIVERY_OFFICIAL_MAPS.find(map => deliveryRulesForMap(map) === rules);
+}
 const SIZE = 15;
 type Seat = 0 | 1;
 type Pair<T> = [T, T];
@@ -20,10 +33,16 @@ export type DeliveryFrame = {
   couriers: Pair<Courier>;
   actions: Pair<string>;
   active: [number, Seat | null][];
+  events?: DeliveryEvent[];
 };
+export type DeliveryEvent =
+  | { kind: "contested"; seat: Seat; orderId: number }
+  | { kind: "delivered"; seat: Seat; orderId: number; base: number; bonus: number }
+  | { kind: "expired"; seat: Seat | null; orderId: number; penalty: number };
+export type DeliveryTiming = { queuedMs: number; prepareMs: number; compileMs: number; playMs: number; cacheHits: number };
 export type DeliveryOutcome = "score" | "forfeit" | "double_forfeit";
 export type DeliveryResult = {
-  rules: typeof DELIVERY_RULES;
+  rules: DeliveryRules;
   seed: number;
   flipped: boolean;
   board: string[];
@@ -33,6 +52,7 @@ export type DeliveryResult = {
   outcome: DeliveryOutcome;
   faults: Pair<string | null>;
   totals: Pair<number>;
+  timing?: DeliveryTiming;
 };
 
 const moves = {
@@ -67,7 +87,7 @@ function paths(board: string[], start: Point) {
   return found;
 }
 
-function scenario(seed: number) {
+function scenario(seed: number, map: DeliveryMap = "classic") {
   if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error("Invalid delivery seed");
   let state = seed >>> 0;
   const random = (limit: number) => {
@@ -76,6 +96,10 @@ function scenario(seed: number) {
   };
   const board = Array.from({ length: SIZE }, (_, y) => Array.from({ length: SIZE }, (_, x) => {
     if (x === 0 || y === 0 || x === SIZE - 1 || y === SIZE - 1) return "#";
+    if (map === "bottleneck") {
+      if (y === 7 && x >= 5 && x <= 9) return ".";
+      if (x === 7) return "#";
+    }
     // A ring and a lattice of connected streets remain open in every seed.
     return x % 4 >= 2 && y % 4 >= 2 && random(4) !== 0 ? "#" : ".";
   }).join(""));
@@ -87,10 +111,18 @@ function scenario(seed: number) {
   const orders = Array.from({ length: 30 }, (_, i): Order => {
     const index = i === 0 ? 0 : i === 1 ? 3 : random(depots.length);
     const from = depots[index];
-    const reachable = destinations.filter(p => (depotPaths[index].get(key(p))?.distance ?? 0) >= 4);
+    const opens = i < 4 ? 1 : 3 + (i - 3) * 3;
+    const reachable = destinations.filter(p => {
+      const distance = depotPaths[index].get(key(p))?.distance ?? 0;
+      if (distance < 4) return false;
+      if (map === "classic") return true;
+      if (distance > DELIVERY_TURNS - opens - 1) return false;
+      if (map === "short") return distance <= 9;
+      if (map === "long") return distance >= 12;
+      return (p.x < 7) !== (from.x < 7);
+    });
     const to = reachable[random(reachable.length)];
     const distance = depotPaths[index].get(key(to))!.distance;
-    const opens = i < 4 ? 1 : 3 + (i - 3) * 3;
     const size = random(4) === 0 ? 2 : 1;
     return { id: i + 1, from, to, opens, size, base: 35 + (size - 1) * 20 + 3 * distance,
       deadline: Math.min(DELIVERY_TURNS, opens + distance + 10 + random(13)) };
@@ -110,7 +142,9 @@ export class DeliveryGame {
   readonly firstPriority: Seat;
   turn = 1;
 
-  constructor(readonly seed: number, readonly flipped = false, input = scenario(seed)) {
+  constructor(readonly seed: number, readonly flipped = false, input?: ReturnType<typeof scenario>,
+    readonly map: DeliveryMap = "classic") {
+    input ??= scenario(seed, map);
     this.board = input.board;
     this.orders = input.orders.map(o => ({ ...o, state: "open", owner: null }));
     const courier = (p: Point): Courier => ({ ...p, score: 0, delivered: 0, penalty: 0 });
@@ -125,11 +159,12 @@ export class DeliveryGame {
   load(seat: Seat) {
     return this.orders.reduce((n, o) => n + (o.state === "carried" && o.owner === seat ? o.size : 0), 0);
   }
-  private capture(turn: number, actions: Pair<string>) {
+  private capture(turn: number, actions: Pair<string>, events: DeliveryEvent[] = []) {
     this.frames.push({
       turn, actions,
       couriers: [{ ...this.couriers[0] }, { ...this.couriers[1] }],
       active: this.active().map(o => [o.id, o.owner]),
+      ...(events.length ? { events } : {}),
     });
   }
   observe(seat: Seat): string {
@@ -145,6 +180,13 @@ export class DeliveryGame {
     if (this.done) throw new Error("Delivery match has ended");
     const priority = ((this.firstPriority + this.turn - 1) % 2) as Seat;
     const applied: Pair<string> = ["WAIT", "WAIT"];
+    const events: DeliveryEvent[] = [];
+    const [a, b] = actions;
+    if (a.kind === "PICKUP" && b.kind === "PICKUP" && a.id === b.id) {
+      const order = this.orders.find(o => o.id === a.id && o.opens <= this.turn && o.state === "open");
+      if (order && ([0, 1] as const).every(s => same(this.couriers[s], order.from) &&
+          this.load(s) + order.size <= DELIVERY_CAPACITY)) events.push({ kind: "contested", seat: priority, orderId: order.id });
+    }
     for (const seat of [priority, (1 - priority) as Seat]) {
       const a = actions[seat], p = this.couriers[seat];
       if (a.kind === "PICKUP" || a.kind === "DELIVER") {
@@ -155,7 +197,9 @@ export class DeliveryGame {
           order.state = "carried"; order.owner = seat; applied[seat] = "PICKUP " + a.id;
         } else if (a.kind === "DELIVER" && order.state === "carried" && order.owner === seat && same(p, order.to)) {
           order.state = "delivered";
-          p.score += deliveryReward(order.base, order.deadline, this.turn);
+          const points = deliveryReward(order.base, order.deadline, this.turn);
+          p.score += points;
+          events.push({ kind: "delivered", seat, orderId: order.id, base: order.base, bonus: points - order.base });
           p.delivered++; applied[seat] = "DELIVER " + a.id;
         }
       } else if (a.kind !== "WAIT") {
@@ -171,16 +215,17 @@ export class DeliveryGame {
         this.couriers[o.owner].score -= o.base;
         this.couriers[o.owner].penalty += o.base;
       }
+      events.push({ kind: "expired", seat: o.owner, orderId: o.id, penalty: o.owner === null ? 0 : o.base });
       o.state = "expired";
     }
     this.turn++;
-    this.capture(this.turn - 1, applied);
+    this.capture(this.turn - 1, applied, events);
   }
   result(faults: Pair<string | null> = [null, null]): DeliveryResult {
     const totals: Pair<number> = [this.couriers[0].score, this.couriers[1].score];
     const both = !!faults[0] && !!faults[1];
     return {
-      rules: DELIVERY_RULES, seed: this.seed, flipped: this.flipped, board: this.board,
+      rules: deliveryRulesForMap(this.map), seed: this.seed, flipped: this.flipped, board: this.board,
       orders: this.orders.map(({ id, from, to, opens, deadline, base, size }) =>
         ({ id, from, to, opens, deadline, base, size })),
       frames: this.frames, totals, faults,

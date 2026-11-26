@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DELIVERY_PYTHON_TEMPLATE } from "../lib/delivery-templates";
 import { playDeliveryMatch } from "../lib/delivery-runtime";
+import { deliveryTestBots } from "./delivery-bots";
 
 Object.assign(process.env, { NODE_ENV: "test" });
 process.env.OJP_GAME_UNSAFE_LOCAL_TEST = "1";
@@ -35,4 +36,24 @@ test("extra commands forfeit instead of being used on the next turn", { timeout:
   assert.equal(result.winner, 1);
   assert.equal(result.outcome, "forfeit");
   assert.match(result.faults[0] ?? "", /one valid action|Unexpected action/);
+});
+
+test("two isolated matches share one compilation and use fresh runnable copies", {
+  skip: process.platform !== "linux" || process.env.JUDGE_SANDBOX !== "bubblewrap", timeout: 25000,
+}, async () => {
+  const sources = [deliveryTestBots.vertical, deliveryTestBots.wait] as const;
+  const options = { versions: ["cache-test-c", "cache-test-js"] as [string, string], queuedMs: 123 };
+  const play = () => playDeliveryMatch(11, false, [...sources], options);
+  const runs = await Promise.all([play(), play()]);
+  for (const r of runs) {
+    assert.deepEqual(r.faults, [null, null]);
+    assert.equal(r.frames.length, 101);
+    assert.equal(r.timing?.queuedMs, 123);
+    assert.ok(r.timing && r.timing.prepareMs >= r.timing.compileMs && r.timing.playMs > 0);
+  }
+  assert.equal(runs.reduce((sum, r) => sum + (r.timing?.cacheHits ?? 0), 0), 2);
+  const warm = await play();
+  assert.equal(warm.timing?.cacheHits, 2);
+  assert.equal(warm.timing?.compileMs, 0);
+  assert.deepEqual(warm.frames, runs[0].frames);
 });
