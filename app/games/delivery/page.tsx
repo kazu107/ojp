@@ -1,47 +1,58 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeliveryAdmin, DeliveryBotEditor, DeliveryRefresh } from "@/components/delivery-controls";
+import { DeliveryLadderPanel } from "@/components/delivery-ladder-panel";
 import { getI18n } from "@/lib/i18n/server";
 import { getOptionalCurrentUser } from "@/lib/store";
 import { DELIVERY_REPLAY_PAGE_SIZE, deliveryEnabled, deliveryOverview } from "@/lib/delivery-store";
 import { deliveryMapForRules, deliveryMapLabels } from "@/lib/delivery-game";
+import { deliveryLadderEnabled, DELIVERY_PLACEMENT_SETS } from "@/lib/delivery-ladder";
+import { deliveryLadderOverview } from "@/lib/delivery-ladder-store";
 
 export const dynamic = "force-dynamic";
 export default async function DeliveryPage({ searchParams }: {
-  searchParams: Promise<{ evaluation?: string; view?: string; replays?: string }>;
+  searchParams: Promise<{ evaluation?: string; view?: string; replays?: string; rankPage?: string }>;
 }) {
   if (!deliveryEnabled()) notFound();
   const { locale, t } = await getI18n();
   const user = await getOptionalCurrentUser();
   const eligible = user?.status === "active" ? user : null;
-  const { evaluation: selected, view, replays } = await searchParams;
+  const { evaluation: selected, view, replays, rankPage } = await searchParams;
+  const continuous = deliveryLadderEnabled();
+  const archive = view === "official" || Boolean(selected);
+  const rawRankPage = Number(rankPage);
+  const ladder = continuous && !archive ? await deliveryLadderOverview(eligible?.id,
+    Number.isSafeInteger(rawRankPage) ? rawRankPage : 1) : null;
   const rawPage = Number(replays);
   const page = Number.isSafeInteger(rawPage) ? Math.max(1, Math.min(rawPage, 250)) : 1;
-  const arena = await deliveryOverview(eligible?.id, selected, view === "official" || selected ? "official" : "live", page);
-  const replayCount = arena.evaluation?._count.matches ?? 0;
+  const arena = ladder ? null : await deliveryOverview(eligible?.id, selected, archive ? "official" : "live", page);
+  const replayCount = arena?.evaluation?._count.matches ?? 0;
   const replayPages = Math.ceil(replayCount / DELIVERY_REPLAY_PAGE_SIZE);
   const replayLink = (target: number) => {
     const params = new URLSearchParams({ replays: String(target) });
-    if (!arena.live) {
+    if (!arena?.live) {
       params.set("view", "official");
-      if (arena.latest) params.set("evaluation", arena.latest.id);
+      if (arena?.latest) params.set("evaluation", arena.latest.id);
     }
     return "/games/delivery?" + params;
   };
   const format = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Tokyo" });
   const showDate = (time: Date) => format.format(time) + " JST";
-  const waiting = arena.trials.some(m => m.status === "queued" || m.status === "running");
-  const total = arena.progress.reduce((sum, row) => sum + row._count, 0);
-  const finished = arena.progress.find(row => row.status === "completed")?._count ?? 0;
-  const names = new Map(arena.entries?.map(entry => [entry.versionId, entry.name]));
-  const kind = (value: string) => value === "weekly" ? t("Weekly evaluation") : t("Manual evaluation");
+  const bot = ladder?.bot ?? arena?.bot ?? null;
+  const trials = ladder?.trials ?? arena?.trials ?? [];
+  const waiting = trials.some(m => m.status === "queued" || m.status === "running");
+  const total = arena?.progress.reduce((sum, row) => sum + row._count, 0) ?? 0;
+  const finished = arena?.progress.find(row => row.status === "completed")?._count ?? 0;
+  const names = new Map(arena?.entries?.map(entry => [entry.versionId, entry.name]));
+  const kind = (value: string) => value === "weekly" ? t("Weekly evaluation") : value === "live" ? t("Live standings") : t("Manual evaluation");
 
   return <div className="page stack">
     <section className="page-head">
       <h1 className="page-title">{t("Delivery Duel")}</h1>
       <Link className="button button-secondary" href="/games">{t("Games")}</Link>
     </section>
-    <DeliveryRefresh pending={waiting || arena.liveWaiting || arena.active?.status === "active"} watch={arena.live} />
+    <DeliveryRefresh pending={waiting || arena?.liveWaiting || arena?.active?.status === "active" || ladder?.me?.state === "pending"}
+      watch={Boolean(ladder) || arena?.live} />
     <details className="panel stack">
       <summary>{t("Delivery rules and bot protocol")}</summary>
       <p>{t("Two bots share a 15×15 city for 100 turns. Pick up orders, carry up to two units, and deliver by the deadline. Bots may share a tile.")}</p>
@@ -55,23 +66,24 @@ export default async function DeliveryPage({ searchParams }: {
 UP | DOWN | LEFT | RIGHT | WAIT | PICKUP id | DELIVER id`}</pre>
       <p>{t("Seat and owner are 0 (A) or 1 (B); an unclaimed order has owner -1. Legal actions that cannot be applied become WAIT.")}</p>
     </details>
-    <section className="panel stack">
+    {ladder ? <DeliveryLadderPanel arena={ladder} t={t} /> : null}
+    {arena ? <section className="panel stack">
       <h2 className="panel-title">{t("Delivery standings")}</h2>
-      {arena.liveAvailable ? <nav className="button-row" aria-label={t("Delivery standings")}>
+      {arena.liveAvailable || continuous ? <nav className="button-row" aria-label={t("Delivery standings")}>
         <Link href="/games/delivery" aria-current={arena.live ? "page" : undefined}
           className={arena.live ? "button button-primary" : "button button-secondary"}>{t("Live standings")}</Link>
         <Link href="/games/delivery?view=official" aria-current={!arena.live ? "page" : undefined}
-          className={arena.live ? "button button-secondary" : "button button-primary"}>{t("Official evaluations")}</Link>
+          className={arena.live ? "button button-secondary" : "button button-primary"}>{continuous ? t("Past evaluations") : t("Official evaluations")}</Link>
       </nav> : null}
-      <p className="text-soft">{t("{count}/{max} registered bots", { count: arena.cap, max: arena.limit })}{" \u00b7 "}
+      {continuous ? null : <p className="text-soft">{t("{count}/{max} registered bots", { count: arena.cap, max: arena.limit })}{" \u00b7 "}
         {arena.live ? (arena.sampled ? t("Live standings use eight assigned opponents per bot with swapped starts.") :
           t("Live rankings use one map with swapped starts and update after bot changes.")) :
-          t("Weekly cutoff: Monday 03:00 JST. A win earns 3 points, a draw 1, a loss 0.")}</p>
+          t("Weekly cutoff: Monday 03:00 JST. A win earns 3 points, a draw 1, a loss 0.")}</p>}
       {arena.active?.status === "active" ? <p role="status">
         {t("Evaluating matches: {done}/{total}", { done: finished, total })}
       </p> : arena.active?.status === "failed" ? <p role="status">{t("Delivery evaluation needs an administrator to retry")}</p> :
         arena.liveWaiting ? <p role="status">{t("Waiting for live evaluation")}</p> : null}
-      {eligible?.role === "admin" && (!arena.live || arena.active?.status === "failed") ? <DeliveryAdmin evaluationId={arena.active?.id}
+      {!continuous && eligible?.role === "admin" && (!arena.live || arena.active?.status === "failed") ? <DeliveryAdmin evaluationId={arena.active?.id}
         failed={arena.active?.status === "failed"} busy={Boolean(arena.active) || arena.cap < 2} /> : null}
       {arena.latest ? <p>{arena.live ? t("Last evaluated") : kind(arena.latest.kind)}{" \u00b7 "}{showDate(arena.latest.cutoff)}</p> : null}
       {arena.standings?.length ? <div className="table-wrap"><table className="table">
@@ -103,15 +115,18 @@ UP | DOWN | LEFT | RIGHT | WAIT | PICKUP id | DELIVER id`}</pre>
           {page < replayPages ? <Link className="button button-secondary" href={replayLink(page + 1)}>{t("Next replays")}</Link> : null}
         </nav>}
       </details> : null}
-    </section>
+    </section> : null}
     <section className="panel stack">
       <h2 className="panel-title">{t("Your delivery bot")}</h2>
       {eligible ? <>
-        {arena.bot ? <p>{t("Registered bot: {name}", { name: arena.bot.name })}</p> : null}
-        <DeliveryBotEditor bot={arena.bot} trialPending={waiting} />
-        {arena.trials.length ? <>
+        {bot ? <p>{t("Registered bot: {name}", { name: bot.name })}</p> : null}
+        {ladder?.me?.state === "pending" ? <p role="status">
+          {t("Placement: {done}/{total} sets", { done: ladder.me.sets, total: DELIVERY_PLACEMENT_SETS })}
+        </p> : ladder?.me?.state === "invalid" ? <p role="status">{t("This bot did not complete placement. Submit a corrected version.")}</p> : null}
+        <DeliveryBotEditor bot={bot} trialPending={waiting} />
+        {trials.length ? <>
           <h3>{t("Private trial history")}</h3>
-          <ul>{arena.trials.map(trial => <li key={trial.id}>
+          <ul>{trials.map(trial => <li key={trial.id}>
             <Link href={`/games/delivery/matches/${trial.id}`}>{showDate(trial.createdAt)}</Link>{" · "}
             {trial.status === "completed" ? t("Completed") : trial.status === "failed" ? t("Failed") :
               trial.status === "running" ? t("Running") : t("Queued")}

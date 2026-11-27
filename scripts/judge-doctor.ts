@@ -36,7 +36,8 @@ async function main() {
       ["PyPy3", "pypy3", ["--version"]],
     ] as const) {
       const result = await runJudgeCommand(command, [...args], {
-        cwd, stdin: "", timeoutMs: 5000, captureMemory: false,
+        // Cold Kotlin JVM startup can exceed the generic probe timeout on a capped worker.
+        cwd, stdin: "", timeoutMs: name === "Kotlin" ? 15000 : 5000, captureMemory: false,
       });
       const available = result.exitCode === 0 && !result.spawnErrorCode;
       const version = (result.stdout || result.stderr).split(/\r?\n/).find((line) => line.trim() && !/warning|deprecated/i.test(line))?.trim();

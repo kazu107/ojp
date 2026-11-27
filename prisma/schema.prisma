@@ -76,6 +76,38 @@ model DeliveryEvaluation {
   matches     DeliveryMatch[]
 
   @@index([status, createdAt])
+  @@index([kind, status, publishedAt], map: "DeliveryEvaluation_kind_status_publishedAt_idx")
+}
+
+model DeliveryLadderEntry {
+  userId             String   @id
+  activeVersionId    String?
+  activeName         String
+  state              String
+  rating             Int      @default(1500)
+  deviation          Int      @default(320)
+  sets               Int      @default(0)
+  cleanGames         Int      @default(0)
+  rankedVersionId    String?
+  rankedName         String?
+  rankedRating       Int      @default(1500)
+  rankedDeviation    Int      @default(320)
+  rankedScore        Int      @default(1180)
+  rankedSets         Int      @default(0)
+  dueAt              DateTime
+  availableAt        DateTime
+  recentOpponentIds  String[] @default([])
+
+  @@index([state, dueAt, userId], map: "DeliveryLadderEntry_state_due_user_idx")
+  @@index([state, rating, userId], map: "DeliveryLadderEntry_state_rating_user_idx")
+  @@index([rankedScore(sort: Desc), userId], map: "DeliveryLadderEntry_rank_user_idx")
+}
+
+model DeliveryLadderClock {
+  id              String   @id
+  nextRatedAt     DateTime
+  placementStreak Int      @default(0)
+  ratedSequence   Int      @default(0)
 }
 
 model DeliveryMatch {

@@ -70,12 +70,14 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap python3 gcc g++ ruby time util-linux
       - run: npm ci
       - run: npm run db:push && npm run db:delivery && npm run db:delivery
+      - run: npm run db:delivery:ladder && npm run db:delivery:ladder
       - run: npm run test:delivery:integration
       - run: npm run build
         env:
           STORE_DB_SYNC: "0"
       - name: Exercise production-build pages with two isolated workers
         env:
+          DELIVERY_ARENA_MODE: legacy
           DELIVERY_MATCH_CONCURRENCY: "2"
         run: |
           JUDGE_PROCESS_MODE=web node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3118 >/tmp/ojp-delivery-web.log 2>&1 &
@@ -91,8 +93,26 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3118/api/health/db >/dev/null
           npm run test:delivery:http
+      - name: Verify continuous ladder with real HTTP and isolated workers
+        env:
+          DELIVERY_ARENA_MODE: ladder
+          DELIVERY_MATCH_CONCURRENCY: "2"
+          DELIVERY_LADDER_INTERVAL_SECONDS: "2"
+          DELIVERY_WEEKLY_ENABLED: "1"
+        run: |
+          JUDGE_PROCESS_MODE=web node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3118 >/tmp/ojp-ladder-web.log 2>&1 &
+          web=$!
+          trap 'kill "$web" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3118/api/health/db >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3118/api/health/db >/dev/null
+          npm run test:delivery:ladder:http
       - if: failure()
         run: cat /tmp/ojp-delivery-{web,worker,worker-2}.log
+      - if: failure()
+        run: cat /tmp/ojp-ladder-web.log
 
   learning:
     runs-on: ubuntu-22.04

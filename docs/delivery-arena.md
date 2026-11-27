@@ -42,44 +42,50 @@ comparison. The runner allows 2.5s for the first move, 250ms per later move,
 
 ## Evaluation
 
-- Each user can register one active bot. The default limit is 16 active
-  users. Updates and withdrawals do not alter official evaluation snapshots.
-- The **Live standings** tab evaluates the current registered versions without
-  waiting for an official round. An idle worker checks for roster changes every
-  two seconds. Each pair plays a single fixed map (seed 54832924) twice, with
-  starting positions and priority reversed. Results from the last published
-  live round are reused for the same pair of bot versions. With 16 active bots
-  the live schedule has 240 games, or 30 new games for one changed version.
-  Starting at 32 active bots, each bot instead plays eight assigned opponents
-  twice. A deterministic balanced pairing keeps opponents unchanged when only
-  code changes. At 32 bots this gives 256 games, or 16 new games for one change.
-  Changes can supersede a still-queued live snapshot without stopping its
-  in-flight match. The visible standings refresh automatically. Completion time
-  depends on the queue and the submitted programs.
-- Weekly evaluation uses the versions active at Monday 03:00 JST. A worker
-  schedules the latest cutoff when the delivery queue can run. If fewer than
-  two bots were active at the cutoff, that week is not evaluated. Administrators
-  can start an extra evaluation using the current versions. View these rounds
-  under **Official evaluations**.
-- In official rounds every pair plays three map categories twice: short deliveries,
-  long deliveries, and cross-city orders through a narrow passage. Starts and
-  priority swap on the second run. Weekly and manual rounds always use all pairs.
-  Wins earn three points, draws one, losses zero. Equal points share a rank.
-  Raw delivery scores are shown separately. There is no league or rating.
+- One active bot per user, with no global registration limit. The existing
+  per-account upload rate limit remains. Only the newest version is queued
+  for placement. An edit or withdrawal cancels obsolete queued matches; an
+  in-flight match can finish, but cannot change the new version's rating.
+- A new version plays up to six placement sets. A set is two games on one
+  seeded map with starts and pickup priority swapped. The next opponent is
+  selected near the updated rating estimate, with a wider check at the end.
+  A win moves the estimate toward stronger opponents; a loss moves it down.
+  Split sets keep more uncertainty than decisive ones. Placement does not
+  affect the opponent's rating. Updates start from the last published rating
+  with larger uncertainty and keep that version visible until placement ends.
+- The **Live standings** table ranks published versions by estimated rating
+  minus heuristic uncertainty, not by cumulative match points. Ratings are
+  separate from contest Elo. A bot that never completes a valid game in
+  placement is excluded until it is updated.
+- Rated sets run continuously even if nobody updates their code. The scheduler
+  starts from the rated bot whose regular turn is oldest, then looks for a
+  similarly rated opponent. It generally avoids the last eight opponents,
+  falls back to a rematch if necessary, and periodically tries a wider matchup.
+  It rotates across short, long, and bottleneck maps. If both types of match
+  are due, at most three consecutive placement sets take precedence before
+  considering a regular set. The scheduler materializes only one open set
+  (two jobs), not a full roster schedule.
+- Weekly rounds are no longer scheduled. The default ladder mode also retires
+  manual batch runs. Existing evaluation results and replay links remain
+  accessible in **Past evaluations**; they are not converted into ratings.
 - New public replays show queue wait, preparation (including compilation),
   compilation, execution, and cache hits, plus contested pickups, delivery base
   and bonus points, and expiration penalties. A reused result shows the original
   run's timing, not a new runtime.
-- No partial standings are published. The previous evaluation stays visible
-  while others run. Infrastructure failures are retried up to three times;
-  an administrator can retry the failed matches without redoing completed ones.
+- A rating change is applied transactionally once both mirrored games finish.
+  Session or worker interruptions resume from the database. Infrastructure
+  failures retry up to three times per match; a failed set does not affect
+  ratings and the affected bots wait briefly before being queued again.
 
 ## Deployment
 
-1. Take a DB backup. Apply the additive migration to the intended database
-   with `npm run db:delivery`; it is idempotent and does not modify existing
-   problem, user, or submission rows. The release schema gate requires this
-   step before a production rollout.
+1. Take a DB backup, stop old arena writers/scheduling and drain their queue.
+   Run `npm run db:delivery` on fresh databases, then
+   `npm run db:delivery:ladder` on both fresh and upgraded databases, as the
+   application database owner. The ladder migration adds two tables and
+   indexes and queues already registered bots for placement. It is idempotent
+   and preserves existing contests, submissions, arena evaluations and replays.
+   Production requires a reviewed schema rollout before switching binaries.
 2. Rebuild the Prisma client and web/worker images. Set
    `DELIVERY_ARENA_ENABLED=1` on the web process and the workers.
    The feature is off by default and does not access delivery tables while off.
@@ -88,14 +94,12 @@ comparison. The runner allows 2.5s for the first move, 250ms per later move,
    own sandbox and workspace. New delivery jobs are not claimed while ordinary,
    heuristic, or package jobs are pending. After one match finishes, the worker
    checks those queues and can immediately start the next one.
-4. Enable `DELIVERY_WEEKLY_ENABLED=1` on workers for automatic weekly rounds.
-   With it off, live evaluation, admin evaluation, and private trials still work.
-   Live standings are on by default when the arena is enabled. Set
-   `DELIVERY_LIVE_ENABLED=0` on both the web process and workers to disable
-   scheduling new live rounds without hiding official results.
-5. Set `DELIVERY_ENTRY_LIMIT` on web and workers to an integer from 2 to 64 to
-   override the default of 16. Decreasing the limit does not remove existing bots.
-   Set `DELIVERY_MATCH_CONCURRENCY=2` on all intended workers only after checking
+4. Set `DELIVERY_LIVE_ENABLED=0` on workers to pause scheduling new sets
+   while draining for maintenance. Existing replays and private trials stay
+   available. `DELIVERY_LADDER_INTERVAL_SECONDS` sets the minimum spacing
+   between regular sets (default 15); ordinary judge activity can delay them.
+   `DELIVERY_WEEKLY_ENABLED` no longer schedules rounds.
+5. Set `DELIVERY_MATCH_CONCURRENCY=2` on all intended workers only after checking
    CPU, normal judge latency, and timeouts. The default is one global match; the
    two-slot mode still fences claims in PostgreSQL. Running matches can finish
    when an ordinary job arrives, but no new delivery match starts until priority
@@ -105,10 +109,15 @@ comparison. The runner allows 2.5s for the first move, 250ms per later move,
    Supported artifacts are copied into new sandbox workspaces, never mounted
    in a shared writable directory. Oversized artifacts, Python/PyPy bytecode,
    and private trials are not cached. Set `DELIVERY_COMPILE_CACHE=0` to disable.
+7. `DELIVERY_ARENA_MODE=legacy` retains the old capped batch view for regression
+   checks or a small-field recovery. Keep web and worker mode consistent. Do not
+   switch a field larger than the old cap to legacy mode; pause or disable the
+   arena instead. No setting change is needed for the default ladder mode.
 
 Run `npm run test:delivery` for rules and process tests. To run the DB integration
 suite, migrate an isolated PostgreSQL database named `ojp_delivery_test`
 on `127.0.0.1`, set `DELIVERY_TEST_DATABASE_URL` to that database, and run
 `npm run test:delivery:integration`. The suite clears the arena tables there.
-Judge Checks also runs `npm run test:delivery:http` with a built web instance
-and two isolated workers to verify the full lifecycle.
+Judge Checks runs both `npm run test:delivery:http` (legacy) and
+`npm run test:delivery:ladder:http` with a built web instance and isolated
+workers to verify the full lifecycle.

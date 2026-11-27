@@ -4,6 +4,7 @@ import { setTimeout as pause } from "node:timers/promises";
 import { deliveryLiveKey } from "../lib/delivery-evaluation";
 
 const url = process.env.DELIVERY_TEST_DATABASE_URL;
+process.env.DELIVERY_ARENA_MODE = "legacy";
 const waitBot = {
   language: "javascript",
   sourceCode: `const lines = require("node:readline").createInterface({input: process.stdin});

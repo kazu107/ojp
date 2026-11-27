@@ -6,6 +6,8 @@ import { isWellFormedText } from "./board-visualization";
 import { DELIVERY_DEFAULT_ENTRIES, DELIVERY_MAX_ENTRIES, DELIVERY_RULES, deliveryMapForRules, type DeliveryResult } from "./delivery-game";
 import { DELIVERY_LIVE_SEEDS, deliveryLiveKey, isSampledDelivery, liveMatchCount, planDeliveryMatches, rankDelivery, weeklyDeliveryCutoff, type ArenaEntry, type DeliveryStanding } from "./delivery-evaluation";
 import { DELIVERY_SOURCE_BYTES, playDeliveryMatch, type DeliveryBotSource } from "./delivery-runtime";
+import { deliveryLadderEnabled, isDeliveryLadderKind } from "./delivery-ladder";
+import { enrollLadderVersion, scheduleLadderPair, settleLadderPair, withdrawLadderVersion } from "./delivery-ladder-store";
 
 const LEASE_MS = 120000;
 const MAX_ATTEMPTS = 3;
@@ -60,22 +62,30 @@ export async function registerDeliveryBot(userId: string, name: unknown, raw: un
     const active = await tx.deliveryBotVersion.findFirst({ where: { userId, validUntil: null },
       select: { id: true, name: true, language: true, sourceCode: true, createdAt: true } });
     if (active?.name === label && active.language === source.language && active.sourceCode === source.sourceCode) {
+      if (deliveryLadderEnabled() && !await tx.deliveryLadderEntry.findFirst({
+        where: { userId, activeVersionId: active.id }, select: { userId: true },
+      })) await enrollLadderVersion(tx, { userId, versionId: active.id, name: active.name }, now);
       return { id: active.id, name: active.name, language: active.language, createdAt: active.createdAt };
     }
-    if (!active && await tx.deliveryBotVersion.count({ where: { validUntil: null } }) >= deliveryEntryLimit())
+    if (!deliveryLadderEnabled() && !active && await tx.deliveryBotVersion.count({ where: { validUntil: null } }) >= deliveryEntryLimit())
       throw new DeliveryError("Delivery registration is full", 409);
     if (await tx.deliveryBotVersion.count({ where: { userId, createdAt: { gte: new Date(now.getTime() - 3600000) } } }) >= 20)
       throw new DeliveryError("Too many delivery registrations", 429);
     if (active) await tx.deliveryBotVersion.update({ where: { id: active.id }, data: { validUntil: now } });
-    return tx.deliveryBotVersion.create({
+    const version = await tx.deliveryBotVersion.create({
       data: { ...source, id: randomUUID(), userId, name: label, createdAt: now },
       select: { id: true, name: true, language: true, createdAt: true },
     });
+    if (deliveryLadderEnabled()) await enrollLadderVersion(tx, { userId, versionId: version.id, name: version.name }, now);
+    return version;
   });
 }
 export async function withdrawDeliveryBot(userId: string) {
   guardEnabled();
-  await locked(tx => tx.deliveryBotVersion.updateMany({ where: { userId, validUntil: null }, data: { validUntil: new Date() } }));
+  await locked(async tx => {
+    await tx.deliveryBotVersion.updateMany({ where: { userId, validUntil: null }, data: { validUntil: new Date() } });
+    if (deliveryLadderEnabled()) await withdrawLadderVersion(tx, userId);
+  });
 }
 
 export async function enqueueDeliveryTrial(ownerId: string, raw: unknown) {
@@ -98,6 +108,7 @@ export async function enqueueDeliveryTrial(ownerId: string, raw: unknown) {
 
 export async function startDeliveryEvaluation(kind: "manual" | "weekly", now = new Date()) {
   guardEnabled();
+  if (deliveryLadderEnabled()) throw new DeliveryError("Scheduled delivery evaluations are archived", 410);
   const window = kind === "weekly" ? weeklyDeliveryCutoff(now) : { key: "manual:" + randomUUID(), cutoff: now };
   return locked(async tx => {
     if (await tx.deliveryEvaluation.findUnique({ where: { key: window.key }, select: { id: true } })) return null;
@@ -181,6 +192,7 @@ async function syncLiveEvaluation() {
 
 export async function retryDeliveryEvaluation(id: string) {
   guardEnabled();
+  if (deliveryLadderEnabled()) throw new DeliveryError("Scheduled delivery evaluations are archived", 410);
   await locked(async tx => {
     const e = await tx.deliveryEvaluation.findFirst({ where: { id, status: "failed" }, select: { id: true, kind: true, key: true } });
     if (!e) throw new DeliveryError("No failed delivery evaluation to retry", 404);
@@ -200,10 +212,17 @@ async function settleDeliveryEvaluation(id: string) {
     const e = await tx.deliveryEvaluation.findFirst({ where: { id, status: "active" }, select: { entries: true, kind: true } });
     if (!e || await tx.deliveryMatch.count({ where: { evaluationId: id, status: { in: CLAIMABLE } } })) return;
     const matches = await tx.$queryRaw<{ status: string; versionA: string | null; versionB: string | null;
-      result: Pick<DeliveryResult, "winner" | "outcome" | "totals"> | null }[]>`
+      result: Pick<DeliveryResult, "winner" | "outcome" | "totals" | "faults"> | null }[]>`
       SELECT status, "versionA", "versionB", CASE WHEN result IS NOT NULL THEN jsonb_build_object(
-        'winner', result->'winner', 'outcome', result->'outcome', 'totals', result->'totals') END AS result
+        'winner', result->'winner', 'outcome', result->'outcome', 'totals', result->'totals', 'faults', result->'faults') END AS result
       FROM "DeliveryMatch" WHERE "evaluationId" = ${id}`;
+    if (isDeliveryLadderKind(e.kind)) {
+      const entries = e.entries as ArenaEntry[];
+      const completed = matches.length === 2 && matches.every(m => m.status === "completed" && m.result?.faults?.length === 2 &&
+        m.versionA === entries[0]?.versionId && m.versionB === entries[1]?.versionId);
+      await settleLadderPair(tx, id, e.kind, entries, completed ? matches.map(m => m.result!) : null);
+      return;
+    }
     if (matches.some(m => m.status !== "completed" || !m.versionA || !m.versionB || !m.result)) {
       await tx.deliveryEvaluation.update({ where: { id }, data: { status: "failed" } });
       return;
@@ -259,13 +278,16 @@ export async function startDeliveryWork(): Promise<{ done: Promise<void> } | nul
     });
     const active = await prisma.deliveryEvaluation.findMany({ where: { status: "active" }, select: { id: true } });
     for (const evaluation of active) await settleDeliveryEvaluation(evaluation.id);
-    if (process.env.DELIVERY_WEEKLY_ENABLED === "1") await startDeliveryEvaluation("weekly");
   }
   if (liveEnabled() && Date.now() - lastLiveSchedule >= LIVE_INTERVAL_MS) {
     lastLiveSchedule = Date.now();
-    await syncLiveEvaluation();
-    const live = await prisma.deliveryEvaluation.findFirst({ where: { kind: "live", status: "active" }, select: { id: true } });
-    if (live) await settleDeliveryEvaluation(live.id);
+    if (deliveryLadderEnabled()) {
+      await locked(tx => scheduleLadderPair(tx));
+    } else {
+      await syncLiveEvaluation();
+      const live = await prisma.deliveryEvaluation.findFirst({ where: { kind: "live", status: "active" }, select: { id: true } });
+      if (live) await settleDeliveryEvaluation(live.id);
+    }
   }
   const claim = await claimDeliveryMatch();
   return claim ? { done: executeDeliveryMatch(claim.job, claim.claimedAt) } : null;
@@ -321,12 +343,14 @@ async function executeDeliveryMatch(job: DeliveryMatch, claimedAt: number) {
 export const DELIVERY_REPLAY_PAGE_SIZE = 60;
 export async function deliveryOverview(userId?: string, evaluationId?: string, view: "live" | "official" = "official", replayPage = 1) {
   guardEnabled();
-  const liveAvailable = liveEnabled();
+  const archived = deliveryLadderEnabled();
+  const liveAvailable = !archived && liveEnabled();
   const live = view === "live" && liveAvailable;
+  const kinds = live ? ["live"] : archived ? ["weekly", "manual", "live"] : ["weekly", "manual"];
   const [history, official, bot, trials, roster] = await Promise.all([
-    prisma.deliveryEvaluation.findMany({ where: { status: "published", kind: live ? "live" : { not: "live" } }, orderBy: { publishedAt: "desc" },
+    prisma.deliveryEvaluation.findMany({ where: { status: "published", kind: { in: kinds } }, orderBy: { publishedAt: "desc" },
       take: live ? 1 : 20, select: { id: true, cutoff: true, kind: true } }),
-    !live ? prisma.deliveryEvaluation.findFirst({ where: { kind: { not: "live" }, status: { in: ["active", "failed"] } },
+    !live && !archived ? prisma.deliveryEvaluation.findFirst({ where: { kind: { in: kinds }, status: { in: ["active", "failed"] } },
       select: { id: true, status: true } }) : null,
     userId ? prisma.deliveryBotVersion.findFirst({ where: { userId, validUntil: null }, select: { name: true, language: true, sourceCode: true } }) : null,
     userId ? prisma.deliveryMatch.findMany({ where: { ownerId: userId }, orderBy: { createdAt: "desc" }, take: 8, select: { id: true, status: true, createdAt: true } }) : [],
@@ -339,8 +363,10 @@ export async function deliveryOverview(userId?: string, evaluationId?: string, v
   const currentActive = current?.status === "active" || current?.status === "failed" ? current : null;
   const active = live ? currentActive : official;
   const liveWaiting = live && cap >= 2 && current?.status !== "published" && current?.status !== "failed";
-  const latest = live ? cap < 2 ? undefined : current?.status === "published" ? current : history[0] :
-    history.find(e => e.id === evaluationId) ?? history[0];
+  const requested = !live && typeof evaluationId === "string" ? await prisma.deliveryEvaluation.findFirst({
+    where: { id: evaluationId, kind: { in: kinds }, status: "published" }, select: { id: true, cutoff: true, kind: true },
+  }) : null;
+  const latest = live ? cap < 2 ? undefined : current?.status === "published" ? current : history[0] : requested ?? history[0];
   const evaluation = latest ? await prisma.deliveryEvaluation.findFirst({
     where: { id: latest.id, status: "published" }, select: { standings: true, entries: true,
       _count: { select: { matches: true } },
