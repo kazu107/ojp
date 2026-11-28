@@ -3751,6 +3751,17 @@ export function findUser(userId: string): User | undefined {
   return store.users.find((user) => user.id === userId);
 }
 
+export async function isActiveAgentOwner(userId: string): Promise<boolean> {
+  if (!STORE_DB_SYNC_ENABLED) return findUser(userId)?.status === "active";
+  // Read only the account status from the authoritative snapshot on each token use.
+  const [row] = await prisma.$queryRaw<{ active: boolean }[]>`
+    SELECT EXISTS(
+      SELECT 1 FROM "AppState" a, jsonb_array_elements(a.snapshot->'users') AS u(record)
+      WHERE a.id=${STORE_STATE_ID} AND u.record->>'id'=${userId} AND u.record->>'status'='active'
+    ) AS active`;
+  return row?.active === true;
+}
+
 export function canCreateProblemByRole(role: UserRole): boolean {
   return role === "admin" || role === "problem_author";
 }
@@ -4072,6 +4083,7 @@ export async function freezeUserByAdmin(userId: string, reason: string): Promise
     reason: reason || "user frozen by admin",
   });
 
+  await persistStoreSnapshotNow();
   return target;
 }
 
@@ -4093,6 +4105,7 @@ export async function unfreezeUserByAdmin(userId: string, reason: string): Promi
     reason: reason || "user unfrozen by admin",
   });
 
+  await persistStoreSnapshotNow();
   return target;
 }
 

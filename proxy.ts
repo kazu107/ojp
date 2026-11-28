@@ -44,11 +44,15 @@ function matchesAny(pathname: string, patterns: RegExp[]): boolean {
 
 export default auth((request) => {
   const { pathname, search } = request.nextUrl;
+  // Only these routes run their own scoped bearer-token authentication.
+  const isAgentRoute =
+    (request.method === "GET" && /^\/api\/agent\/v1\/delivery\/(game|trials\/[^/]+)$/.test(pathname)) ||
+    (request.method === "POST" && /^\/api\/agent\/v1\/delivery\/(trials|drafts)$/.test(pathname));
   const isPublicPath = pathname.startsWith("/api/auth") || matchesAny(pathname, PUBLIC_PAGE_PATTERNS);
   const isPublicApiGet =
     request.method === "GET" && matchesAny(pathname, PUBLIC_API_GET_PATTERNS);
 
-  if (isPublicPath || isPublicApiGet || request.auth) {
+  if (isPublicPath || isPublicApiGet || isAgentRoute || request.auth) {
     return NextResponse.next();
   }
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SUBMISSION_LANGUAGES as PROFILE_LANGUAGES } from "@/lib/languages";
 
 import { getI18n } from "@/lib/i18n/server";
@@ -12,6 +13,7 @@ import {
   listSubmissionsForViewer,
 } from "@/lib/store";
 import { SUBMISSION_STATUS_VALUES } from "@/lib/submission-status";
+import { deliveryAgentEnabled } from "@/lib/delivery-agent-store";
 
 
 
@@ -89,6 +91,8 @@ export default async function MePage() {
         <div>
           <h1 className="page-title">{t("Profile")}</h1>
         </div>
+        {deliveryAgentEnabled() && user.status === "active" ?
+          <Link href="/me/agent" className="button button-secondary">{t("Coding agent connection")}</Link> : null}
       </section>
 
       <section className="panel stack">

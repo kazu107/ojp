@@ -8,6 +8,7 @@ import { DELIVERY_REPLAY_PAGE_SIZE, deliveryEnabled, deliveryOverview } from "@/
 import { deliveryMapForRules, deliveryMapLabels } from "@/lib/delivery-game";
 import { deliveryLadderEnabled, DELIVERY_PLACEMENT_SETS } from "@/lib/delivery-ladder";
 import { deliveryLadderOverview } from "@/lib/delivery-ladder-store";
+import { deliveryAgentEnabled } from "@/lib/delivery-agent-store";
 
 export const dynamic = "force-dynamic";
 export default async function DeliveryPage({ searchParams }: {
@@ -49,7 +50,11 @@ export default async function DeliveryPage({ searchParams }: {
   return <div className="page stack">
     <section className="page-head">
       <h1 className="page-title">{t("Delivery Duel")}</h1>
-      <Link className="button button-secondary" href="/games">{t("Games")}</Link>
+      <div className="button-row">
+        {eligible && deliveryAgentEnabled() ?
+          <Link href="/me/agent" className="button button-secondary">{t("Coding agent connection")}</Link> : null}
+        <Link className="button button-secondary" href="/games">{t("Games")}</Link>
+      </div>
     </section>
     <DeliveryRefresh pending={waiting || arena?.liveWaiting || arena?.active?.status === "active" || ladder?.me?.state === "pending"}
       watch={Boolean(ladder) || arena?.live} />

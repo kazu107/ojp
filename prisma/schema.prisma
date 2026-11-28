@@ -110,6 +110,50 @@ model DeliveryLadderClock {
   ratedSequence   Int      @default(0)
 }
 
+model AgentAccessToken {
+  id        String   @id
+  ownerId   String
+  label     String
+  digest    String   @unique
+  scopes    String[] @default([])
+  createdAt DateTime
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([ownerId, createdAt])
+}
+
+// A trial's runnable source is discarded after judging. Keep only its identity
+// and a digest so a proposal can refer to the exact code that was exercised.
+model AgentDeliveryTrial {
+  id           String   @id
+  ownerId      String
+  requestKey   String
+  sourceDigest String
+  createdAt    DateTime
+
+  @@unique([ownerId, requestKey])
+}
+
+model AgentDeliveryDraft {
+  id                String   @id
+  ownerId           String
+  tokenId           String
+  trialId           String
+  baselineVersionId String?
+  name              String
+  language          Language
+  sourceCode        String?
+  sourceDigest      String
+  createdAt         DateTime
+  expiresAt         DateTime
+  appliedVersionId  String?
+  appliedAt         DateTime?
+
+  @@index([ownerId, createdAt])
+  @@index([tokenId])
+}
+
 model DeliveryMatch {
   id           String             @id
   evaluationId String?

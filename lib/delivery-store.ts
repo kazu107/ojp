@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Prisma, type DeliveryMatch } from "@prisma/client";
 import { prisma } from "./db/prisma";
 import { isSubmissionLanguage } from "./languages";
@@ -28,12 +28,13 @@ export class DeliveryError extends Error {
 function guardEnabled() {
   if (!deliveryEnabled()) throw new DeliveryError("Delivery arena is disabled", 404);
 }
-async function locked<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) {
+export async function withDeliveryLock<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) {
   return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('ojp-delivery-arena-v1'))::text`;
     return fn(tx);
   }, { maxWait: 5000, timeout: 15000 });
 }
+const locked = withDeliveryLock;
 async function insertDeliveryMatches(tx: Prisma.TransactionClient, evaluationId: string, matches: ReturnType<typeof planDeliveryMatches>) {
   const createdAt = new Date();
   for (let offset = 0; offset < matches.length; offset += 500) {
@@ -42,7 +43,7 @@ async function insertDeliveryMatches(tx: Prisma.TransactionClient, evaluationId:
     })) });
   }
 }
-function botSource(raw: unknown): DeliveryBotSource {
+export function parseDeliveryBotSource(raw: unknown): DeliveryBotSource {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new DeliveryError("Invalid delivery bot");
   const { language, sourceCode } = raw as Record<string, unknown>;
   if (!isSubmissionLanguage(language) || typeof sourceCode !== "string" || !sourceCode.trim() ||
@@ -50,35 +51,43 @@ function botSource(raw: unknown): DeliveryBotSource {
       Buffer.byteLength(sourceCode, "utf8") > DELIVERY_SOURCE_BYTES) throw new DeliveryError("Invalid delivery bot");
   return { language, sourceCode };
 }
-export async function registerDeliveryBot(userId: string, name: unknown, raw: unknown) {
-  guardEnabled();
-  const source = botSource(raw);
+export function parseDeliveryBotName(name: unknown) {
   if (typeof name !== "string" || !name.trim() || name.length > 40 ||
       Array.from(name).some(c => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127) || !isWellFormedText(name))
     throw new DeliveryError("Invalid delivery bot name");
-  const label = name.trim();
-  return locked(async tx => {
-    const now = new Date();
-    const active = await tx.deliveryBotVersion.findFirst({ where: { userId, validUntil: null },
-      select: { id: true, name: true, language: true, sourceCode: true, createdAt: true } });
-    if (active?.name === label && active.language === source.language && active.sourceCode === source.sourceCode) {
-      if (deliveryLadderEnabled() && !await tx.deliveryLadderEntry.findFirst({
-        where: { userId, activeVersionId: active.id }, select: { userId: true },
-      })) await enrollLadderVersion(tx, { userId, versionId: active.id, name: active.name }, now);
-      return { id: active.id, name: active.name, language: active.language, createdAt: active.createdAt };
-    }
-    if (!deliveryLadderEnabled() && !active && await tx.deliveryBotVersion.count({ where: { validUntil: null } }) >= deliveryEntryLimit())
-      throw new DeliveryError("Delivery registration is full", 409);
-    if (await tx.deliveryBotVersion.count({ where: { userId, createdAt: { gte: new Date(now.getTime() - 3600000) } } }) >= 20)
-      throw new DeliveryError("Too many delivery registrations", 429);
-    if (active) await tx.deliveryBotVersion.update({ where: { id: active.id }, data: { validUntil: now } });
-    const version = await tx.deliveryBotVersion.create({
-      data: { ...source, id: randomUUID(), userId, name: label, createdAt: now },
-      select: { id: true, name: true, language: true, createdAt: true },
-    });
-    if (deliveryLadderEnabled()) await enrollLadderVersion(tx, { userId, versionId: version.id, name: version.name }, now);
-    return version;
+  return name.trim();
+}
+export function deliverySourceDigest(source: DeliveryBotSource) {
+  return createHash("sha256").update(JSON.stringify([source.language, source.sourceCode])).digest("hex");
+}
+export async function registerDeliveryBot(userId: string, name: unknown, raw: unknown) {
+  guardEnabled();
+  return locked(tx => registerDeliveryBotLocked(tx, userId, name, raw));
+}
+// Kept internal to the store boundary so draft approval and registration can share one transaction.
+export async function registerDeliveryBotLocked(tx: Prisma.TransactionClient, userId: string, name: unknown, raw: unknown) {
+  guardEnabled();
+  const source = parseDeliveryBotSource(raw), label = parseDeliveryBotName(name);
+  const now = new Date();
+  const active = await tx.deliveryBotVersion.findFirst({ where: { userId, validUntil: null },
+    select: { id: true, name: true, language: true, sourceCode: true, createdAt: true } });
+  if (active?.name === label && active.language === source.language && active.sourceCode === source.sourceCode) {
+    if (deliveryLadderEnabled() && !await tx.deliveryLadderEntry.findFirst({
+      where: { userId, activeVersionId: active.id }, select: { userId: true },
+    })) await enrollLadderVersion(tx, { userId, versionId: active.id, name: active.name }, now);
+    return { id: active.id, name: active.name, language: active.language, createdAt: active.createdAt };
+  }
+  if (!deliveryLadderEnabled() && !active && await tx.deliveryBotVersion.count({ where: { validUntil: null } }) >= deliveryEntryLimit())
+    throw new DeliveryError("Delivery registration is full", 409);
+  if (await tx.deliveryBotVersion.count({ where: { userId, createdAt: { gte: new Date(now.getTime() - 3600000) } } }) >= 20)
+    throw new DeliveryError("Too many delivery registrations", 429);
+  if (active) await tx.deliveryBotVersion.update({ where: { id: active.id }, data: { validUntil: now } });
+  const version = await tx.deliveryBotVersion.create({
+    data: { ...source, id: randomUUID(), userId, name: label, createdAt: now },
+    select: { id: true, name: true, language: true, createdAt: true },
   });
+  if (deliveryLadderEnabled()) await enrollLadderVersion(tx, { userId, versionId: version.id, name: version.name }, now);
+  return version;
 }
 export async function withdrawDeliveryBot(userId: string) {
   guardEnabled();
@@ -88,21 +97,42 @@ export async function withdrawDeliveryBot(userId: string) {
   });
 }
 
-export async function enqueueDeliveryTrial(ownerId: string, raw: unknown) {
+export async function enqueueDeliveryTrial(ownerId: string, raw: unknown, agent?: {
+  requestKey: string; authorize: (tx: Prisma.TransactionClient) => Promise<void>;
+}) {
   guardEnabled();
-  const source = botSource(raw);
+  const source = parseDeliveryBotSource(raw);
   return locked(async tx => {
+    if (agent) await agent.authorize(tx);
+    const requestKey = agent?.requestKey;
+    const sourceDigest = requestKey ? deliverySourceDigest(source) : undefined;
+    if (requestKey) {
+      const request = await tx.agentDeliveryTrial.findUnique({ where: { ownerId_requestKey: { ownerId, requestKey } } });
+      if (request) {
+        if (request.sourceDigest !== sourceDigest) throw new DeliveryError("Trial request key was already used for different code", 409);
+        const trial = await tx.deliveryMatch.findFirst({
+          where: { id: request.id, ownerId, evaluationId: null }, select: { id: true, status: true },
+        });
+        if (!trial) throw new DeliveryError("Trial not found", 404);
+        return trial;
+      }
+    }
     if (await tx.deliveryMatch.count({ where: { ownerId, status: { in: CLAIMABLE } } }))
       throw new DeliveryError("A delivery trial is already queued", 409);
     if (await tx.deliveryMatch.count({ where: { ownerId, createdAt: { gte: new Date(Date.now() - 30000) } } }))
       throw new DeliveryError("Please wait 30 seconds before another delivery trial", 429);
     if (await tx.deliveryMatch.count({ where: { evaluationId: null, status: { in: CLAIMABLE } } }) >= 8)
       throw new DeliveryError("Delivery trial queue is full", 429);
-    return tx.deliveryMatch.create({
+    const createdAt = new Date();
+    const trial = await tx.deliveryMatch.create({
       data: { id: randomUUID(), ownerId, ordinal: 0, trialSource: source, rules: DELIVERY_RULES,
-        seed: 11, flipped: false, status: "queued", createdAt: new Date() },
+        seed: 11, flipped: false, status: "queued", createdAt },
       select: { id: true, status: true },
     });
+    if (requestKey && sourceDigest) await tx.agentDeliveryTrial.create({
+      data: { id: trial.id, ownerId, requestKey, sourceDigest, createdAt },
+    });
+    return trial;
   });
 }
 
@@ -314,7 +344,7 @@ async function executeDeliveryMatch(job: DeliveryMatch, claimedAt: number) {
       if (!id) throw new Error("Missing delivery bot version");
       return prisma.deliveryBotVersion.findUniqueOrThrow({ where: { id }, select: { sourceCode: true, language: true } });
     };
-    const a = job.evaluationId ? await load(job.versionA) : botSource(job.trialSource);
+    const a = job.evaluationId ? await load(job.versionA) : parseDeliveryBotSource(job.trialSource);
     const b = job.evaluationId ? await load(job.versionB) : null;
     const result = await playDeliveryMatch(job.seed, job.flipped, [a, b], {
       map, versions: [job.versionA, job.versionB], queuedMs: Math.max(0, claimedAt - job.createdAt.getTime()),

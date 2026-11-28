@@ -71,6 +71,7 @@ jobs:
       - run: npm ci
       - run: npm run db:push && npm run db:delivery && npm run db:delivery
       - run: npm run db:delivery:ladder && npm run db:delivery:ladder
+      - run: npm run db:delivery:agent && npm run db:delivery:agent
       - run: npm run test:delivery:integration
       - run: npm run build
         env:
@@ -113,6 +114,23 @@ jobs:
         run: cat /tmp/ojp-delivery-{web,worker,worker-2}.log
       - if: failure()
         run: cat /tmp/ojp-ladder-web.log
+      - name: Verify agent CLI, MCP and browser approval with an isolated worker
+        env:
+          DELIVERY_ARENA_MODE: ladder
+          DELIVERY_AGENT_ENABLED: "1"
+          DELIVERY_LIVE_ENABLED: "0"
+        run: |
+          JUDGE_PROCESS_MODE=web node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3118 >/tmp/ojp-agent-web.log 2>&1 &
+          web=$!
+          trap 'kill "$web" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3118/api/health/db >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3118/api/health/db >/dev/null
+          npm run test:delivery:agent:http
+      - if: failure()
+        run: cat /tmp/ojp-agent-web.log
 
   learning:
     runs-on: ubuntu-22.04
